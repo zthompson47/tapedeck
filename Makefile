@@ -1,4 +1,4 @@
-.PHONY: help test clean lint
+.PHONY: help test clean lint coverage
 
 help:
 	@echo "test - run pytest"
@@ -18,3 +18,7 @@ lint:
 	python -m pydocstyle tapedeck tests
 	python -m pyflakes tapedeck tests
 	python -m pylint tapedeck tests
+
+coverage:
+	coverage run --source tapedeck --module pytest
+	coverage report -m
