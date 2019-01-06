@@ -3,7 +3,7 @@
 help:
 	@echo "test - run pytest"
 	@echo "clean - remove build and runtime files"
-	@echo "lint - run pylint and flake8"
+	@echo "lint - check code for style and static errors"
 
 test:
 	python -m pytest
