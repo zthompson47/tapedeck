@@ -10,15 +10,21 @@ test:
 
 clean:
 	find . -name '*.pyc' -exec rm {} +
+	rm -f .coverage
+	rm -f .coverage.*
+	rm -rf htmlcov/*
 
 lint:
 	python -m flake8 tapedeck tests
-	python -m mypy tapedeck tests
+	python -m mypy -m tapedeck
 	python -m pycodestyle tapedeck tests
 	python -m pydocstyle tapedeck tests
 	python -m pyflakes tapedeck tests
 	python -m pylint tapedeck tests
 
-coverage:
-	coverage run --source tapedeck --module pytest
+coverage: clean
+	coverage run --module pytest
+	coverage combine
 	coverage report -m
+
+fulltest: coverage lint
