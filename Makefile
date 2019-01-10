@@ -11,10 +11,12 @@ test:
 	python -m pytest
 
 clean:
-	find . -name '*.pyc' -exec rm {} +
+	find . -type d -name '__pycache__' -exec rm -r {} +
+	find . -type d -name '.pytest_cache' -exec rm -r {} +
 	rm -f .coverage
 	rm -f .coverage.*
-	rm -rf htmlcov/*
+	rm -rf htmlcov/
+	rm -rf tapedeck.egg-info/
 
 lint:
 	python -m flake8 tapedeck tests
