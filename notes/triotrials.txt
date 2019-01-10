@@ -1,0 +1,39 @@
+1. ---
+
+    @pytest.mark.asyncio
+    async def test_version():
+        """Show the version number."""
+        Runner = CliRunner()
+        result = await runner.invoke(td, ['--version'])
+>       assert result.exit_code == 0
+E       AssertionError: assert 1 == 0
+E        +  where 1 = <Result RuntimeError('must be called from async context')>.exit_code
+
+
+Trying to test trio_click and having trouble getting error messages.
+Needed to run the command by hand to get more info, but it was tough
+because the CLI can run by hand successfully and still not pass this
+test.  Looks like it's the pytest plugin - I have pytest-asyncio now,
+which won't work, but this error doesn't tell me that.
+
+So, install pytest-trio.  Now still doesn't work but different error
+message from pytest-asyncio, so uninstaill pytest-asyncio to get things
+working.  Hmm - confusing.
+
+OK - remove "@pytest.mark.asyncio", then I can reinstall pytest-asyncio
+and it works.
+
+2. ---
+
+(~/g/tapedeck)$ python tapedeck/cli.py -v
+Traceback (most recent call last):
+  File "tapedeck/cli.py", line 14, in <module>
+    trio.run(td())
+  File "/Users/zach/.allotropic/pyenv/lib/python3.7/site-packages/trio_click/core.py", line 822, in __call__
+    return anyio.run(self._main, main, args, kwargs, backend=_anyio_backend)
+AttributeError: module 'anyio' has no attribute 'run'
+
+
+I don't have anyio installed, but trio_click seems to use it.  After
+installing anyio with pip, the error goes away.  0h - I uninstalled anyio
+by hand and pip didn't complain: reinstalling trio_click fixes it.
