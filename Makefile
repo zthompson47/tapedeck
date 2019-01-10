@@ -10,12 +10,16 @@ help:
 test:
 	python -m pytest
 
-clean:
+clean-cache:
 	find . -type d -name '__pycache__' -exec rm -r {} +
 	find . -type d -name '.pytest_cache' -exec rm -r {} +
+
+clean-coverage:
 	rm -f .coverage
 	rm -f .coverage.*
 	rm -rf htmlcov/
+
+clean: clean-coverage clean-cache
 	rm -rf tapedeck.egg-info/
 
 lint:
@@ -25,9 +29,10 @@ lint:
 	python -m pyflakes tapedeck tests
 	python -m pylint tapedeck tests
 
-coverage: clean
+coverage: clean-coverage
 	coverage run --module pytest
 	coverage combine
 	coverage report -m
+	coverage html
 
 fulltest: coverage lint
