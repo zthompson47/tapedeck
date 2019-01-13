@@ -1,11 +1,11 @@
 """Test suite for the tapedeck command line interface."""
-import os
+from pathlib import Path
 
-from trio import subprocess
 from trio_click.testing import CliRunner
 
 import tapedeck
 from tapedeck import cli
+from tapedeck import pypeline
 
 
 async def test_no_args():
@@ -26,49 +26,21 @@ async def test_version():
 
 async def test_version_external():
     """Show the version number by running the actual CLI."""
-    new_env = os.environ
-    new_env['COVERAGE_PROCESS_START'] = '.coveragerc'
-    new_env['PYTHONPATH'] = '.'
-    td_proc = subprocess.Process(
-        ['python', '-m', 'tapedeck.cli', '-v'],
-        stdout=subprocess.PIPE,
-        env=new_env
-    )
-    result = b''
-    async with td_proc:
-        await td_proc.wait()
-        assert td_proc.returncode == 0
-
-        # Put output stream into one string
-        async with td_proc.stdout as out:
-            some = await out.receive_some(8)
-            while some:
-                result += some
-                some = await out.receive_some(8)
-
-    assert result.decode('utf-8').strip() == tapedeck.__version__
+    command = 'python -m tapedeck.cli -v'
+    config = {'COVERAGE_PROCESS_START': 'setup.cfg',
+              'PYTHONPATH': str(Path('.').resolve()), }
+    proc = pypeline.Producer(command, config)
+    output = await proc.run_with_output()
+    assert proc.stat == 0
+    assert output == tapedeck.__version__
 
 
 async def test_no_args_external():
     """Run the CLI externally with no arguments."""
-    new_env = os.environ
-    new_env['COVERAGE_PROCESS_START'] = '.coveragerc'
-    new_env['PYTHONPATH'] = '.'
-    td_proc = subprocess.Process(
-        ['python', '-m', 'tapedeck.cli'],
-        stdout=subprocess.PIPE,
-        env=new_env
-    )
-    result = b''
-    async with td_proc:
-        await td_proc.wait()
-        assert td_proc.returncode == 0
-
-        # Put output stream into one string
-        async with td_proc.stdout as out:
-            some = await out.receive_some(8)
-            while some:
-                result += some
-                some = await out.receive_some(8)
-
-    assert result.decode('utf-8').strip() == ''
+    command = 'python -m tapedeck.cli'
+    config = {'COVERAGE_PROCESS_START': 'setup.cfg',
+              'PYTHONPATH': str(Path('.').resolve()), }
+    proc = pypeline.Producer(command, config)
+    output = await proc.run_with_output()
+    assert proc.stat == 0
+    assert output == ''
