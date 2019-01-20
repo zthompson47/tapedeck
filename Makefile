@@ -14,6 +14,7 @@ clean-cache:
 	find . -type d -name '__pycache__' -exec rm -r {} +
 	find . -type d -name '.pytest_cache' -exec rm -r {} +
 	find . -type d -name '.mypy_cache' -exec rm -r {} +
+	find . -type d -name 'pytype_output' -exec rm -r {} +
 
 clean-coverage:
 	rm -f .coverage
@@ -27,7 +28,7 @@ other_files = sitecustomize.py setup.py
 lint:
 	python -m flake8 tapedeck tests $(other_files)
 	python -m mypy tapedeck $(other_files)
-	#pytype tapedeck $(other_files)
+	pytype tapedeck $(other_files)
 	python -m pycodestyle tapedeck tests $(other_files)
 	python -m pydocstyle tapedeck tests $(other_files)
 	python -m pyflakes tapedeck tests $(other_files)

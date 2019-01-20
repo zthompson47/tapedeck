@@ -1,4 +1,5 @@
 __pycache__/
+pytype_output/
 htmlcov/
 .coverage
 .coverage.*
