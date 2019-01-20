@@ -1,1 +1,2 @@
 trio==0.10.0
+trio-click==7.0.2
