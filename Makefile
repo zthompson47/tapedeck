@@ -29,9 +29,7 @@ lint:
 	python -m flake8 tapedeck tests $(other_files)
 	python -m mypy tapedeck $(other_files)
 	pytype tapedeck $(other_files)
-	python -m pycodestyle tapedeck tests $(other_files)
 	python -m pydocstyle tapedeck tests $(other_files)
-	python -m pyflakes tapedeck tests $(other_files)
 	python -m pylint tapedeck tests $(other_files)
 
 coverage: clean-coverage

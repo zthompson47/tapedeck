@@ -13,5 +13,10 @@ setup(
     zip_safe=False,
     entry_points={
         'console_scripts': ['tapedeck=tapedeck.cli:main'],
-    }
+    },
+    install_requires=[
+        'trio>=0.10.0',
+        'trio-click>=7.0.2',
+        'reel',
+    ],
 )
