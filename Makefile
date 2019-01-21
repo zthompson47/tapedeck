@@ -1,22 +1,22 @@
-.PHONY: help test clean-cache clean-coverage clean-dist clean lint coverage testall
+.PHONY: help test clean-tools clean-coverage clean-dist clean lint coverage testall dist
 
 project = reel
 
 help:
 	@echo "test - run pytest"
-	@echo "clean-cache - remove cacne files"
+	@echo "clean-tools - remove lint and testing files"
 	@echo "clean-coverage - remove coverage test files"
 	@echo "clean-dist - remove distribution build files"
 	@echo "clean - remove build and runtime files"
 	@echo "lint - check code for style and static errors"
 	@echo "coverage - measure how much code the tests cover"
 	@echo "testall - shortcut for test/coverage/lint"
+	@echo "dist - build a distribution for pypi"
 
 test:
 	python -m pytest
 
-clean-cache:
-	find . -type d -name '__pycache__' -exec rm -r {} +
+clean-tools:
 	find . -type d -name '.pytest_cache' -exec rm -r {} +
 	find . -type d -name '.mypy_cache' -exec rm -r {} +
 	find . -type d -name 'pytype_output' -exec rm -r {} +
@@ -27,10 +27,11 @@ clean-coverage:
 	rm -rf htmlcov/
 
 clean-dist:
+	find . -type d -name '__pycache__' -exec rm -r {} +
 	find . -type d -name 'build' -exec rm -r {} +
 	find . -type d -name 'dist' -exec rm -r {} +
 
-clean: clean-coverage clean-cache clean-dist
+clean: clean-coverage clean-tools clean-dist
 	rm -rf $(project).egg-info/
 
 other_files = sitecustomize.py setup.py
@@ -49,3 +50,6 @@ coverage: clean-coverage
 	coverage html
 
 testall: coverage lint
+
+dist: clean-dist
+	python setup.py sdist bdist_wheel
