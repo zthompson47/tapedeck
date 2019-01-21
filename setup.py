@@ -1,10 +1,9 @@
 """Install the tapedeck package."""
-from setuptools import setup
+from setuptools import find_packages, setup
 
 setup(
     license='MIT',
     name='tapedeck',
-    packages=['tapedeck'],
     version='0.0.1',
     author='Zach Thompson',
     author_email='zach@allotropic.com',
@@ -25,4 +24,5 @@ setup(
         'reel',
     ],
     zip_safe=False,
+    packages=find_packages(),
 )
