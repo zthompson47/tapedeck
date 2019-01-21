@@ -24,5 +24,5 @@ setup(
     install_requires=[
         'trio>=0.10.0',
         'trio-click>=7.0.2',
-    ]
+    ],
 )
