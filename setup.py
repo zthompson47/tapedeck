@@ -2,15 +2,20 @@
 from setuptools import setup
 
 setup(
+    license='MIT',
     name='tapedeck',
-    description='''Tapedeck finds and plays music
-                   across muiltiple sources and devices.''',
-    url='http://github.com/zthompson47/tapedeck',
+    packages=['tapedeck'],
+    version='0.0.1',
     author='Zach Thompson',
     author_email='zach@allotropic.com',
-    license='MIT',
-    packages=['tapedeck'],
-    zip_safe=False,
+    url='http://github.com/zthompson47/tapedeck',
+    description='A music player',
+    long_description=open('README.rst', 'r').read(),
+    classifiers=[
+        "Programming Language :: Python :: 3.5",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
     entry_points={
         'console_scripts': ['tapedeck=tapedeck.cli:main'],
     },
@@ -19,4 +24,5 @@ setup(
         'trio-click>=7.0.2',
         'reel',
     ],
+    zip_safe=False,
 )

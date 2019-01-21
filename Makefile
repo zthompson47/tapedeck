@@ -1,4 +1,5 @@
-.PHONY: help test clean-cache clean-coverage clean lint coverage testall
+.PHONY: help test clean-tools clean-coverage clean-dist \
+	    clean lint coverage testall dist
 
 help:
 	@echo "test - run pytest"
@@ -10,8 +11,7 @@ help:
 test:
 	python -m pytest
 
-clean-cache:
-	find . -type d -name '__pycache__' -exec rm -r {} +
+clean-tools:
 	find . -type d -name '.pytest_cache' -exec rm -r {} +
 	find . -type d -name '.mypy_cache' -exec rm -r {} +
 	find . -type d -name 'pytype_output' -exec rm -r {} +
@@ -21,7 +21,12 @@ clean-coverage:
 	rm -f .coverage.*
 	rm -rf htmlcov/
 
-clean: clean-coverage clean-cache
+clean-dist:
+	find . -type d -name '__pycache__' -exec rm -r {} +
+	find . -type d -name 'build' -exec rm -r {} +
+	find . -type d -name 'dist' -exec rm -r {} +
+
+clean: clean-coverage clean-tools clean-dist
 	rm -rf tapedeck.egg-info/
 
 other_files = sitecustomize.py setup.py
@@ -39,3 +44,6 @@ coverage: clean-coverage
 	coverage html
 
 testall: coverage lint
+
+dist: clean-dist
+	python setup.py sdist bdist_wheel
