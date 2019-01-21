@@ -31,7 +31,7 @@ def env_home(tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def config_icecast():
+def config_icecast(tmp_path_factory):
     """Return variables to populate an icecast.xml config file."""
     return dict(
         location='Neptune',
@@ -39,7 +39,7 @@ def config_icecast():
         password='hack-it-up',
         hostname='127.0.0.1',
         port='8555',
-        logdir='.',
+        logdir=str(tmp_path_factory.mktemp('icecast_log')),
     )
 
 

@@ -25,14 +25,14 @@ async def test_shell_commands():
 
     assert 'rutabaga' in await Source(f'grep utabag {__file__}').read_text()
 
-    found = Source('find .', xconf={'-type': 'f'})
+    found = Source('find .', xconf=['-type', 'f'])
     assert __file__ in await found.read_list(through=resolve)
 
     assert float((await Source('python -V').read_text())[7:10]) >= 3.5
 
-    conf = {'-c': "import os; print(os.environ['_ASDF'])"}
+    xconf = ['-c', "import os; print(os.environ['_ASDF'])"]
     env = {'_ASDF': 'asdf'}
-    assert await Source('python', xconf=conf, xenv=env).read_text() == 'asdf'
+    assert await Source('python', xconf=xconf, xenv=env).read_text() == 'asdf'
 
     # fname = 'test.flac'
     # assert await Source(f'flac -t {fname}').read_bool()
@@ -53,8 +53,8 @@ async def test_server(config_icecast):
     """Run a server."""
     config_dir = await get_xdg_config_dir()
     config = await get_config(config_dir, 'icecast.xml', **config_icecast)
-    xconf = {'-c': str(config)}
-    async with Daemon('icecast', conf=xconf) as icecast:
+    xconf = ['-c', str(config)]
+    async with Daemon('icecast', xconf=xconf) as icecast:
         await icecast.start()
         procs = await Source('ps ax').read_list()
         found = False

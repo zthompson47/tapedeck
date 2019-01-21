@@ -21,4 +21,8 @@ setup(
     entry_points={
         'console_scripts': ['reel=reel.cli:main'],
     },
+    install_requires=[
+        'trio>=0.10.0',
+        'trio-click>=7.0.2',
+    ]
 )

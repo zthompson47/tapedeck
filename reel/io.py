@@ -73,16 +73,16 @@ class Output(trio.abc.ReceiveStream):
     async def read_bytes(self, limit=2048):
         """..."""
         _output = b''
-        async with self._receive_stream as out:
-            print('before True---------------------------')
-            while True:
-                print('after True---------------------------')
-                chunk = await out.receive_some(limit)
-                print(f'after chundk-------f{len(chunk)}--------------------')
-                if not chunk:
+        # async with self._receive_stream as out:
+        print('before True---------------------------')
+        while True:
+            print('after True---------------------------')
+            chunk = await self._receive_stream.receive_some(limit)
+            print(f'after chundk-------f{len(chunk)}--------------------')
+            if not chunk:
+                break
+            _output += chunk
+            if limit:
+                if len(_output) >= limit:
                     break
-                _output += chunk
-                if limit:
-                    if len(_output) >= limit:
-                        break
         return _output

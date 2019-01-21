@@ -38,7 +38,7 @@ other_files = sitecustomize.py setup.py
 lint:
 	python -m flake8 --max-complexity 10 $(project) tests $(other_files)
 	python -m mypy $(project) $(other_files)
-	# pytype $(project) $(other_files)
+	pytype -d import-error,attribute-error $(project) $(other_files)
 	python -m pydocstyle $(project) tests $(other_files)
 	python -m pylint $(project) tests $(other_files)
 

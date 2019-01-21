@@ -7,3 +7,4 @@ mypy==0.660
 pydocstyle==3.0.0
 pylint==2.2.2
 trio==0.10.0
+pytype==2019.1.18

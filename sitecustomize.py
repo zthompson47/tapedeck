@@ -23,7 +23,7 @@ if Path('.').resolve() == Path(__file__).resolve().parent:
 
 # Temporarily alter sys.path so we can reload this module and pick
 # up the default sitecustomize.py file, if it exists.
-_SYS_PATH = sys.path.copy()
+_SYS_PATH = list(sys.path)
 _CWD = str(Path('.').resolve())
 while _CWD in sys.path:
     sys.path.remove(_CWD)

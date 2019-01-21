@@ -1,26 +1,25 @@
 """Handle subprocesses and pipes."""
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 import os
 import shlex
 
 import trio
 
-from reel.io import Output
+from reel.io import Input, Output
 
 __all__ = ['Daemon', 'Destination', 'Source']
 LIMIT = 163840
 
 
-class Daemon:
-    """A server process."""
+class ProcBase(metaclass=ABCMeta):
+    """Base class for subprocesses."""
 
-    def __init__(self, command, xenv=None, conf=None):
+    def __init__(self, command, xenv=None, xconf=None):
         """Initialize the server."""
         self._command = shlex.split(command)
-        if conf:
-            for flag, value in conf.items():
+        if xconf:
+            for flag in xconf:
                 self._command.append(shlex.quote(flag))
-                self._command.append(shlex.quote(value))
         self._env = os.environ
         if xenv:
             for key, val in xenv.items():
@@ -30,7 +29,7 @@ class Daemon:
 
     @abstractmethod
     async def prepare_command(self):
-        """Prepare things and return a command that will start the server."""
+        """Prepare a command to start the process."""
         return self._command
 
     async def __aenter__(self):
@@ -42,6 +41,14 @@ class Daemon:
         if self._proc:
             self._proc.terminate()
             await self._proc.aclose()
+
+
+class Daemon(ProcBase):
+    """A server process."""
+
+    async def prepare_command(self):
+        """Return the command for this process."""
+        return self._command
 
     async def start(self):
         """Start the server."""
@@ -63,12 +70,17 @@ class Destination:
     _nurse = None
     _status = None
 
-    def __init__(self, command, env=None):
+    def __init__(self, command, xenv=None, xconf=None):
         """Get the command ready to run."""
         self._command = shlex.split(command)
-        if env:
-            for key, val in env.items():
+        self._proc = None
+        if xconf:
+            for flag in xconf:
+                self._command.append(flag)
+        if xenv:
+            for key, val in xenv.items():
                 self._env[key] = val
+        print(' '.join(self._command))
 
     async def __aenter__(self):
         """Hijack ``trio._core._run.NurseryManager``."""
@@ -84,6 +96,17 @@ class Destination:
     def status(self):
         """Return the command exit code."""
         return self._status
+
+    async def receive(self):
+        """Return a context-managed output stream."""
+        self._proc = trio.subprocess.Process(
+            self._command,
+            stdin=trio.subprocess.PIPE,
+            stdout=None,
+            stderr=None,
+            env=self._env
+        )
+        return Input(self._proc.stdin)
 
 
 class Source():
@@ -103,15 +126,12 @@ class Source():
         """Get the command ready to run."""
         self._command = shlex.split(command)
         if xconf:
-            for flag, value in xconf.items():
-                # self._command.append(shlex.quote(flag))
-                # self._command.append(shlex.quote(value))
+            for flag in xconf:
                 self._command.append(flag)
-                self._command.append(value)
         if xenv:
             for key, val in xenv.items():
                 self._env[key] = val
-        print(self._command)
+        print(' '.join(self._command))
 
     async def __aenter__(self):
         """Hijack ``trio._core._run.NurseryManager``."""
@@ -147,7 +167,7 @@ class Source():
 
     async def _stream_stderr(self, limit):
         """..."""
-        async with self._proc.stderr as err:
+        async with self._proc.stderr as err:  # type: trio.abc.ReceiveStream
             while True:
                 chunk = await err.receive_some(limit)
                 if not chunk:
@@ -181,6 +201,27 @@ class Source():
             except trio.BrokenResourceError:
                 pass
 
+    async def run(self, message=None):
+        """Run the command."""
+        if message:
+            message = message.encode('utf-8')
+            _stdin = trio.subprocess.PIPE
+        else:
+            _stdin = None
+        self._proc = trio.subprocess.Process(
+            self._command,
+            stdin=_stdin,
+            stdout=None,
+            stderr=None,
+            env=self._env
+        )
+        if message:
+            async with trio.open_nursery() as nursery:
+                nursery.start_soon(self._stream_stdin, message)
+        await self._proc.wait()
+        self._status = self._proc.returncode
+        return self._output.decode('utf-8').strip()
+
     async def read_bool(self, stdin=None):
         """Run the command and return the exit status."""
         if stdin:
@@ -203,19 +244,6 @@ class Source():
             await self._proc.wait()
             self._status = self._proc.returncode
         return self.status == 0
-
-    async def run(self):
-        """Run the command."""
-        self._proc = trio.subprocess.Process(
-            self._command,
-            stdin=None,
-            stdout=None,
-            stderr=None,
-            env=self._env
-        )
-        await self._proc.wait()
-        self._status = self._proc.returncode
-        return self._output.decode('utf-8').strip()
 
     async def read_text(self, message=None):
         """Run the command and return the output."""
@@ -281,7 +309,7 @@ class Source():
             self._command,
             stdin=_stdin,
             stdout=trio.subprocess.PIPE,
-            stderr=trio.subprocess.PIPE,
+            stderr=None,
             env=self._env
         )
         if message:
