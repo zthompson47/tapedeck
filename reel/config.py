@@ -6,14 +6,14 @@ assigns defaults when appropriate.
 """
 import os
 
-from trio import Path
+import trio
 
 from reel.tools import resolve
 
 
 async def get_package_dir():
     """Return the path to this package, assuming this module is top-level."""
-    return (await Path(__file__).resolve()).parent
+    return (await trio.Path(__file__).resolve()).parent
 
 
 async def get_package_name():
@@ -47,7 +47,7 @@ async def get_xdg_config_dir(app=None, feature=None):
     """
     if app is None:
         app = await get_package_name()
-    config_home = Path(await get_xdg_home('XDG_CONFIG_HOME'))
+    config_home = trio.Path(await get_xdg_home('XDG_CONFIG_HOME'))
     config_dir = config_home / app
     if not await config_dir.exists():
         await config_dir.mkdir()

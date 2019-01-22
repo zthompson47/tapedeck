@@ -11,7 +11,7 @@ async def test_cmd_module():
     assert cmd.SRC_SILENCE
 
 
-async def test_play_radio():
+async def test_play_radio(capsys):
     """Play a few seconds of music."""
     radio = 'http://ice1.somafm.com/groovesalad-256-mp3'
     music = ''.join(['https://archive.org/download/',
@@ -40,3 +40,8 @@ async def test_play_radio():
                 chunk = await src.receive_some(4096)
                 count += 1
                 assert chunk
+
+    # put these somewhere better - "check output doesn't bork ipython"
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    assert captured.err == ''

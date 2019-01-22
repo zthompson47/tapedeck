@@ -73,11 +73,14 @@ async def test_stdin():
 #             assert size == 57684912
 
 
-async def test_short_context():
+async def test_short_context(capsys):
     """Run a short command with i / o in context managers."""
     async with await Source('cat').stream('china') as sun:
         assert isinstance(sun, reel.io.Output)
         assert len(await sun.read_bytes()) == 5
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    assert captured.err == ''
 
 
 async def test_audio_dir(audio_dir):

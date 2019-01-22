@@ -1,15 +1,8 @@
 """Command line interface for tapedeck."""
-import logging
-import os
-
 import trio
 import trio_click as click
 
 import reel
-
-# Override the log level with an environment variable.
-LOGGING_LEVEL = os.environ.get('PL_LOGGING_LEVEL', 'ERROR')
-logging.basicConfig(level=LOGGING_LEVEL)
 
 
 @click.command()

@@ -9,5 +9,3 @@ async def resolve(path):
     expanded = await Path(path).expanduser()
     resolved = await expanded.resolve()
     return str(resolved)
-
-# def grep

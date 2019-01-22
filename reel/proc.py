@@ -1,5 +1,6 @@
 """Handle subprocesses and pipes."""
 from abc import ABCMeta, abstractmethod
+import logging
 import os
 import shlex
 
@@ -9,6 +10,7 @@ from reel.io import Input, Output
 
 __all__ = ['Daemon', 'Destination', 'Source']
 LIMIT = 163840
+LOGGER = logging.getLogger(__name__)
 
 
 class ProcBase(metaclass=ABCMeta):
@@ -80,7 +82,7 @@ class Destination:
         if xenv:
             for key, val in xenv.items():
                 self._env[key] = val
-        print(' '.join(self._command))
+        LOGGER.debug(' '.join(self._command))
 
     async def __aenter__(self):
         """Hijack ``trio._core._run.NurseryManager``."""
@@ -102,8 +104,8 @@ class Destination:
         self._proc = trio.subprocess.Process(
             self._command,
             stdin=trio.subprocess.PIPE,
-            stdout=None,
-            stderr=None,
+            stdout=trio.subprocess.DEVNULL,
+            stderr=trio.subprocess.DEVNULL,
             env=self._env
         )
         return Input(self._proc.stdin)
@@ -131,7 +133,7 @@ class Source():
         if xenv:
             for key, val in xenv.items():
                 self._env[key] = val
-        print(' '.join(self._command))
+        LOGGER.debug(' '.join(self._command))
 
     async def __aenter__(self):
         """Hijack ``trio._core._run.NurseryManager``."""
@@ -309,7 +311,7 @@ class Source():
             self._command,
             stdin=_stdin,
             stdout=trio.subprocess.PIPE,
-            stderr=None,
+            stderr=trio.subprocess.DEVNULL,
             env=self._env
         )
         if message:
