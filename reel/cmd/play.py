@@ -2,7 +2,7 @@
 from reel.proc import Destination
 
 
-def speaker():
+async def speaker():
     """Send audio to the speaker."""
     flags = ['-t', 'raw',
              '-r', '44.1k',
@@ -11,4 +11,4 @@ def speaker():
              '--endian', 'little',
              '-c', '2',
              '-']
-    return Destination('play', xconf=flags).receive()
+    return await Destination('play', xconf=flags).receive()
