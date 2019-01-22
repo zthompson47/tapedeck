@@ -1,5 +1,6 @@
 .PHONY: help test clean-tools clean-coverage clean-dist \
 	    clean lint coverage testall dist
+project = tapedeck
 
 help:
 	@echo "test - run pytest"
@@ -27,15 +28,16 @@ clean-dist:
 	find . -type d -name 'dist' -exec rm -r {} +
 
 clean: clean-coverage clean-tools clean-dist
-	rm -rf tapedeck.egg-info/
+	rm -rf $(project).egg-info/
 
 other_files = sitecustomize.py setup.py
 lint:
-	python -m flake8 tapedeck tests $(other_files)
-	python -m mypy tapedeck $(other_files)
-	pytype tapedeck $(other_files)
-	python -m pydocstyle tapedeck tests $(other_files)
-	python -m pylint tapedeck tests $(other_files)
+	python -m flake8 --max-complexity 10 $(project) tests $(other_files)
+	python -m flake8 $(project) tests $(other_files)
+	python -m mypy $(project) $(other_files)
+	pytype -d import-error,attribute-error $(project) $(other_files)
+	python -m pydocstyle $(project) tests $(other_files)
+	python -m pylint $(project) tests $(other_files)
 
 coverage: clean-coverage
 	coverage run --module pytest
