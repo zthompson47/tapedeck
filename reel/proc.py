@@ -203,7 +203,7 @@ class Source():
             except trio.BrokenResourceError:
                 pass
 
-    async def run(self, message=None):
+    async def run(self, timeout=None, message=None):
         """Run the command."""
         if message:
             message = message.encode('utf-8')
@@ -213,16 +213,23 @@ class Source():
         self._proc = trio.subprocess.Process(
             self._command,
             stdin=_stdin,
-            stdout=None,
-            stderr=None,
+            stdout=trio.subprocess.DEVNULL,
+            stderr=trio.subprocess.DEVNULL,
             env=self._env
         )
         if message:
             async with trio.open_nursery() as nursery:
                 nursery.start_soon(self._stream_stdin, message)
-        await self._proc.wait()
+        if timeout:
+            with trio.move_on_after(timeout):
+                await self._proc.wait()
+            self._proc.terminate()
+            await self._proc.wait()
+        else:
+            await self._proc.wait()
         self._status = self._proc.returncode
-        return self._output.decode('utf-8').strip()
+        return ''
+        # return self._output.decode('utf-8').strip()
 
     async def read_bool(self, stdin=None):
         """Run the command and return the exit status."""
@@ -268,6 +275,8 @@ class Source():
             nursery.start_soon(self._stream_stdout, self._limit)
             await self._proc.wait()
             self._status = self._proc.returncode
+        if self._err:
+            LOGGER.debug(self._err)
         return self._output.decode('utf-8').strip()
 
     async def read_bytes(self, send_bytes=None):
