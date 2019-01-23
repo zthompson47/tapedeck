@@ -1,13 +1,15 @@
 # pylint: disable=C0411
 """Command line interface for tapedeck."""
+from ansicolortags import printc, sprint
 import trio
+from trio import Path
 import trio_click as click
 
 from reel.cmd import ffmpeg, sox
 from reel.io import StreamIO
 
 import tapedeck
-from tapedeck.search import find_tunes
+from tapedeck.search import find_tunes, is_audio
 
 
 @click.group(invoke_without_command=True,
@@ -32,7 +34,7 @@ async def main(version, cornell):
 @click.option('-l', '--follow-links', is_flag=True,
               help='Search symlinked directories.')
 async def search(directory, follow_links, follow_dots):
-    """¤ Find your music."""
+    """Find your music."""
     results = find_tunes(directory,
                          followlinks=follow_links,
                          followdots=follow_dots)
@@ -45,27 +47,42 @@ async def search(directory, follow_links, follow_dots):
 @click.option('-o', '--output-destination', default='speaker',
               help='Output destination')
 async def play(music_uri, output_destination):
-    """¤ Play your music."""
+    """Play your music."""
+    playlist = []
+    music_path = Path(music_uri)
+    if await Path(music_path).is_dir():
+        songs = [_ for _ in await music_path.iterdir() if await _.is_file()]
+        songs.sort()
+        for song in songs:
+            if is_audio(str(song)):
+                playlist.append(await song.resolve())
+    else:
+        playlist.append(music_uri)
     destinations = {'speaker': sox.play,
                     'udp': ffmpeg.udp}
-    click.echo(f'Playing {music_uri}')
     async with await destinations[str(output_destination)]() as out:
-        async with await ffmpeg.stream(music_uri) as src:
-            await StreamIO(src, out).flow()
+        for song in playlist:
+            if isinstance(song, str):
+                click.echo(sprint(f'<blue>{song}<reset>'))
+            else:
+                album_name = f'<blue>{song.parent.name}<yellow> / '
+                song_name = f'<blue>{song.name}<reset>'
+                click.echo(sprint(album_name + song_name))
+            async with await ffmpeg.stream(str(song)) as src:
+                await StreamIO(src, out).flow()
 
 
 async def barton_hall():
     """1977-05-08, Set 2 :-) ."""
-    click.echo('''If you get confused,
-                  just listen to the music play.
-                  -- Rober Hunter''')
+    click.echo('If you get confused, just listen to the music play.')
+    click.echo(sprint('<red>  -- Rober Hunter<reset>'))
     music = ''.join(['https://archive.org/download/',
                      'gd1977-05-08.shure57.stevenson.29303.flac16/',
                      'gd1977-05-08d02t0{track}.flac'])
     async with await sox.play() as out:
-        for num in range(4, 10):
+        for num in range(4, 7):
             uri = music.format(track=num)
-            click.echo(uri)
+            printc(f'<green>{uri}<reset>')
             async with await ffmpeg.stream(uri) as src:
                 while True:
                     chunk = await src.receive_some(4096)

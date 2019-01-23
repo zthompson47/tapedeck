@@ -48,7 +48,7 @@ async def test_version_external():
 async def test_search(music_dir):
     """Find some music."""
     search = Source(f'python -m tapedeck.cli search {str(music_dir)}')
-    # ... - import coverage in default pyenv needed
+    # ... import coverage in default pyenv needed
     results = await search.read_list(through=resolve)
     assert search.status == 0
     assert len(results) == 3
@@ -57,15 +57,24 @@ async def test_search(music_dir):
         if path.endswith('subsubsubdir'):
             found = True
     assert found
-    # ... - hide dot files
-    # ... - hide symlinks
+    # ... hide dot files
+    # ... hide symlinks
 
 
 async def test_play():
     """Stream from source to destination."""
     player = Source(f'python -m tapedeck.cli play {RADIO} -o speaker')
     await player.run(timeout=4.7)
-    assert player.status != 0  # maybe it should not be an erorr?
+    assert player.status != 0  # ... maybe it should not be an erorr?
+
+
+async def test_play_directory():
+    """Detect a directory and play each song."""
+    directory = '/Users/zach/tunes/1972 - #1 Record [2009 Remaster]'
+    player = Source(f'python -m tapedeck.cli play {directory}')
+    await player.run(timeout=4.7)
+    assert player.status != 0  # ... maybe it should not be an erorr?
+    # ... test sort
 
 
 async def test_just_do_something():
