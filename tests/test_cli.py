@@ -10,6 +10,7 @@ from tapedeck import cli
 from tests.fixtures import music_dir
 
 ENV_COVERAGE = {'COVERAGE_PROCESS_START': 'setup.cfg', 'PYTHONPATH': '.'}
+RADIO = 'http://ice1.somafm.com/groovesalad-256-mp3'
 
 
 async def test_no_args():
@@ -57,10 +58,18 @@ async def test_search(music_dir):
             found = True
     assert found
     # ... - hide dot files
+    # ... - hide symlinks
 
 
-# async def test_just_do_something():
-#    """Make sure this thing can play some music."""
-#    music = Source('python -m tapedeck.cli --cornell 77', ENV_COVERAGE)
-#    await music.run(timeout=4.9)
-#    assert music.status != 0
+async def test_play():
+    """Stream from source to destination."""
+    player = Source(f'python -m tapedeck.cli play {RADIO} -o speaker')
+    await player.run(timeout=4.7)
+    assert player.status != 0  # maybe it should not be an erorr?
+
+
+async def test_just_do_something():
+    """Make sure this thing can play some music."""
+    music = Source('python -m tapedeck.cli --cornell 77', ENV_COVERAGE)
+    await music.run(timeout=4.9)
+    assert music.status != 0  # maybe it should not be an erorr?

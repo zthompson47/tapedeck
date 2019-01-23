@@ -3,7 +3,8 @@
 import trio
 import trio_click as click
 
-from reel.cmd import ffmpeg, play
+from reel.cmd import ffmpeg, sox
+from reel.io import StreamIO
 
 import tapedeck
 from tapedeck.search import find_tunes
@@ -39,6 +40,20 @@ async def search(directory, follow_links, follow_dots):
         click.echo(folder.path)
 
 
+@main.command(options_metavar='<options>')
+@click.argument('music_uri', metavar='<music_uri>')
+@click.option('-o', '--output-destination', default='speaker',
+              help='Output destination')
+async def play(music_uri, output_destination):
+    """¤ Play your music."""
+    destinations = {'speaker': sox.play,
+                    'udp': ffmpeg.udp}
+    click.echo(f'Playing {music_uri}')
+    async with await destinations[str(output_destination)]() as out:
+        async with await ffmpeg.stream(music_uri) as src:
+            await StreamIO(src, out).flow()
+
+
 async def barton_hall():
     """1977-05-08, Set 2 :-) ."""
     click.echo('''If you get confused,
@@ -47,15 +62,16 @@ async def barton_hall():
     music = ''.join(['https://archive.org/download/',
                      'gd1977-05-08.shure57.stevenson.29303.flac16/',
                      'gd1977-05-08d02t0{track}.flac'])
-    async with await play.speaker() as out:
+    async with await sox.play() as out:
         for num in range(4, 10):
             uri = music.format(track=num)
             click.echo(uri)
             async with await ffmpeg.stream(uri) as src:
-                chunk = await src.receive_some(4096)
-                while chunk:
-                    await out.send_all(chunk)
+                while True:
                     chunk = await src.receive_some(4096)
+                    if not chunk:
+                        break
+                    await out.send_all(chunk)
 
 
 if __name__ == '__main__':
