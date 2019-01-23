@@ -40,3 +40,15 @@ async def test_version_external():
     output = await version.read_text()
     assert version.status == 0
     assert output == reel.__version__
+
+
+async def test_dump_config():
+    """Show the current configuration."""
+    command = 'python -m reel.cli --config'
+    env = {'COVERAGE_PROCESS_START': 'setup.cfg', 'PYTHONPATH': '.'}
+    config = Source(command, env)
+    dump = await config.read_list()
+    assert len(dump) == 3
+    assert config.status == 0
+    for line in dump:
+        assert line.startswith('REEL_')

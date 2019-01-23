@@ -34,7 +34,7 @@ verbose, are:
 
 By default, ``reel`` places the log file in ``$XDG_DATA_HOME``.  If
 ``$XDG_DATA_HOME`` is not set, ``reel`` chooses a suitable default
-directory.  To view the choice, ask ``reel`` to show you it's
+directory.  To view the choice, ask ``reel`` to print the current
 configuration (e.g. bash)::
 
    $ reel --config | grep LOGGING
