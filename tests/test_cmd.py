@@ -2,7 +2,7 @@
 import os
 
 from reel import cmd
-from reel.cmd import ffmpeg, play
+from reel.cmd import ffmpeg, sox
 from reel.io import StreamIO
 
 BYTE_LIMIT = 1000000
@@ -20,7 +20,7 @@ async def test_cmd_module():
 
 async def test_play_music(capsys):
     """Play a few seconds of music."""
-    async with await play.speaker() as out:
+    async with await sox.play() as out:
         async with await ffmpeg.stream(SONG) as src:
             count = 0
             chunk = await src.receive_some(4096)
@@ -52,7 +52,7 @@ async def test_play_music(capsys):
 
 async def test_play_music_better_way():
     """Play a few seconds of music with less code."""
-    async with await play.speaker() as out:
+    async with await sox.play() as out:
         async with await ffmpeg.stream(SONG) as src:
             await StreamIO(src, out).flow(byte_limit=1000000)
         async with await ffmpeg.stream(RADIO) as src:
