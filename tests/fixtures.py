@@ -6,6 +6,11 @@ import pytest
 
 # from reel.proc import Source
 
+RADIO = 'http://ice1.somafm.com/groovesalad-256-mp3'
+SONG = ''.join(['https://archive.org/download/',
+                'gd1977-05-08.shure57.stevenson.29303.flac16/',
+                'gd1977-05-08d02t04.flac'])
+
 
 def set_env(env):
     """Add some variables to the environment."""
@@ -51,3 +56,44 @@ def audio_dir(tmp_path_factory):
     # ... save the file ...
     # output_flac = Source('flac output.wav')
     return rootdir
+
+
+@pytest.fixture
+def music_dir(tmpdir):
+    """Create a temporary directory with of music subdirectories."""
+    music_dirs = [
+        {
+            'root1': [
+                {'Some folder.shnf': ['asdf.wav']},
+                {'some other folder': ['rr.txt', 'asdf.wav', 'eHello~!.doc']},
+                {'subdir': [
+                    {'subsubdir': [
+                        {'subsubsubdir': ['asdfasdfasdfasdf.aac']},
+                    ]},
+                    [],
+                ]},
+                [],
+                'rootfile.txt',
+                {'yeah whatev': []},
+            ],
+        },
+    ]
+
+    def create_nodes(structure, parent_node=None):
+        result = None
+        for node in structure:
+            if isinstance(node, dict):
+                for subnode in node.keys():
+                    if parent_node:
+                        result = parent_node.join(subnode).mkdir()
+                    else:
+                        result = tmpdir.join(subnode).mkdir()
+                    create_nodes(node[subnode], result)
+            elif isinstance(node, list):
+                for subnode in node:
+                    create_nodes(subnode, parent_node)
+            elif isinstance(node, str):
+                if parent_node:
+                    parent_node.join(node).write('yup')
+        return result
+    return str(create_nodes(music_dirs))

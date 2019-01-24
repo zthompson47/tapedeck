@@ -1,15 +1,16 @@
+# pylint: disable=W0611, W0621
 """Test the pre-configured commands."""
 import os
 
 from reel import cmd
-from reel.cmd import ffmpeg, sox
+from reel.cmd import (
+    ffmpeg, sox, tapedeck
+)
 from reel.io import StreamIO
 
+from tests.fixtures import music_dir, RADIO, SONG
+
 BYTE_LIMIT = 1000000
-RADIO = 'http://ice1.somafm.com/groovesalad-256-mp3'
-SONG = ''.join(['https://archive.org/download/',
-                'gd1977-05-08.shure57.stevenson.29303.flac16/',
-                'gd1977-05-08d02t04.flac'])
 
 
 async def test_cmd_module():
@@ -52,8 +53,15 @@ async def test_play_music(capsys):
 
 async def test_play_music_better_way():
     """Play a few seconds of music with less code."""
-    async with await sox.play() as out:
-        async with await ffmpeg.stream(SONG) as src:
-            await StreamIO(src, out).flow(byte_limit=1000000)
-        async with await ffmpeg.stream(RADIO) as src:
-            await StreamIO(src, out).flow(byte_limit=1000000)
+    if os.environ.get('REEL_ALLOW_AUDIO_PLAY'):
+        async with await sox.play() as out:
+            async with await ffmpeg.stream(SONG) as src:
+                await StreamIO(src, out).flow(byte_limit=1000000)
+            async with await ffmpeg.stream(RADIO) as src:
+                await StreamIO(src, out).flow(byte_limit=1000000)
+
+
+async def test_cmd_tapedeck(music_dir):
+    """Run tapedeck.cli through reel.cmd."""
+    results = await tapedeck.search(music_dir)
+    assert len(results) == 3

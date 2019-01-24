@@ -82,7 +82,7 @@ class Destination:
         if xenv:
             for key, val in xenv.items():
                 self._env[key] = val
-        LOGGER.debug(' '.join(self._command))
+        LOGGER.info('Destination() %s', ' '.join(self._command))
 
     async def __aenter__(self):
         """Hijack ``trio._core._run.NurseryManager``."""
@@ -133,7 +133,7 @@ class Source():
         if xenv:
             for key, val in xenv.items():
                 self._env[key] = val
-        LOGGER.debug(' '.join(self._command))
+        LOGGER.info('Source() %s', ' '.join(self._command))
 
     async def __aenter__(self):
         """Hijack ``trio._core._run.NurseryManager``."""
@@ -255,7 +255,7 @@ class Source():
         return self.status == 0
 
     async def read_text(self, message=None):
-        """Run the command and return the output."""
+        """Return the output as text."""
         if message:
             message = message.encode('utf-8')
             _stdin = trio.subprocess.PIPE
@@ -280,7 +280,7 @@ class Source():
         return self._output.decode('utf-8').strip()
 
     async def read_bytes(self, send_bytes=None):
-        """Run the command and return the output."""
+        """Return the output as bytes."""
         if send_bytes:
             _stdin = trio.subprocess.PIPE
         else:
