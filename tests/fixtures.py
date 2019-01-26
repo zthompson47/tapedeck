@@ -1,15 +1,30 @@
 """Some commonly used test fixtures."""
+import logging
 import os
 
 # import numpy as np
 import pytest
 
+import reel
 # from reel.proc import Source
 
+ENV_COVERAGE = {
+    'COVERAGE_PROCESS_START': 'setup.cfg',
+    'PYTHONPATH': '.'
+}
+
 RADIO = 'http://ice1.somafm.com/groovesalad-256-mp3'
-SONG = ''.join(['https://archive.org/download/',
-                'gd1977-05-08.shure57.stevenson.29303.flac16/',
-                'gd1977-05-08d02t04.flac'])
+
+SONG = ''.join([
+    'https://archive.org/download/',
+    'gd1977-05-08.shure57.stevenson.29303.flac16/',
+    'gd1977-05-08d02t04.flac'
+])
+
+logging.basicConfig(
+    filename=reel.LOGGING_FILE,
+    level=reel.LOGGING_LEVEL
+)
 
 
 def set_env(env):
@@ -22,6 +37,12 @@ def unset_env(env):
     """Remove some variables from the environment."""
     for key in env:
         del os.environ[key]
+
+
+@pytest.fixture
+def env_audio_dest():
+    """Enable setting an audio output for testing."""
+    return os.environ.get('REEL_TESTING_AUDIO_DEST', '/dev/null')
 
 
 @pytest.fixture(scope="session")

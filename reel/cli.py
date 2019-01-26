@@ -1,8 +1,12 @@
 """Command line interface for tapedeck."""
+import logging
+
 import trio
 import trio_click as click
 
 import reel
+
+logging.basicConfig(filename=reel.LOGGING_FILE, level=reel.LOGGING_LEVEL)
 
 
 @click.command()
