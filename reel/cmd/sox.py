@@ -2,7 +2,7 @@
 from reel.proc import Destination
 
 
-async def play():
+def play():
     """Send audio to the speaker."""
     cmd = 'play'
     flags = ['-t', 'raw',
@@ -12,4 +12,4 @@ async def play():
              '--endian', 'little',
              '-c', '2',
              '-']
-    return await Destination(cmd, xconf=flags).receive()
+    return Destination(cmd, xconf=flags).receive()

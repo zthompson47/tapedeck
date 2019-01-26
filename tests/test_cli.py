@@ -5,6 +5,8 @@ import reel
 from reel import cli
 from reel.proc import Source
 
+from tests.fixtures import ENV_COVERAGE
+
 
 async def test_no_args():
     """Run cli with no arguments."""
@@ -25,8 +27,7 @@ async def test_version():
 async def test_no_args_external():
     """Run the CLI externally with no arguments."""
     command = 'python -m reel.cli'
-    config = {'COVERAGE_PROCESS_START': 'setup.cfg', 'PYTHONPATH': '.'}
-    noargs = Source(command, config)
+    noargs = Source(command, ENV_COVERAGE)
     output = await noargs.run()
     assert noargs.status == 0
     assert output == ''
@@ -35,8 +36,7 @@ async def test_no_args_external():
 async def test_version_external():
     """Show the version number by running the actual CLI."""
     command = 'python -m reel.cli -v'
-    env = {'COVERAGE_PROCESS_START': 'setup.cfg', 'PYTHONPATH': '.'}
-    version = Source(command, env)
+    version = Source(command, ENV_COVERAGE)
     output = await version.read_text()
     assert version.status == 0
     assert output == reel.__version__
@@ -45,8 +45,7 @@ async def test_version_external():
 async def test_dump_config():
     """Show the current configuration."""
     command = 'python -m reel.cli --config'
-    env = {'COVERAGE_PROCESS_START': 'setup.cfg', 'PYTHONPATH': '.'}
-    config = Source(command, env)
+    config = Source(command, ENV_COVERAGE)
     dump = await config.read_list()
     assert len(dump) == 3
     assert config.status == 0

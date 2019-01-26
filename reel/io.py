@@ -3,7 +3,7 @@ import logging
 
 import trio
 
-__all__ = ['Input', 'Output', 'StreamIO']
+__all__ = ['InputStream', 'OutputStream', 'StreamIO']
 
 
 class StreamIO:
@@ -26,41 +26,40 @@ class StreamIO:
         async with trio.open_nursery() as nursery:
             send_ch, receive_ch = trio.open_memory_channel(0)
             async with send_ch, receive_ch:
-                nursery.start_soon(self._producer.send,
-                                   send_ch.clone(),
-                                   byte_limit)
-                nursery.start_soon(self._consumer.receive,
-                                   receive_ch.clone())
+                nursery.start_soon(
+                    self._producer.send,
+                    send_ch.clone(),
+                    byte_limit
+                )
+                nursery.start_soon(
+                    self._consumer.receive,
+                    receive_ch.clone()
+                )
         self._is_flowing = False
 
 
-class Input(trio.abc.SendStream):
-    """."""
+class InputStream:
+    """An input stream."""
 
     def __init__(self, send_stream):
         """Store the real stream."""
         self._send_stream = send_stream
 
     async def __aenter__(self):
-        """Enter the stream context."""
-        await self._send_stream.__aenter__()
+        """."""
         return self
 
-    async def __aexit__(self, *args):
-        """Exit the stream context."""
-        await self._send_stream.__aexit__(*args)
+    async def __aexit__(self, *args, **kwargs):
+        """."""
+        # await self._send_stream.aclose()
 
-    async def aclose(self):
-        """Implement trio.AsyncResource and behave nicely."""
+    async def __aclose(self):
+        """Close up shop."""
         await self._send_stream.aclose()
 
-    async def send_all(self, data):
-        """Impl."""
-        await self._send_stream.send_all(data)
-
-    async def wait_send_all_might_not_block(self):
-        """Impl."""
-        await self._send_stream.wait_send_all_might_not_block()
+    async def send_all(self, chunk):
+        """."""
+        await self._send_stream.send_all(chunk)
 
     async def receive(self, receive_channel):
         """Stream output from the memory channel."""
@@ -68,7 +67,7 @@ class Input(trio.abc.SendStream):
             await self._send_stream.send_all(chunk)
 
 
-class Output(trio.abc.ReceiveStream):
+class OutputStream:
     """An output stream."""
 
     def __init__(self, receive_stream):
@@ -76,20 +75,15 @@ class Output(trio.abc.ReceiveStream):
         self._receive_stream = receive_stream
 
     async def __aenter__(self):
-        """Enter the stream context."""
-        await self._receive_stream.__aenter__()
+        """."""
         return self
 
-    async def __aexit__(self, *args):
-        """Exit the stream context."""
-        await self._receive_stream.__aexit__(*args)
-
-    async def aclose(self):
-        """Implement trio.AsyncResource and behave nicely."""
+    async def __aexit__(self, *args, **kwargs):
+        """."""
         await self._receive_stream.aclose()
 
     async def receive_some(self, max_bytes):
-        """..."""
+        """."""
         return await self._receive_stream.receive_some(max_bytes)
 
     async def send(self, send_channel, byte_limit=None):
@@ -120,3 +114,30 @@ class Output(trio.abc.ReceiveStream):
                 if len(_output) >= limit:
                     break
         return _output
+
+
+class NullDestStream(InputStream):
+    """An input stream that goes nowhere."""
+
+    def __init__(self):
+        """Store the real stream."""
+        super().__init__(self)
+        self._send_stream = None
+
+    async def __aenter__(self):
+        """."""
+        return self
+
+    async def __aexit__(self, *args, **kwargs):
+        """."""
+
+    async def __aclose(self):
+        """Close up shop."""
+
+    async def send_all(self, chunk):
+        """."""
+
+    async def receive(self, receive_channel):
+        """Stream output from the memory channel."""
+        async for _ in receive_channel:  # noqa: F841
+            pass

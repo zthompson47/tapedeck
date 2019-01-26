@@ -6,7 +6,7 @@ import shlex
 
 import trio
 
-from reel.io import Input, Output
+from reel.io import InputStream, OutputStream
 
 __all__ = ['Daemon', 'Destination', 'Source']
 LIMIT = 163840
@@ -99,7 +99,7 @@ class Destination:
         """Return the command exit code."""
         return self._status
 
-    async def receive(self):
+    def receive(self):
         """Return a context-managed output stream."""
         self._proc = trio.subprocess.Process(
             self._command,
@@ -108,7 +108,7 @@ class Destination:
             stderr=trio.subprocess.DEVNULL,
             env=self._env
         )
-        return Input(self._proc.stdin)
+        return InputStream(self._proc.stdin)
 
 
 class Source():
@@ -214,15 +214,14 @@ class Source():
             self._command,
             stdin=_stdin,
             stdout=trio.subprocess.DEVNULL,
-            stderr=trio.subprocess.DEVNULL,
+            stderr=None,
             env=self._env
         )
         if message:
             async with trio.open_nursery() as nursery:
                 nursery.start_soon(self._stream_stdin, message)
         if timeout:
-            with trio.move_on_after(timeout):
-                await self._proc.wait()
+            await trio.sleep(timeout)
             self._proc.terminate()
             await self._proc.wait()
         else:
@@ -309,6 +308,25 @@ class Source():
             return [await through(_) for _ in output_list]
         return output_list
 
+    async def send(self, message=None):
+        """Return a context-managed output stream."""
+        if message:
+            message = message.encode('utf-8')
+            _stdin = trio.subprocess.PIPE
+        else:
+            _stdin = None
+        self._proc = trio.subprocess.Process(
+            self._command,
+            stdin=_stdin,
+            stdout=trio.subprocess.PIPE,
+            stderr=trio.subprocess.DEVNULL,
+            env=self._env
+        )
+        if message:
+            async with trio.open_nursery() as nursery:
+                nursery.start_soon(self._stream_stdin, message)
+        return OutputStream(self._proc.stdout)
+
     async def stream(self, message=None):
         """Return a context-managed output stream."""
         if message:
@@ -326,4 +344,4 @@ class Source():
         if message:
             async with trio.open_nursery() as nursery:
                 nursery.start_soon(self._stream_stdin, message)
-        return Output(self._proc.stdout)
+        return self._proc.stdout

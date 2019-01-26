@@ -15,7 +15,7 @@ def test_import():
     """Import the reel module."""
     assert reel
     assert reel.__all__ == ['io', 'proc', 'tools']
-    assert reel.io.__all__ == ['Input', 'Output', 'StreamIO']
+    assert reel.io.__all__ == ['InputStream', 'OutputStream', 'StreamIO']
     assert reel.proc.__all__ == ['Daemon', 'Destination', 'Source']
     assert reel.tools.__all__ == ['resolve']
 
@@ -68,3 +68,10 @@ async def test_server(config_icecast):
         if 'icecast' in proc:
             found = True
     assert not found
+
+
+async def test_source_run_timeout():
+    """Make sure a process returns normally with a timeout interrupt."""
+    nothing = Source('cat /dev/random')
+    await nothing.run(timeout=0.47)
+    assert nothing.status <= 0
