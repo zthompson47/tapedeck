@@ -4,9 +4,11 @@ import os
 
 # import numpy as np
 import pytest
+import trio
 
 import reel
-# from reel.proc import Source
+from reel import cmd
+from reel.io import NullDestStream
 
 ENV_COVERAGE = {
     'COVERAGE_PROCESS_START': 'setup.cfg',
@@ -41,8 +43,21 @@ def unset_env(env):
 
 @pytest.fixture
 def env_audio_dest():
-    """Enable setting an audio output for testing."""
-    return os.environ.get('REEL_TESTING_AUDIO_DEST', '/dev/null')
+    """Return an audio output for testing."""
+    dest = os.environ.get('REEL_TESTING_AUDIO_DEST', '/dev/null')
+    out = None
+    if dest == 'speakers':
+        out = cmd.sox.play()
+    elif dest == 'udp':
+        out = cmd.ffmpeg.udp()
+    else:
+        # Check for file output.
+        out_path = trio.Path(dest)
+        if dest == '/dev/null':
+            out = NullDestStream()
+        elif trio.run(out_path.is_file) or trio.run(out_path.is_dir):
+            out = cmd.ffmpeg.to_file(out_path)
+    return out
 
 
 @pytest.fixture(scope="session")

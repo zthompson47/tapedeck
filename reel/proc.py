@@ -8,7 +8,7 @@ import trio
 
 from reel.io import InputStream, OutputStream
 
-__all__ = ['Daemon', 'Destination', 'Source']
+__all__ = ['Daemon', 'Destination', 'ProcBase', 'Source']
 LIMIT = 163840
 LOGGER = logging.getLogger(__name__)
 

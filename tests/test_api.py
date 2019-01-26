@@ -5,24 +5,26 @@ from reel.config import (
     get_config,
     get_xdg_config_dir,
 )
+from reel.cmd import *
 from reel.io import *
 from reel.proc import *
 from reel.tools import *
-from tests.fixtures import config_icecast
+
+from tests.fixtures import *
 
 
 def test_import():
     """Import the reel module."""
     assert reel
-    assert reel.__all__ == ['io', 'proc', 'tools']
+    assert reel.__all__ == ['cmd', 'io', 'proc', 'tools']
+    assert reel.cmd.__all__ == ['ffmpeg', 'sox', 'tapedeck']
     assert reel.io.__all__ == ['InputStream', 'OutputStream', 'StreamIO']
-    assert reel.proc.__all__ == ['Daemon', 'Destination', 'Source']
+    assert reel.proc.__all__ == ['Daemon', 'Destination', 'ProcBase', 'Source']
     assert reel.tools.__all__ == ['resolve']
 
 
 async def test_shell_commands():
     """Run a few shell commands."""
-
     assert 'rutabaga' in await Source(f'grep utabag {__file__}').read_text()
 
     found = Source('find .', xconf=['-type', 'f'])
@@ -52,6 +54,7 @@ async def test_shell_commands():
 async def test_server(config_icecast):
     """Run a server."""
     config_dir = await get_xdg_config_dir()
+    # ... get_config needs better naming, e.g. get_config_from_template
     config = await get_config(config_dir, 'icecast.xml', **config_icecast)
     xconf = ['-c', str(config)]
     async with Daemon('icecast', xconf=xconf) as icecast:
@@ -68,10 +71,3 @@ async def test_server(config_icecast):
         if 'icecast' in proc:
             found = True
     assert not found
-
-
-async def test_source_run_timeout():
-    """Make sure a process returns normally with a timeout interrupt."""
-    nothing = Source('cat /dev/random')
-    await nothing.run(timeout=0.47)
-    assert nothing.status <= 0

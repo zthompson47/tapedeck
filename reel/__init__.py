@@ -5,7 +5,7 @@ import trio
 
 from reel.config import get_xdg_config_dir
 
-__all__ = ['io', 'proc', 'tools']
+__all__ = ['cmd', 'io', 'proc', 'tools']
 __version__ = '0.0.3'
 
 LOGGING_LEVEL = os.environ.get(
