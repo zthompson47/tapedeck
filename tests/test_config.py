@@ -45,7 +45,7 @@ async def test_use_default_xdg_home(env_home):
     assert config['XDG_CACHE_HOME'] == str(home / '.cache')
     assert config['XDG_DATA_HOME'] == str(home / '.local' / 'share')
     assert config['XDG_RUNTIME_DIR'] == str(home / '.local' / 'run')
-    # ... log warning if no xdg_runtime pylint: disable=W0511 ...
+    # ... log warning if no xdg_runtime pylint : disable = W0511 ...
 
 
 async def test_get_xdg_home_function(env_home):
