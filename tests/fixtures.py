@@ -1,5 +1,27 @@
 """Shared test fixtures and functions."""
+import logging
+import os
+
 import pytest
+
+import tapedeck
+
+ENV_COVERAGE = {
+    'COVERAGE_PROCESS_START': 'setup.cfg',
+    'PYTHONPATH': '.'
+}
+RADIO = 'http://ice1.somafm.com/groovesalad-256-mp3'
+
+logging.basicConfig(
+    filename=tapedeck.LOGGING_FILE,
+    level=tapedeck.LOGGING_LEVEL
+)
+
+
+@pytest.fixture
+def env_audio_dest():
+    """Enable setting an audio output for testing."""
+    return os.environ.get('TAPEDECK_TESTING_AUDIO_DEST', '/dev/null')
 
 
 @pytest.fixture
@@ -24,6 +46,7 @@ def music_dir(tmpdir):
     ]
 
     def create_nodes(structure, parent_node=None):
+        """Create a filesystem from a template `structure`."""
         result = None
         for node in structure:
             if isinstance(node, dict):
