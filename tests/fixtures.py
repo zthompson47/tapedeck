@@ -49,7 +49,7 @@ def env_audio_dest():
     if dest == 'speakers':
         out = cmd.sox.play()
     elif dest == 'udp':
-        out = cmd.ffmpeg.udp()
+        out = cmd.ffmpeg.udp('0.0.0.0', '8771')
     else:
         # Check for file output.
         out_path = trio.Path(dest)

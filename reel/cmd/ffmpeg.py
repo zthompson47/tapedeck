@@ -30,7 +30,7 @@ def to_file(path):
     return Destination(cmd, xconf=flags).receive()
 
 
-def udp(ipaddr='192.168.1.100', port='6667'):
+def udp(host, port):
     """Stream audio over udp."""
     cmd = 'ffmpeg'
     flags = [
@@ -43,6 +43,6 @@ def udp(ipaddr='192.168.1.100', port='6667'):
         '-acodec', 'mp3',  # compress to mp3
         '-q:a', '0',  # maximum quality
         '-f', 'mp3',  # mp3 format
-        f'udp://{ipaddr}:{port}',  # receiver address
+        f'udp://{host}:{port}',  # receiver address
     ]
     return Destination(cmd, xconf=flags).receive()

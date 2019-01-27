@@ -1,14 +1,14 @@
-.PHONY: help test clean-tools clean-coverage clean-dist clean lint\
-    	coverage testall dist dist-upload
+.PHONY: help test clean clean-tools clean-coverage clean-dist\
+        lint coverage testall dist dist-upload
 
 project = reel
 
 help:
 	@echo "test - run pytest"
+	@echo "clean - remove build and runtime files"
 	@echo "clean-tools - remove lint and testing files"
 	@echo "clean-coverage - remove coverage test files"
 	@echo "clean-dist - remove distribution build files"
-	@echo "clean - remove build and runtime files"
 	@echo "lint - check code for style"
 	@echo "coverage - measure how much code the tests cover"
 	@echo "testall - shortcut for test/coverage/lint"
