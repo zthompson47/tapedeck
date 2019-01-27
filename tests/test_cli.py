@@ -1,4 +1,3 @@
-# pylint: disable=W0611,W0621
 """Test suite for the tapedeck command line interface."""
 import os
 
@@ -6,7 +5,7 @@ import pytest
 from trio_click.testing import CliRunner
 
 from reel import cmd
-from reel.proc import Source  # pylint: disable=C0411
+from reel.proc import Source
 from reel.tools import resolve
 
 import tapedeck
@@ -55,25 +54,3 @@ async def test_just_do_something(env_audio_dest):
     )
     await music.run(timeout=4.9)
     assert music.status <= 0
-
-
-async def test_search(music_dir):
-    """Find some music."""
-    search = Source(f'python -m tapedeck.cli search {str(music_dir)}')
-    # ... import coverage in default pyenv needed
-    results = await search.read_list(through=resolve)
-    assert search.status == 0
-    assert len(results) == 3
-    found = False
-    for path in results:
-        if path.endswith('subsubsubdir'):
-            found = True
-    assert found
-    # ... hide dot files
-    # ... hide symlinks
-
-
-async def test_search_cache(music_dir):
-    """Save each search and play folders by search index."""
-    search = await cmd.tapedeck.search(music_dir)
-    assert len(search) == 3

@@ -1,4 +1,3 @@
-# pylint: disable=W0611,W0613,W0621
 """Tests for the 'tapedeck play' cli command."""
 import shlex
 

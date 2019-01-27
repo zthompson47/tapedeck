@@ -5,6 +5,8 @@ from typing import List
 
 import trio
 
+from reel.tools import resolve
+
 
 class Folder:
     """A folder of music."""
@@ -36,9 +38,9 @@ class Folder:
         return self._pretty_print()
 
 
-def find_tunes(music_dir: str,
-               followlinks=False,
-               followdots=False) -> List[Folder]:
+async def find_tunes(music_dir: str,
+                     followlinks=False,
+                     followdots=False) -> List[Folder]:
     """Scan a list of directories for music files."""
     results = []
     logging.info("Scanning for music files...")
@@ -59,7 +61,7 @@ def find_tunes(music_dir: str,
                 text_files.append(fname)
         if song_files:
             folder = Folder(
-                path=dirname,
+                path=await resolve(dirname),  # ... test absolute path ...
                 song_files=song_files,
                 text_files=text_files,
             )

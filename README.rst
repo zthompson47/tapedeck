@@ -1,9 +1,86 @@
 Tapedeck
 ========
 
-Tapedeck finds and plays music across muiltiple sources and devices.
+Tapedeck finds and plays music across muiltiple sources and devices::
 
-It's like a fresh box of blank tapes.
+   $ pip install tapedeck
+   $ tapedeck play --shuffle ~/Music -o speakers
+
+**And the band keeps playing on...**
+   -- John Perry Barlow
+
+Usage
+-----
+
+Play a music folder::
+
+   $ tapedeck play shows/gd1980-07-01.139309.sbd.moore.berger.flac24/
+   gd1980-07-01.139309.sbd.moore.berger.flac24 / gd80-07-01s1t01.flac
+   gd1980-07-01.139309.sbd.moore.berger.flac24 / gd80-07-01s1t02.flac
+
+Find music and play a folder::
+
+   $ tapedeck search ~/Downloads
+    ...
+     4. ny1969-xx-xx/
+     5. ny1970-xx-xx/
+     6. oaitw1973-xx-xx/
+    ...
+   $ tapedeck play -h 5
+
+View the last search::
+
+   $ tapedeck search -h
+    ...
+     4. ny1969-xx-xx/
+     5. ny1970-xx-xx/
+     6. oaitw1973-xx-xx/
+    ...
+   $
+
+Stream music to a device::
+
+   $ tapedeck play . -o udp
+
+Installation
+------------
+
+Follow the three-step installation process for your system:
+
+Mac
+~~~
+
+1. Install `Homebrew <http://brew.sh>`_ -
+   "The missing package manager for macOS".
+
+2. Install some handy programs that ``tapedeck`` requires::
+
+   $ brew install python3 ffmpeg sox aria2 postgresql icecast2
+
+3. Install ``tapedeck``::
+
+   $ pip3 install tapedeck
+
+Android
+~~~~~~~
+
+1. Install termux
+2. Install deps
+3. ``pip install tapedeck``
+
+Windows
+~~~~~~~
+
+1. ``git clone http://github.com/zthompson47/tapedeck``
+2. make it happen
+3. let me know
+
+iPhone
+~~~~~~
+
+1. refer
+2. to
+3. above
 
 Motivation
 ----------
@@ -17,28 +94,5 @@ download, streaming, and playback.  We also own piles of media purchases
 that (hopefully) still exist in physical format to be ripped.
 
 Tapedeck strives to organize these collections of music and provide
-a way for the owners to enjoy their stash.
+a way for the you to enjoy your stash.
 
-    *And the band keeps playing on...*
-        John Perry Barlow
-
-Features
---------
-
-* Music search on local fileystem and network
-* Bittorrent client
-* RSS browser to list torrents
-* Music player with network streaming
-* Gapless playback
-* CLI, REST, and Web interfaces
-* Playlist manager
-* Song lyrics with PDF output
-* Meta tag display and discovery
-
-Requirements
-------------
-* python3
-* aria2
-* ffmpeg
-* postgresql
-* icecast2
