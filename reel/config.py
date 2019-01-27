@@ -12,7 +12,7 @@ from reel.tools import resolve
 
 
 async def get_package_dir():
-    """Return the path to this package, assuming this module is top-level."""
+    """Return the file path to this package's directory."""
     return (await trio.Path(__file__).resolve()).parent
 
 
@@ -66,3 +66,18 @@ async def get_config(config_path, template_file, **xconf):
         formatted = (await default_file.read_text()).format(**xconf)
         await config_file.write_text(formatted)
     return config_file
+
+
+async def get_xdg_cache_dir(app=None):
+    """Return a cache directory for this app.
+
+    Create the directory if it does not exist.
+
+    """
+    if app is None:
+        app = await get_package_name()
+    cache_home = trio.Path(await get_xdg_home('XDG_CACHE_HOME'))
+    cache_dir = cache_home / app
+    if not await cache_dir.exists():
+        await cache_dir.mkdir()
+    return await cache_dir.resolve()
