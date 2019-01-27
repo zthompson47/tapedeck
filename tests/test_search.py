@@ -46,14 +46,15 @@ async def test_search(music_dir):
 
 async def test_search_results(music_dir):
     """Find and list music folders."""
-    search = await cmd.tapedeck.search(music_dir)
+    search = Source(f'python -m tapedeck.cli search {str(music_dir)}')
+    results = await search.read_list()
 
     # List search results.
-    assert len(search) == 3
+    assert len(results) == 3
 
     # Show indexes numbering each result.
     idx = 0
-    for line in search:
+    for line in results:
         idx += 1
         print(line)
         # ... hack to pass test - cmd.tapedeck.search strips whitespace ...
@@ -61,7 +62,7 @@ async def test_search_results(music_dir):
 
     # List the name of each folder (not the absolute path).
     filenames = []
-    for line in search:
+    for line in results:
         filename = line[line.find(' ') + 1:]  # index number at start of line
         filenames.append(filename)
         assert not trio.Path(filename).is_absolute()
