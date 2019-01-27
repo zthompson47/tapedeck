@@ -1,14 +1,17 @@
 """Install the reel package."""
 from setuptools import find_packages, setup
 
+from reel import __version__
+
 setup(
     license='MIT',
     name='reel',
-    version='0.0.2',
+    version=__version__,
     author='Zach Thompson',
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/reel',
     description='An async subprocess manager',
+    long_description_content_type='text/x-rst',
     long_description=open('README.rst', 'r').read(),
     classifiers=[
         "Programming Language :: Python :: 3.5",

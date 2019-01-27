@@ -1,4 +1,5 @@
-.PHONY: help test clean-tools clean-coverage clean-dist clean lint coverage testall dist
+.PHONY: help test clean-tools clean-coverage clean-dist clean lint\
+    	coverage testall dist dist-upload
 
 project = reel
 
@@ -12,6 +13,7 @@ help:
 	@echo "coverage - measure how much code the tests cover"
 	@echo "testall - shortcut for test/coverage/lint"
 	@echo "dist - build a distribution for pypi"
+	@echo "dist-upload - upload a distribution to pypi"
 
 test:
 	python -m pytest
@@ -48,3 +50,7 @@ testall: lint coverage
 
 dist: clean-dist
 	python setup.py sdist bdist_wheel
+	twine check dist/*
+
+dist-upload: dist
+	twine upload dist/*
