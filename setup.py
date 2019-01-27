@@ -1,12 +1,10 @@
 """Install the reel package."""
 from setuptools import find_packages, setup
 
-from reel import __version__
-
 setup(
     license='MIT',
     name='reel',
-    version=__version__,
+    version='0.0.4',
     author='Zach Thompson',
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/reel',
@@ -24,6 +22,7 @@ setup(
     install_requires=[
         'trio>=0.10.0',
         'trio-click>=7.0.2',
+        'ansicolortags>=0.4',
     ],
     zip_safe=False,
     packages=find_packages(),
