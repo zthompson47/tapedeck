@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 setup(
     license='MIT',
     name='tapedeck',
-    version='0.0.1',
+    version='0.0.2',
     author='Zach Thompson',
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/tapedeck',
@@ -23,6 +23,7 @@ setup(
         'trio>=0.10.0',
         'trio-click>=7.0.2',
         'reel',
+        'ansicolortags',
     ],
     zip_safe=False,
     packages=find_packages(),
