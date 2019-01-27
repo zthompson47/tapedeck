@@ -46,11 +46,11 @@ async def test_version_external():
     assert output == tapedeck.__version__
 
 
-async def test_just_do_something(env_audio_dest):
-    """Make sure this thing can play some music."""
-    music = Source(
-        f'python -m tapedeck.cli --cornell 77 -o {env_audio_dest}',
-        ENV_COVERAGE
-    )
-    await music.run(timeout=4.9)
-    assert music.status <= 0
+# async def test_just_do_something(env_audio_dest):
+#     """Make sure this thing can play some music."""
+#     music = Source(
+#         f'python -m tapedeck.cli --cornell 77 -o {env_audio_dest}',
+#         ENV_COVERAGE
+#     )
+#     await music.run(timeout=4.9)
+#     assert music.status <= 0

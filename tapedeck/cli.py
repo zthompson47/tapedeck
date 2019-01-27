@@ -1,6 +1,7 @@
 """The command line interface to tapedeck."""
 import random
 
+import ansicolortags
 import trio
 import trio_click as click
 
@@ -18,44 +19,29 @@ from tapedeck.search import find_tunes, is_audio
 @click.group(
     invoke_without_command=True,
     context_settings=dict(help_option_names=['--help']),
-    options_metavar='<options>'
+    options_metavar='<options>',
+    help='¤- Manage your music'
 )
-@click.option('--cornell', help='Raise the roof.', metavar='<int>')
-@click.option(
-    '-o', '--output-destination',
-    default='speakers',
-    help='Output destination'
-)
-@click.option(
-    '-v', '--version', is_flag=True,
-    help=f'Print "{tapedeck.__version__}" and exit.'
-)
-async def main(version, cornell, output_destination):
-    """¤ Manage your music."""
-    await trio.sleep(0.1)
+@click.option('-v', '--version', is_flag=True,
+              help=f'Print "{tapedeck.__version__}" and exit.')
+async def main(version):
+    """Enter the tapedeck cli."""
     if version:
         await click_echof(tapedeck.__version__)
-    if cornell and cornell == '77':
-        await barton_hall(output_destination)
 
 
-@main.command(options_metavar='<options>')
-@click.argument('directory', metavar='<directory>', required=False)
-@click.option(
-    '-d', '--follow-dots', is_flag=True,
-    help='Search hidden dot-directories.'
-)
-@click.option(
-    '-h', '--history', is_flag=True,
-    help='Show search history'
-)
-@click.option(
-    '-l', '--follow-links', is_flag=True,
-    help='Search symlinked directories.'
-)
-async def search(directory, follow_links, follow_dots, history):
-    """Find your music."""
-    if history:
+@main.command(options_metavar='[options]',
+              help='¤- Find your music')
+@click.argument('directory', metavar='[directory]', required=False)
+@click.option('-d', '--follow-dots', is_flag=True,
+              help='Search hidden dot-directories.')
+@click.option('-l', '--follow-links', is_flag=True,
+              help='Search symlinked directories.')
+@click.option('-c', '--cached', is_flag=True,
+              help='Show cached search history')
+async def search(directory, follow_links, follow_dots, cached):
+    """Search for music."""
+    if cached:
         cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
         async with await cache_file.open('r') as out:
             lines = (await out.read()).split('\n')[0:-1]
@@ -64,8 +50,8 @@ async def search(directory, follow_links, follow_dots, history):
             number = line[0:line.find(' ')]
             filename = line[line.find(' ') + 1:]
             path = trio.Path(filename)
-            output.append(number + ' ' + path.name)
-        click.echo_via_pager('\n'.join(output))
+            output.append(f' <green>{number} <blue>{path.name}<reset>')
+        click.echo_via_pager(ansicolortags.sprint('\n'.join(output)))
         return
 
     results = await find_tunes(
@@ -77,7 +63,7 @@ async def search(directory, follow_links, follow_dots, history):
     for folder in results:
         idx += 1
         path = trio.Path(folder.path)
-        await click_echof(f'<green>{idx}. <blue>{path.name}<reset>')
+        await click_echof(f'  <green>{idx}. <blue>{path.name}<reset>')
 
     # Store results in a cache file.
     cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
@@ -88,55 +74,62 @@ async def search(directory, follow_links, follow_dots, history):
             await out.write(f'{idx}. {str(folder.path)}\n')
 
 
-# pylint: disable=too-many-branches,too-many-locals
-@main.command(options_metavar='<options>')  # noqa: C901
-@click.argument('music_uri', metavar='<music_uri>', required=False)
-@click.option(
-    '-o', '--output-destination',
-    default='speakers',
-    help='Output destination'
-)
-@click.option(
-    '-h', '--history',
-    help='Play track from search history'
-)
-@click.option(
-    '-s', '--shuffle', is_flag=True,
-    help='Shuffle order of tracks'
-)
-async def play(music_uri, output_destination, history, shuffle):
-    """Play your music."""
+# pylint: disable=too-many-branches,too-many-locals,too-many-arguments
+@main.command(options_metavar='[options]',  # noqa: C901
+              help='¤- Play your music')
+@click.argument('source', metavar='[source]', required=False)
+@click.option('-o', '--output', default='speakers',
+              help='Output destination', show_default=True)
+@click.option('-s', '--shuffle', help='Shuffle order of tracks', is_flag=True)
+@click.option('-r', '--recursive', help='Play subfolders', is_flag=True)
+@click.option('-c', '--cached', help='Play track from cached search', type=int)
+@click.option('-h', '--host', help='Network host')
+# https://www.iana.org/assignments/service-names-port-numbers\
+#        /service-names-port-numbers.xhtml
+@click.option('-p', '--port', help='Network port',
+              type=click.IntRange(1024, 49151))
+async def play(source, output, cached, shuffle, host, port, recursive):
+    """Build a playlist and play it."""
     playlist = []
-    if history:
+
+    if cached:
+        # Find the track filename by index in the cached search results.
         cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
         async with await cache_file.open('r') as out:
             lines = (await out.read()).split('\n')[0:-1]
-        track = lines[int(history) - 1]
+        track = lines[int(cached) - 1]
         music_path = trio.Path(track[track.find(' ') + 1:])
     else:
-        music_path = trio.Path(music_uri)
+        music_path = trio.Path(source)
 
-    # queue music_uri
     if await trio.Path(music_path).is_dir():
+        playlist_folders = [music_path]
+        if recursive:
+            # Run find_tunes on this dir to get all music folders.
+            results = await find_tunes(music_path)
+            for folder in results:
+                playlist_folders.append(trio.Path(folder.path))
+
         # in a directory, queue each song file
-        songs = [_ for _ in await music_path.iterdir() if await _.is_file()]
-        songs.sort()
-        for song in songs:
-            if is_audio(str(song)):
-                playlist.append(await song.resolve())
+        for folder in playlist_folders:
+            songs = [_ for _ in await folder.iterdir() if await _.is_file()]
+            songs.sort()
+            for song in songs:
+                if is_audio(str(song)):
+                    playlist.append(await song.resolve())
     else:
         # Otherwise, just queue the uri.
-        playlist.append(music_uri)
+        playlist.append(source)
 
     out = None
-    if output_destination == 'speakers':
+    if output == 'speakers':
         out = sox.play()
-    elif output_destination == 'udp':
-        out = ffmpeg.udp()
+    elif output == 'udp':
+        out = ffmpeg.udp(host=host, port=port)
     else:
         # Check for file output.
-        out_path = trio.Path(output_destination)
-        if output_destination == '/dev/null':
+        out_path = trio.Path(output)
+        if output == '/dev/null':
             out = NullDestStream()
         elif await out_path.is_file() or await out_path.is_dir():
             out = ffmpeg.to_file(out_path)

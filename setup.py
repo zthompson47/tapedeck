@@ -9,6 +9,7 @@ setup(
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/tapedeck',
     description='A music player',
+    long_description_content_type='text/x-rst',
     long_description=open('README.rst', 'r').read(),
     classifiers=[
         "Programming Language :: Python :: 3.5",

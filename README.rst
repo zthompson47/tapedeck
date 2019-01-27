@@ -4,7 +4,7 @@ Tapedeck
 Tapedeck finds and plays music across muiltiple sources and devices::
 
    $ pip install tapedeck
-   $ tapedeck play --shuffle ~/Music -o speakers
+   $ tapedeck play --recursive --shuffle ~/Music -o speakers
 
 **And the band keeps playing on...**
    -- John Perry Barlow
@@ -26,11 +26,11 @@ Find music and play a folder::
      5. ny1970-xx-xx/
      6. oaitw1973-xx-xx/
     ...
-   $ tapedeck play -h 5
+   $ tapedeck play -c 5
 
 View the last search::
 
-   $ tapedeck search -h
+   $ tapedeck search -c
     ...
      4. ny1969-xx-xx/
      5. ny1970-xx-xx/
@@ -40,7 +40,7 @@ View the last search::
 
 Stream music to a device::
 
-   $ tapedeck play . -o udp
+   $ tapedeck play . -o udp -h 192.168.1.100 -p 8771
 
 Installation
 ------------
