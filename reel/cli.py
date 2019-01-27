@@ -1,4 +1,4 @@
-"""Command line interface for tapedeck."""
+"""Command line interface for reel."""
 import logging
 
 import trio

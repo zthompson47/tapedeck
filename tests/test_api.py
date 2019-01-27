@@ -17,7 +17,7 @@ def test_import():
     """Import the reel module."""
     assert reel
     assert reel.__all__ == ['cmd', 'io', 'proc', 'tools']
-    assert reel.cmd.__all__ == ['ffmpeg', 'sox', 'tapedeck']
+    assert reel.cmd.__all__ == ['ffmpeg', 'sox']
     assert reel.io.__all__ == ['InputStream', 'OutputStream', 'StreamIO']
     assert reel.proc.__all__ == ['Daemon', 'Destination', 'ProcBase', 'Source']
     assert reel.tools.__all__ == ['resolve']

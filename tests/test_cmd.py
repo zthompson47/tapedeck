@@ -5,9 +5,7 @@ import os
 from trio import Path
 
 from reel import cmd
-from reel.cmd import (
-    ffmpeg, sox, tapedeck
-)
+from reel.cmd import ffmpeg, sox
 from reel.io import NullDestStream, StreamIO
 
 from tests.fixtures import (
@@ -64,9 +62,3 @@ async def test_play_music_better_way(env_audio_dest):
 #     async with env_audio_dest as out:
 #         for track in [SONG, RADIO]:
 #             await ffmpeg.stream(track) | limit(1000000) | out
-
-
-async def test_tapedeck(music_dir):
-    """Run tapedeck.cli through reel.cmd."""
-    results = await tapedeck.search(music_dir)
-    assert len(results) == 3

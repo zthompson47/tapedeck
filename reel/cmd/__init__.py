@@ -1,7 +1,7 @@
 """Pre-configured commands."""
-from . import ffmpeg, sox, tapedeck
+from . import ffmpeg, sox
 
-__all__ = ['ffmpeg', 'sox', 'tapedeck']
+__all__ = ['ffmpeg', 'sox']
 
 SRC_SILENCE = "ffmpeg -re -f s16le -i /dev/zero -f s16le -"
 

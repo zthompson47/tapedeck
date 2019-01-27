@@ -49,6 +49,7 @@ coverage: clean-coverage
 testall: lint coverage
 
 dist: clean-dist
+	find . -type d -name '$(project).egg-info' -exec rm -r {} +
 	python setup.py sdist bdist_wheel
 	twine check dist/*
 
