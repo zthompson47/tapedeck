@@ -30,7 +30,7 @@ def test_is_audio():
 
 async def test_search(music_dir):
     """Find some music."""
-    search = Source(f'python -m tapedeck.cli search {str(music_dir)}')
+    search = Source(f'python -m tapedeck.cli.main search {str(music_dir)}')
     # ... import coverage in default pyenv needed
     results = await search.read_list(through=resolve)
     assert search.status == 0
@@ -46,7 +46,7 @@ async def test_search(music_dir):
 
 async def test_search_results(music_dir):
     """Find and list music folders."""
-    search = Source(f'python -m tapedeck.cli search {str(music_dir)}')
+    search = Source(f'python -m tapedeck.cli.main search {str(music_dir)}')
     results = await search.read_list()
 
     # List search results.

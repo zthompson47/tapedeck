@@ -17,13 +17,13 @@ setup(
         "Operating System :: OS Independent",
     ],
     entry_points={
-        'console_scripts': ['tapedeck=tapedeck.cli:main'],
+        'console_scripts': ['tapedeck=tapedeck.cli.main:tapedeck_cli'],
     },
     install_requires=[
         'trio>=0.10.0',
         'trio-click>=7.0.2',
         'reel',
-        'ansicolortags',
+        'blessings',
     ],
     zip_safe=False,
     packages=find_packages(),
