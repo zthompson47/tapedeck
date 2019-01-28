@@ -46,7 +46,7 @@ coverage: clean-coverage
 	coverage html
 	coverage report -m
 
-testall: lint coverage
+testall: clean lint coverage
 
 dist: clean-dist
 	find . -type d -name '$(project).egg-info' -exec rm -r {} +

@@ -22,7 +22,6 @@ setup(
     install_requires=[
         'trio>=0.10.0',
         'trio-click>=7.0.2',
-        'ansicolortags>=0.4',
     ],
     zip_safe=False,
     packages=find_packages(),
