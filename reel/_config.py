@@ -6,14 +6,19 @@ assigns defaults when appropriate.
 """
 import os
 
-import trio
+from ._path import Path
 
-from reel.tools import resolve
+__all__ = [
+    'get_config',
+    'get_package_dir', 'get_package_name',
+    'get_xdg_home', 'get_xdg_config_dir',
+    'get_config', 'get_xdg_cache_dir',
+]
 
 
 async def get_package_dir():
     """Return the file path to this package's directory."""
-    return (await trio.Path(__file__).resolve()).parent
+    return (await Path(__file__).resolve()).parent
 
 
 async def get_package_name():
@@ -24,10 +29,10 @@ async def get_package_name():
 async def get_xdg_home(choice=None):
     """Return the root configuration directories for this environment."""
     home_env = {
-        'XDG_CONFIG_HOME': await resolve('~/.config'),
-        'XDG_CACHE_HOME': await resolve('~/.cache'),
-        'XDG_DATA_HOME': await resolve('~/.local/share'),
-        'XDG_RUNTIME_DIR': await resolve('~/.local/run'),
+        'XDG_CONFIG_HOME': await Path.canon('~/.config'),
+        'XDG_CACHE_HOME': await Path.canon('~/.cache'),
+        'XDG_DATA_HOME': await Path.canon('~/.local/share'),
+        'XDG_RUNTIME_DIR': await Path.canon('~/.local/run'),
     }
 
     # Override the defaults if already set in an environment variable.
@@ -47,7 +52,7 @@ async def get_xdg_config_dir(app=None, feature=None):
     """
     if app is None:
         app = await get_package_name()
-    config_home = trio.Path(await get_xdg_home('XDG_CONFIG_HOME'))
+    config_home = Path(await get_xdg_home('XDG_CONFIG_HOME'))
     config_dir = config_home / app
     if not await config_dir.exists():
         await config_dir.mkdir()
@@ -76,7 +81,7 @@ async def get_xdg_cache_dir(app=None):
     """
     if app is None:
         app = await get_package_name()
-    cache_home = trio.Path(await get_xdg_home('XDG_CACHE_HOME'))
+    cache_home = Path(await get_xdg_home('XDG_CACHE_HOME'))
     cache_dir = cache_home / app
     if not await cache_dir.exists():
         await cache_dir.mkdir()

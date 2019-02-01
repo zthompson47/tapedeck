@@ -4,15 +4,15 @@ import pathlib
 
 import trio
 
-from reel.config import (
+from reel import (
     get_config,
     get_package_dir,
     get_package_name,
     get_xdg_cache_dir,
     get_xdg_config_dir,
     get_xdg_home,
+    Path,
 )
-from reel.tools import resolve
 from tests.fixtures import (
     config_icecast, env_home, set_env, unset_env
 )
@@ -24,7 +24,7 @@ async def test_fixture_env_home_works(env_home):
                 'XDG_CACHE_HOME',
                 'XDG_DATA_HOME',
                 'XDG_RUNTIME_DIR']:
-        assert await trio.Path(env_home[var]).exists()
+        assert await Path(env_home[var]).exists()
 
 
 async def test_fixture_env_home_uses_environ(env_home):
@@ -51,8 +51,7 @@ async def test_fixture_env_home_uses_default(env_home):
 
 async def test_get_package_dir():
     """Get the path to this package."""
-    assert await resolve('./reel') == str(await get_package_dir())
-    assert isinstance(await get_package_dir(), trio.Path)
+    assert await Path.canon('./reel') == str(await get_package_dir())
 
 
 async def test_get_package_name():
@@ -123,5 +122,5 @@ async def test_get_xdg_cache_dir(env_home):
     assert cache_dir.name == '_testapp_'
 
     # Make sure get_xdg_cache_dir returns a resolved path.
-    xdg_cache_home = await trio.Path(env_home['XDG_CACHE_HOME']).resolve()
+    xdg_cache_home = await Path(env_home['XDG_CACHE_HOME']).resolve()
     assert cache_dir.parent == xdg_cache_home
