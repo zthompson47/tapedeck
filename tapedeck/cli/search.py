@@ -1,4 +1,5 @@
 """The ``tapedeck`` cli 'search' command."""
+import logging
 import pathlib
 
 import blessings
@@ -18,17 +19,17 @@ T = blessings.Terminal()
               help='Search hidden dot-directories.')
 @click.option('-l', '--follow-links', is_flag=True,
               help='Search symlinked directories.')
-# @click.option('-m', '--memory',
-#               help='Play tracks from last search', type=int)
-@click.option('-c', '--cached', is_flag=True,
-              help='Show cached search history')
-async def search(directory, follow_links, follow_dots, cached):
+@click.option('-m', '--memory', is_flag=True,
+              help='Show last search from memory')
+async def search(directory, follow_links, follow_dots, memory):
     """Search for music."""
-    if cached:
+    click.echo('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', err=True)
+    if memory:
         # Read the cached search file.
         cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
         async with await cache_file.open('r') as out:
             lines = (await out.read()).split('\n')[0:-1]
+        logging.debug(lines)
 
         # Print the cached search to a pager.
         output = []

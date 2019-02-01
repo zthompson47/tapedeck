@@ -1,4 +1,16 @@
-"""Search for music."""
+"""Tests for `tapedeck.cli.search`.
+
+Usage: tapedeck search [options] [directory]
+
+  ¤ Find music
+
+Options:
+  -d, --follow-dots   Search hidden dot-directories.
+  -l, --follow-links  Search symlinked directories.
+  -m, --memory        Show last search from memory
+  --help              Show this message and exit.
+
+"""
 from reel import get_xdg_cache_dir, Path
 from reel.proc import Source
 
@@ -60,3 +72,14 @@ async def test_search_results(music_dir):
         filenames.append(filename)
         assert Path(filename).is_absolute()
     assert sorted(filenames) == sorted(list(set(filenames)))
+
+
+async def test_cached_results(music_dir):
+    """Show the prior search."""
+    search = Source(f'tapedeck search {str(music_dir)}')
+    results = await search.read_list()
+    assert len(results) == 3
+
+    cached_search = Source('tapedeck search -m')
+    cached_results = await cached_search.read_list()
+    assert len(cached_results) == 3

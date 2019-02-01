@@ -13,29 +13,33 @@ class Folder:
 
     def __init__(self, **kwargs):
         """Create a folder."""
-        self.path = ''
+        self._path = ''
         self.song_files = []
         self.text_files = []
         for key, value in kwargs.items():
-            self.__setattr__(key, value)
+            if key == 'path':
+                self._path = value
+            else:
+                self.__setattr__(key, value)
 
     def _pretty_print(self):
         """Print prettily."""
         result = 'Folder:/'
-        parent = trio.run(trio.Path(self.path).parent.resolve)
+        parent = trio.run(trio.Path(self._path).parent.resolve)
         for part in parent.parts:
             if part[0] != '/':
                 result += part[0] + '/'
-        result += trio.Path(self.path).name
+        result += trio.Path(self._path).name
         return result
 
     def __repr__(self):
         """Print prettily."""
         return self._pretty_print()
 
-    def __str__(self):
-        """Print prettily."""
-        return self._pretty_print()
+    @property
+    def path(self):
+        """Return this path."""
+        return self._path
 
 
 async def find_tunes(music_dir: str,

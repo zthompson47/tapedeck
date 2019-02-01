@@ -8,11 +8,12 @@ from reel.proc import Source
 
 async def test_play(env_audio_dest, uri):
     """Stream from source to destination."""
-    print(env_audio_dest)
+    audio_uri = '/Users/zach/out000.wav'
     player = Source(
-        f'python -m tapedeck.cli.main play {uri.RADIO} -o {env_audio_dest}'
+        f'python -m tapedeck.cli.main play {audio_uri} -o {env_audio_dest}'
     )
-    await player.run(timeout=4.7)
+    # await player.run(timeout=4.7)  # ... needs clean kill
+    await player.run()
     assert player.status <= 0  # ... maybe it should not be an erorr?
 
 
