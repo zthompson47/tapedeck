@@ -16,7 +16,7 @@ help:
 	@echo "dist-upload - upload a distribution to pypi"
 
 test:
-	python -m pytest
+	python -m pytest -W ignore
 
 clean-tools:
 	find . -type d -name '.pytest_cache' -exec rm -r {} +
@@ -47,7 +47,7 @@ lint:
 	python -m pylint --disable=$(disabled) tests $(other_files)
 
 coverage: clean-coverage
-	coverage run --module pytest
+	coverage run --module pytest -W ignore
 	coverage combine
 	coverage html
 	coverage report -m

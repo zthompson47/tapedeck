@@ -1,10 +1,8 @@
 """Search for music."""
 import trio
 
-from reel import cmd
-from reel import config
+from reel import cmd, get_xdg_cache_dir, Path
 from reel.proc import Source
-from reel.tools import resolve
 
 from tapedeck.search import find_tunes, is_audio
 from tests.fixtures import music_dir
@@ -32,7 +30,7 @@ async def test_search(music_dir):
     """Find some music."""
     search = Source(f'python -m tapedeck.cli.main search {str(music_dir)}')
     # ... import coverage in default pyenv needed
-    results = await search.read_list(through=resolve)
+    results = await search.read_list(through=Path.canon)
     assert search.status == 0
     assert len(results) == 3
     found = False
@@ -71,7 +69,7 @@ async def test_search_results(music_dir):
     assert sorted(filenames) == sorted(list(set(filenames)))
 
     # Save a cache file with the search results.
-    cache_dir = await config.get_xdg_cache_dir('tapedeck')
+    cache_dir = await get_xdg_cache_dir('tapedeck')
     assert await cache_dir.exists()
     cached_search = cache_dir / 'search.txt'
     assert await cached_search.exists()
