@@ -5,14 +5,12 @@ import pytest
 
 from reel.proc import Source
 
-from tests.fixtures import RADIO, env_audio_dest, music_dir
 
-
-async def test_play(env_audio_dest):
+async def test_play(env_audio_dest, uri):
     """Stream from source to destination."""
     print(env_audio_dest)
     player = Source(
-        f'python -m tapedeck.cli.main play {RADIO} -o {env_audio_dest}'
+        f'python -m tapedeck.cli.main play {uri.RADIO} -o {env_audio_dest}'
     )
     await player.run(timeout=4.7)
     assert player.status <= 0  # ... maybe it should not be an erorr?

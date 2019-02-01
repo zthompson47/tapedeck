@@ -5,7 +5,8 @@ from reel import cmd, get_xdg_cache_dir, Path
 from reel.proc import Source
 
 from tapedeck.search import find_tunes, is_audio
-from tests.fixtures import music_dir
+
+TD = 'python -m tapedeck.cli.main'
 
 
 async def test_find_tunes(music_dir):
@@ -28,7 +29,7 @@ def test_is_audio():
 
 async def test_search(music_dir):
     """Find some music."""
-    search = Source(f'python -m tapedeck.cli.main search {str(music_dir)}')
+    search = Source(f'{TD} search {str(music_dir)}')
     # ... import coverage in default pyenv needed
     results = await search.read_list(through=Path.canon)
     assert search.status == 0
@@ -44,7 +45,7 @@ async def test_search(music_dir):
 
 async def test_search_results(music_dir):
     """Find and list music folders."""
-    search = Source(f'python -m tapedeck.cli.main search {str(music_dir)}')
+    search = Source(f'{TD} search {str(music_dir)}')
     results = await search.read_list()
 
     # List search results.

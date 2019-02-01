@@ -1,21 +1,40 @@
-"""Shared test fixtures and functions."""
+"""Magic startup file for pytest.
+
+Imported before tests.  Loads fixtures and sets environment
+variables for subprocess testing.
+
+"""
 import logging
 import os
+from tempfile import mkdtemp
 
 import pytest
 
 import tapedeck
 
-ENV_COVERAGE = {
-    'COVERAGE_PROCESS_START': 'setup.cfg',
-    'PYTHONPATH': '.'
-}
-RADIO = 'http://ice1.somafm.com/groovesalad-256-mp3'
-
+# Use config from environ for logging.
 logging.basicConfig(
     filename=tapedeck.LOGGING_FILE,
     level=tapedeck.LOGGING_LEVEL
 )
+
+# Enable full test coverage for subprocesses.
+os.environ['COVERAGE_PROCESS_START'] = 'setup.cfg'
+os.environ['PYTHONPATH'] = '.'  # to find sitecustomize.py
+
+# Create temp home directories.
+os.environ['XDG_CONFIG_HOME'] = mkdtemp('xdg_config')
+os.environ['XDG_CACHE_HOME'] = mkdtemp('xdg_cache')
+os.environ['XDG_DATA_HOME'] = mkdtemp('xdg_data')
+os.environ['XDG_RUNTIME_DIR'] = mkdtemp('xdg_runtime')
+
+
+@pytest.fixture
+def uri():
+    """Return a list of music to play."""
+    return type('Z', (object,), {
+        'RADIO': 'http://ice1.somafm.com/groovesalad-256-mp3',
+    })
 
 
 @pytest.fixture
@@ -26,7 +45,7 @@ def env_audio_dest():
 
 @pytest.fixture
 def music_dir(tmpdir):
-    """Create a temporary directory with of music subdirectories."""
+    """Create a temporary directory with subdirectories of music."""
     music_dirs = [
         {
             'root1': [
