@@ -1,10 +1,13 @@
 """Install the reel package."""
 from setuptools import find_packages, setup
 
+# pylint: disable=exec-used
+exec(open("reel/_version.py", encoding="utf-8").read())  # __version__
+
 setup(
     license='MIT',
     name='reel',
-    version='0.0.4',
+    version=__version__,  # noqa: F821 # pylint: disable=undefined-variable
     author='Zach Thompson',
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/reel',
