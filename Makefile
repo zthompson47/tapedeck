@@ -16,7 +16,7 @@ help:
 	@echo "dist-upload - upload a distribution to pypi"
 
 test:
-	python -m pytest
+	python -m pytest -W ignore
 
 clean-tools:
 	find . -type d -name '.pytest_cache' -exec rm -r {} +
@@ -38,10 +38,10 @@ other_files = sitecustomize.py setup.py
 lint:
 	python -m flake8 --max-complexity 10 $(project) tests $(other_files)
 	python -m pydocstyle $(project) tests $(other_files)
-	python -m pylint $(project) tests $(other_files)
+	python -m pylint --disable=R0801 $(project) tests $(other_files)
 
 coverage: clean-coverage
-	coverage run --module pytest
+	coverage run --module pytest -W ignore
 	coverage combine
 	coverage html
 	coverage report -m
