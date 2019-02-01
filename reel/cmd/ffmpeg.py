@@ -1,5 +1,20 @@
 """Various ffmpeg command line tools."""
-from reel.proc import Destination, Source
+import reel
+from reel import Source, Destination
+
+
+def read(uri):
+    """Prepare a command to read an audio file and stream to stdout."""
+    cmd = 'ffmpeg'
+    flags = [
+        '-ac', '2',  # 2-channel stereo
+        '-i', uri,  # input file or url
+        '-f', 's16le',  # 16 bit little-endian
+        '-ar', '44.1k',  # sample rate
+        '-acodec', 'pcm_s16le',  # wav format
+        '-',  # stream to stdout
+    ]
+    return reel.Spool(cmd, xconf=flags)
 
 
 async def stream(uri):

@@ -42,6 +42,25 @@ def unset_env(env):
 
 
 @pytest.fixture
+def test_audio_dest():
+    """Return an audio output for testing."""
+    dest = os.environ.get('REEL_TESTING_AUDIO_DEST', '/dev/null')
+    out = None
+    if dest == 'speakers':
+        out = cmd.sox.play()
+    elif dest == 'udp':
+        out = cmd.ffmpeg.udp('0.0.0.0', '8771')
+    else:
+        # Check for file output.
+        out_path = reel.Path(dest)
+        if dest == '/dev/null':
+            out = NullDestStream()
+        elif trio.run(out_path.is_file) or trio.run(out_path.is_dir):
+            out = cmd.ffmpeg.to_file(out_path)
+    return out
+
+
+@pytest.fixture
 def env_audio_dest():
     """Return an audio output for testing."""
     dest = os.environ.get('REEL_TESTING_AUDIO_DEST', '/dev/null')
@@ -52,7 +71,7 @@ def env_audio_dest():
         out = cmd.ffmpeg.udp('0.0.0.0', '8771')
     else:
         # Check for file output.
-        out_path = trio.Path(dest)
+        out_path = reel.Path(dest)
         if dest == '/dev/null':
             out = NullDestStream()
         elif trio.run(out_path.is_file) or trio.run(out_path.is_dir):
