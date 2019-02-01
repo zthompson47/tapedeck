@@ -1,8 +1,10 @@
 """Handle subprocesses and pipes."""
+# pylint: disable=R0801
 from abc import ABCMeta, abstractmethod
 import logging
 import os
 import shlex
+import subprocess
 
 import trio
 
@@ -55,7 +57,7 @@ class Daemon(ProcBase):
     async def start(self):
         """Start the server."""
         command = await self.prepare_command()
-        self._proc = trio.subprocess.Process(
+        self._proc = trio.Process(
             command,
             stdin=None,
             stdout=None,
@@ -101,11 +103,11 @@ class Destination:
 
     def receive(self):
         """Return a context-managed output stream."""
-        self._proc = trio.subprocess.Process(
+        self._proc = trio.Process(
             self._command,
-            stdin=trio.subprocess.PIPE,
-            stdout=trio.subprocess.DEVNULL,
-            stderr=trio.subprocess.DEVNULL,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             env=self._env
         )
         return InputStream(self._proc.stdin)
@@ -207,13 +209,13 @@ class Source():
         """Run the command."""
         if message:
             message = message.encode('utf-8')
-            _stdin = trio.subprocess.PIPE
+            _stdin = subprocess.PIPE
         else:
             _stdin = None
-        self._proc = trio.subprocess.Process(
+        self._proc = trio.Process(
             self._command,
             stdin=_stdin,
-            stdout=trio.subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
             stderr=None,
             env=self._env
         )
@@ -234,18 +236,18 @@ class Source():
         """Run the command and return the exit status."""
         if stdin:
             stdin = stdin.encode('utf-8')
-            _stdin = trio.subprocess.PIPE
+            _stdin = subprocess.PIPE
         else:
             _stdin = None
-        self._proc = trio.subprocess.Process(
+        self._proc = trio.Process(
             self._command,
             stdin=_stdin,
-            stdout=trio.subprocess.PIPE,
-            stderr=trio.subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             env=self._env
         )
         async with trio.open_nursery() as nursery:
-            if _stdin == trio.subprocess.PIPE:
+            if _stdin == subprocess.PIPE:
                 nursery.start_soon(self._stream_stdin, stdin)
             nursery.start_soon(self._stream_stderr, self._limit)
             nursery.start_soon(self._stream_stdout, self._limit)
@@ -257,18 +259,18 @@ class Source():
         """Return the output as text."""
         if message:
             message = message.encode('utf-8')
-            _stdin = trio.subprocess.PIPE
+            _stdin = subprocess.PIPE
         else:
             _stdin = None
-        self._proc = trio.subprocess.Process(
+        self._proc = trio.Process(
             self._command,
             stdin=_stdin,
-            stdout=trio.subprocess.PIPE,
-            stderr=trio.subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             env=self._env
         )
         async with trio.open_nursery() as nursery:
-            if _stdin == trio.subprocess.PIPE:
+            if _stdin == subprocess.PIPE:
                 nursery.start_soon(self._stream_stdin, message)
             nursery.start_soon(self._stream_stderr, self._limit)
             nursery.start_soon(self._stream_stdout, self._limit)
@@ -281,18 +283,18 @@ class Source():
     async def read_bytes(self, send_bytes=None):
         """Return the output as bytes."""
         if send_bytes:
-            _stdin = trio.subprocess.PIPE
+            _stdin = subprocess.PIPE
         else:
             _stdin = None
-        self._proc = trio.subprocess.Process(
+        self._proc = trio.Process(
             self._command,
             stdin=_stdin,
-            stdout=trio.subprocess.PIPE,
-            stderr=trio.subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             env=self._env
         )
         async with trio.open_nursery() as nursery:
-            if _stdin == trio.subprocess.PIPE:
+            if _stdin == subprocess.PIPE:
                 nursery.start_soon(self._stream_stdin, send_bytes)
             nursery.start_soon(self._stream_stderr, self._limit)
             nursery.start_soon(self._stream_stdout, None)
@@ -312,14 +314,14 @@ class Source():
         """Return a context-managed output stream."""
         if message:
             message = message.encode('utf-8')
-            _stdin = trio.subprocess.PIPE
+            _stdin = subprocess.PIPE
         else:
             _stdin = None
-        self._proc = trio.subprocess.Process(
+        self._proc = trio.Process(
             self._command,
             stdin=_stdin,
-            stdout=trio.subprocess.PIPE,
-            stderr=trio.subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
             env=self._env
         )
         if message:
@@ -331,14 +333,14 @@ class Source():
         """Return a context-managed output stream."""
         if message:
             message = message.encode('utf-8')
-            _stdin = trio.subprocess.PIPE
+            _stdin = subprocess.PIPE
         else:
             _stdin = None
-        self._proc = trio.subprocess.Process(
+        self._proc = trio.Process(
             self._command,
             stdin=_stdin,
-            stdout=trio.subprocess.PIPE,
-            stderr=trio.subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
             env=self._env
         )
         if message:

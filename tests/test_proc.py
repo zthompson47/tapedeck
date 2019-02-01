@@ -34,7 +34,7 @@ async def test_version():
     assert src.status == 0
     assert src.err == ''
     assert isinstance(src._proc,  # pylint: disable=protected-access
-                      trio.subprocess.Process)
+                      trio.Process)
     assert version == reel.__version__
 
 
