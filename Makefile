@@ -49,7 +49,7 @@ lint:
 coverage: clean-coverage
 	coverage run --module pytest -W ignore
 	coverage combine
-	coverage html
+	coverage html -d etc/htmlcov
 	coverage report -m
 
 testall: clean lint coverage
