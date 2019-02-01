@@ -1,1 +1,1 @@
-"""Test the tapedeck package."""
+"""Tests for the tapedeck package."""
