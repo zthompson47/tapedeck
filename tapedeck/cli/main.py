@@ -9,7 +9,11 @@ import tapedeck
 from . import play, search
 from .. import config
 
-LOGGER = trio.run(config.get_logger, __name__)
+LOG_LEVEL = trio.run(config.env, 'TAPEDECK_LOG_LEVEL')
+if LOG_LEVEL:
+    LOG_FILE = trio.run(config.logfile, 'tapedeck.log')
+    logging.basicConfig(level=LOG_LEVEL, filename=LOG_FILE)
+LOGGER = logging.getLogger(__name__)
 LOGGER.debug('Begin logging for tapedeck ~-~=~-~=~-~=~!!<(o>)!!~=~-~=~-~=~')
 
 
