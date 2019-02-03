@@ -9,24 +9,48 @@ import os
 from tempfile import mkdtemp
 
 import pytest
+import trio
+
+from reel import Path
 
 import tapedeck
 
-# Use config from environ for logging.
-logging.basicConfig(
-    filename=tapedeck.LOGGING_FILE,
-    level=tapedeck.LOGGING_LEVEL
-)
+
+# Log debug messages for testing.
+LOG_FILE = trio.run(tapedeck.logfile, 'tests.log')
+logging.basicConfig(filename=LOG_FILE, level='DEBUG')
+LOGGER = logging.getLogger(__name__)
+LOGGER.debug('Begin logging for tests ~-~=~-~=~-~=~!!((o))!!~=~-~=~-~=~')
+
+# Fetch testing configuration from environment vars.
+TESTING_AUDIO_DEST = os.environ.get('TAPEDECK_TESTING_AUDIO_DEST', '/dev/null')
+
+# Remove any existing TAPEDECK_* config vars.
+for key in os.environ.keys():
+    if key.startswith('TAPEDECK_'):
+        del os.environ[key]
+
+# Create home directories for testing.
+XDG = {
+    'XDG_CONFIG_HOME': Path(mkdtemp('xdg_config')),
+    'XDG_CACHE_HOME': Path(mkdtemp('xdg_cache')),
+    'XDG_DATA_HOME': Path(mkdtemp('xdg_data')),
+    'XDG_RUNTIME_DIR': Path(mkdtemp('xdg_runtime')),
+}
+
+# Set xdg environment variables.
+for key, val in XDG.items():
+    os.environ[key] = val
 
 # Enable full test coverage for subprocesses.
 os.environ['COVERAGE_PROCESS_START'] = 'setup.cfg'
 os.environ['PYTHONPATH'] = '.'  # to find sitecustomize.py
 
-# Create temp home directories.
-os.environ['XDG_CONFIG_HOME'] = mkdtemp('xdg_config')
-os.environ['XDG_CACHE_HOME'] = mkdtemp('xdg_cache')
-os.environ['XDG_DATA_HOME'] = mkdtemp('xdg_data')
-os.environ['XDG_RUNTIME_DIR'] = mkdtemp('xdg_runtime')
+
+@pytest.fixture
+def xdg():
+    """Return the xdg environment."""
+    return XDG
 
 
 @pytest.fixture
@@ -40,7 +64,7 @@ def uri():
 @pytest.fixture
 def env_audio_dest():
     """Enable setting an audio output for testing."""
-    return os.environ.get('TAPEDECK_TESTING_AUDIO_DEST', '/dev/null')
+    return TESTING_AUDIO_DEST
 
 
 @pytest.fixture

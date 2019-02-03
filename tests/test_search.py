@@ -35,4 +35,4 @@ def test_folder_print(tmpdir):
     """Print the folder prettily, keeping final name in path."""
     folder = Folder(path=tmpdir)
     assert folder
-    assert Path(folder.path).name == Path(str(folder)).name
+    assert Path(folder.path) in str(folder)

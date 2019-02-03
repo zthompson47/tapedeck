@@ -3,9 +3,9 @@ import logging
 import os
 from typing import List
 
-import trio
-
 from reel.tools import resolve
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Folder:
@@ -21,20 +21,11 @@ class Folder:
                 self._path = value
             else:
                 self.__setattr__(key, value)
-
-    def _pretty_print(self):
-        """Print prettily."""
-        result = 'Folder:/'
-        parent = trio.run(trio.Path(self._path).parent.resolve)
-        for part in parent.parts:
-            if part[0] != '/':
-                result += part[0] + '/'
-        result += trio.Path(self._path).name
-        return result
+        LOGGER.debug('__init__:%s', self)
 
     def __repr__(self):
         """Print prettily."""
-        return self._pretty_print()
+        return f"Folder('{self._path}')"
 
     @property
     def path(self):

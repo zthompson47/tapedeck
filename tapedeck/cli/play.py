@@ -16,7 +16,7 @@ T = blessings.Terminal()
 
 # pylint: disable=too-many-branches,too-many-locals,too-many-arguments
 @click.command(options_metavar='[options]',  # noqa: C901
-               help='''¤_play music_¤
+               help='''¤_ Play Music _¤
 
                       Use a local file path or a network URL for <source>.
                       Do not provide <source> if using the --cached option.
@@ -30,8 +30,10 @@ T = blessings.Terminal()
 # @click.option('-m', '--memory',\
 # help='Play tracks from last search', type=int)
 @click.option('-c', '--cached', help='Play track from cached search', type=int)
-@click.option('-h', '--host', help='Network streaming host')
-@click.option('-p', '--port', help='Network streaming port', type=int)
+@click.option('-h', '--host', envvar='TAPEDECK_UDP_HOST',
+              help='Network streaming host')
+@click.option('-p', '--port', envvar='TAPEDECK_UDP_PORT',
+              help='Network streaming port', type=int)
 async def play(source, output, cached, shuffle, host, port, recursive):
     """Build a playlist and play it."""
     playlist = []
@@ -69,6 +71,8 @@ async def play(source, output, cached, shuffle, host, port, recursive):
     if output == 'speakers':
         out = sox.play()
     elif output == 'udp':
+        if host is None or port is None:
+            raise click.BadOptionUsage('-o', 'udp needs host and port')
         out = ffmpeg.udp(host=host, port=port)
     else:
         # Check for file output.

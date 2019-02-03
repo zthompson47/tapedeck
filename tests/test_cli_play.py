@@ -1,4 +1,5 @@
 """Tests for the 'tapedeck play' cli command."""
+import os
 import shlex
 
 import pytest
@@ -36,3 +37,20 @@ async def test_play_shuffle(music_dir):
 
 async def test_play_loop(music_dir):
     """Repeat a playlist forever."""
+
+
+async def test_host_port_env_config():
+    """Use default host and port from environment variables."""
+    audio_uri = '/Users/zach/out000.wav'
+
+    # Try with no host or port.
+    player = Source(f'tapedeck play {audio_uri} -o udp')
+    await player.run()
+    assert player.status > 0
+    # assert 'udp needs host and port' in player.err  # ... CAN'T GET STDERR
+
+    # Set a host and port.
+    xenv = {'TAPEDECK_UDP_HOST': '0.0.0.0', 'TAPEDECK_UDP_PORT': '0'}
+    player = Source(f'tapedeck play {audio_uri} -o udp', xenv)
+    await player.run()
+    assert player.status <= 0
