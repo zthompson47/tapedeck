@@ -10,7 +10,7 @@ import pathlib
 import trio
 
 
-class Path(trio.Path):
+class Path(trio.Path, str):
     """A path object with some added file streaming methods."""
 
     @classmethod

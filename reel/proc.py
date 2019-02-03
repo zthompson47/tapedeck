@@ -212,6 +212,7 @@ class Source():
             _stdin = subprocess.PIPE
         else:
             _stdin = None
+
         self._proc = trio.Process(
             self._command,
             stdin=_stdin,
@@ -219,6 +220,7 @@ class Source():
             stderr=None,
             env=self._env
         )
+
         if message:
             async with trio.open_nursery() as nursery:
                 nursery.start_soon(self._stream_stdin, message)
