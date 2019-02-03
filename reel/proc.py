@@ -117,7 +117,6 @@ class Source():
     """A subprocess that produces output."""
 
     _command = None
-    _env = os.environ
     _err = b''
     _limit = LIMIT
     _nurse = None
@@ -128,6 +127,7 @@ class Source():
 
     def __init__(self, command, xenv=None, xconf=None):
         """Get the command ready to run."""
+        self._env = dict(os.environ)  # ... was class var without dict ?!?
         self._command = shlex.split(command)
         if xconf:
             for flag in xconf:
@@ -279,7 +279,7 @@ class Source():
             await self._proc.wait()
             self._status = self._proc.returncode
         if self._err:
-            LOGGER.debug(self._err)
+            LOGGER.debug('REMOTE: %s', self._err.decode('utf-8'))
         return self._output.decode('utf-8').strip()
 
     async def read_bytes(self, send_bytes=None):
@@ -311,6 +311,15 @@ class Source():
         if through:
             return [await through(_) for _ in output_list]
         return output_list
+
+    async def read_dict(self, split=':', message=None):
+        """Return the output as a dict."""
+        output = await self.read_list(message)
+        result = {}
+        for line in output:
+            key, val = line.split(split)
+            result[key] = val
+        return result
 
     async def send(self, message=None):
         """Return a context-managed output stream."""
