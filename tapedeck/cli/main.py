@@ -34,8 +34,7 @@ T = blessings.Terminal()
 @click.option('--config', is_flag=True, help='Print configuration and exit')
 @click.option('--version', is_flag=True, help='Print version number and exit')
 @click.option('--log-to-stderr', is_flag=True, help='Route logging to stderr')
-@click.pass_context
-async def tapedeck_cli(ctx, config, version, log_to_stderr):
+async def tapedeck_cli(config, version, log_to_stderr):
     """Run the tapedeck cli."""
     if log_to_stderr:
         LOGGER.addHandler(logging.StreamHandler(sys.stderr))
