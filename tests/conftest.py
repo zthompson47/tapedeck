@@ -17,18 +17,16 @@ import tapedeck
 
 
 # Log debug messages for testing.
-LOG_FILE = trio.run(tapedeck.logfile, 'tests.log')
+LOG_FILE = trio.run(tapedeck.config.logfile, 'tests.log')
 logging.basicConfig(filename=LOG_FILE, level='DEBUG')
 LOGGER = logging.getLogger(__name__)
 LOGGER.debug('Begin logging for tests ~-~=~-~=~-~=~!!((o))!!~=~-~=~-~=~')
 
-# Fetch testing configuration from environment vars.
-TESTING_AUDIO_DEST = os.environ.get('TAPEDECK_TESTING_AUDIO_DEST', '/dev/null')
-
 # Remove any existing TAPEDECK_* config vars.
 for key in os.environ.keys():
     if key.startswith('TAPEDECK_'):
-        del os.environ[key]
+        if not key.startswith('TAPEDECK_TESTS_'):
+            del os.environ[key]
 
 # Create home directories for testing.
 XDG = {
@@ -64,7 +62,7 @@ def uri():
 @pytest.fixture
 def env_audio_dest():
     """Enable setting an audio output for testing."""
-    return TESTING_AUDIO_DEST
+    return os.environ.get('TAPEDECK_TESTS_AUDIO_DEST', '/dev/null')
 
 
 @pytest.fixture

@@ -25,7 +25,7 @@ clean-tools:
 clean-coverage:
 	rm -f .coverage
 	rm -f .coverage.*
-	rm -rf htmlcov/
+	rm -rf etc/htmlcov/
 
 clean-dist:
 	find . -type d -name '__pycache__' -exec rm -r {} +

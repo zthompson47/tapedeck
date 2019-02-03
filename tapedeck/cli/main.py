@@ -7,9 +7,9 @@ import trio_click as click
 
 import tapedeck
 from . import play, search
-from .. _config import get_logger
+from .. import config
 
-LOGGER = trio.run(get_logger, __name__)
+LOGGER = trio.run(config.get_logger, __name__)
 LOGGER.debug('Begin logging for tapedeck ~-~=~-~=~-~=~!!<(o>)!!~=~-~=~-~=~')
 
 
@@ -28,7 +28,7 @@ LOGGER.debug('Begin logging for tapedeck ~-~=~-~=~-~=~!!<(o>)!!~=~-~=~-~=~')
 @click.option('--config', is_flag=True, help='Print the configuration')
 @click.option('--version', is_flag=True, help='Print version number and exit')
 @click.help_option('--help', help='Display help message and exit')
-def tapedeck_cli(**kwargs: str) -> None:
+async def tapedeck_cli(**kwargs: str) -> None:
     """Run the tapedeck cli."""
     if kwargs['log_to_stderr']:
         LOGGER.addHandler(logging.StreamHandler(sys.stderr))
@@ -38,7 +38,10 @@ def tapedeck_cli(**kwargs: str) -> None:
         click.echo('v' + tapedeck.__version__)
 
     if kwargs['config']:
-        click.echo('------>>>>>>>>>>>>>')
+        for key, val in (await tapedeck.config.env()).items():
+            if not val:
+                val = ''
+            click.echo(f'{key}={val}')
 
 
 tapedeck_cli.add_command(play.play)
