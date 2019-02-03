@@ -13,7 +13,7 @@ from tapedeck.search import find_tunes
 T = blessings.Terminal()
 
 
-@click.command(options_metavar='[options]', help='¤_ Search For Music _¤')
+@click.command(options_metavar='[options]', help='¤ Search For Music')
 @click.argument('directory', metavar='[directory]', required=False)
 @click.option('-d', '--follow-dots', is_flag=True,
               help='Search hidden dot-directories.')

@@ -2,19 +2,21 @@
 import logging
 import sys
 
+import blessings
 import trio
 import trio_click as click
 
 import tapedeck
 from . import play, search
-from .. import config
 
-LOG_LEVEL = trio.run(config.env, 'TAPEDECK_LOG_LEVEL')
+LOG_LEVEL = trio.run(tapedeck.config.env, 'TAPEDECK_LOG_LEVEL')
 if LOG_LEVEL:
-    LOG_FILE = trio.run(config.logfile, 'tapedeck.log')
+    LOG_FILE = trio.run(tapedeck.config.logfile, 'tapedeck.log')
     logging.basicConfig(level=LOG_LEVEL, filename=LOG_FILE)
 LOGGER = logging.getLogger(__name__)
 LOGGER.debug('Begin logging for tapedeck ~-~=~-~=~-~=~!!<(o>)!!~=~-~=~-~=~')
+
+T = blessings.Terminal()
 
 
 @click.group(invoke_without_command=True,
@@ -28,24 +30,26 @@ LOGGER.debug('Begin logging for tapedeck ~-~=~-~=~-~=~!!<(o>)!!~=~-~=~-~=~')
                      and stream live music.  It's like a fresh
                      box of blank tapes.
                   ''')
-@click.option('--log-to-stderr', is_flag=True, help='Print logging to stderr')
-@click.option('--config', is_flag=True, help='Print the configuration')
-@click.option('--version', is_flag=True, help='Print version number and exit')
 @click.help_option('--help', help='Display help message and exit')
-async def tapedeck_cli(**kwargs: str) -> None:
+@click.option('--config', is_flag=True, help='Print configuration and exit')
+@click.option('--version', is_flag=True, help='Print version number and exit')
+@click.option('--log-to-stderr', is_flag=True, help='Route logging to stderr')
+@click.pass_context
+async def tapedeck_cli(ctx, config, version, log_to_stderr):
     """Run the tapedeck cli."""
-    if kwargs['log_to_stderr']:
+    if log_to_stderr:
         LOGGER.addHandler(logging.StreamHandler(sys.stderr))
 
-    if kwargs['version']:
+    if version:
         LOGGER.debug('Running tapedeck v%s cli...', tapedeck.__version__)
-        click.echo('v' + tapedeck.__version__)
+        click.echo(f'{T.blue}¤_tapedeck_¤ ', nl=False)
+        click.echo(f'{T.yellow}v{tapedeck.__version__}{T.normal}')
 
-    if kwargs['config']:
+    if config:
         for key, val in (await tapedeck.config.env()).items():
             if not val:
                 val = ''
-            click.echo(f'{key}={val}')
+            click.echo(f'{T.blue}{key}{T.normal}={T.yellow}{val}{T.normal}')
 
 
 tapedeck_cli.add_command(play.play)

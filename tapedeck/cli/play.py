@@ -15,13 +15,7 @@ T = blessings.Terminal()
 
 
 # pylint: disable=too-many-branches,too-many-locals,too-many-arguments
-@click.command(options_metavar='[options]',  # noqa: C901
-               help='''¤_ Play Music _¤
-
-                      Use a local file path or a network URL for <source>.
-                      Do not provide <source> if using the --cached option.
-
-                    ''')
+@click.command(options_metavar='[options]', help='¤ Play Music')  # noqa: C901
 @click.argument('source', metavar='<source>', required=False)
 @click.option('-o', '--output', default='speakers',
               help='Output destination', show_default=True)
@@ -29,21 +23,21 @@ T = blessings.Terminal()
 @click.option('-r', '--recursive', help='Play subfolders', is_flag=True)
 # @click.option('-m', '--memory',\
 # help='Play tracks from last search', type=int)
-@click.option('-c', '--cached', help='Play track from cached search', type=int)
+@click.option('-m', '--memory', help='Play track from memory', type=int)
 @click.option('-h', '--host', envvar='TAPEDECK_UDP_HOST',
               help='Network streaming host')
 @click.option('-p', '--port', envvar='TAPEDECK_UDP_PORT',
               help='Network streaming port', type=int)
-async def play(source, output, cached, shuffle, host, port, recursive):
+async def play(source, output, memory, shuffle, host, port, recursive):
     """Build a playlist and play it."""
     playlist = []
 
-    if cached:
+    if memory:
         # Find the track filename by index in the cached search results.
         cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
         async with await cache_file.open('r') as out:
             lines = (await out.read()).split('\n')[0:-1]
-        track = lines[int(cached) - 1]
+        track = lines[int(memory) - 1]
         music_path = trio.Path(track[track.find(' ') + 1:])
     else:
         music_path = trio.Path(source)
