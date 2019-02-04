@@ -5,8 +5,6 @@ import logging
 import reel
 from reel.cmd import ffmpeg, sox
 
-from tests.fixtures import env_audio_dest, RADIO, SONG  # noqa: F401
-
 
 async def test_pipe_operator():
     """Overload the ``__or__`` operator to make piping streams look cool."""
@@ -47,7 +45,7 @@ async def test_play_music_even_better(env_audio_dest):  # noqa: F811
             await player.play()
 
 
-async def test_play_neil_with_pipes(env_audio_dest):  # noqa: F811
+async def test_play_neil_with_pipes(env_audio_dest, audio_uri):  # noqa: F811
     """Try pipe operators on the *Come on Baby Let's Go Downtown* intro.
 
     This method is gapless.  The `Transport` can keep the speaker
@@ -59,7 +57,7 @@ async def test_play_neil_with_pipes(env_audio_dest):  # noqa: F811
         '/Users/zach/out000.wav', '/Users/zach/out001.wav',
         '/Users/zach/out002.wav', '/Users/zach/out003.wav',
         '/Users/zach/out004.wav', '/Users/zach/out005.wav',
-        SONG, RADIO,
+        audio_uri['SONG'], audio_uri['RADIO'],
     ]])
     async with env_audio_dest as destination:
         assert destination

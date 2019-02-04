@@ -9,8 +9,6 @@ from reel.cmd import *
 from reel.io import *
 from reel.proc import *
 
-from tests.fixtures import *
-
 
 def test_import():
     """Import the reel module."""

@@ -1,44 +1,75 @@
-"""Some commonly used test fixtures."""
+"""Magic startup file for pytest.
+
+Imported before tests.  Loads fixtures and sets environment
+variables for subprocess testing.
+
+"""
 import logging
 import os
+from tempfile import mkdtemp
 
 # import numpy as np
 import pytest
 import trio
 
 import reel
+from reel import _config as config
 from reel import cmd
 from reel.io import NullDestStream
 
-ENV_COVERAGE = {
-    'COVERAGE_PROCESS_START': 'setup.cfg',
-    'PYTHONPATH': '.'
+# Log debug messages for testing.
+LOG_DIR = trio.run(config.get_xdg_data_dir, 'reel')
+LOG_FILE = LOG_DIR / 'tests.log'
+logging.basicConfig(filename=LOG_FILE, level='DEBUG')
+LOGGER = logging.getLogger(__name__)
+LOGGER.debug('Begin logging for tests <~~~~~~(~<~(o~>)~>~~~~~>')
+
+# Remove any existing REEL_[^TESTS_]* config vars.
+for key in os.environ.keys():
+    if key.startswith('REEL_'):
+        if not key.startswith('REEL_TESTS_'):
+            del os.environ[key]
+
+# Create home directories for testing.
+XDG = {
+    'XDG_CONFIG_HOME': reel.Path(mkdtemp('xdg_config')),
+    'XDG_CACHE_HOME': reel.Path(mkdtemp('xdg_cache')),
+    'XDG_DATA_HOME': reel.Path(mkdtemp('xdg_data')),
+    'XDG_RUNTIME_DIR': reel.Path(mkdtemp('xdg_runtime')),
 }
 
-RADIO = 'http://ice1.somafm.com/groovesalad-256-mp3'
+# Set xdg environment variables.
+for key, val in XDG.items():
+    os.environ[key] = val
 
-SONG = ''.join([
-    'https://archive.org/download/',
-    'gd1977-05-08.shure57.stevenson.29303.flac16/',
-    'gd1977-05-08d02t04.flac'
-])
-
-logging.basicConfig(
-    filename=reel.LOGGING_FILE,
-    level=reel.LOGGING_LEVEL
-)
+# Enable full test coverage for subprocesses.
+os.environ['COVERAGE_PROCESS_START'] = 'setup.cfg'
+os.environ['PYTHONPATH'] = '.'  # to find sitecustomize.py
 
 
 def set_env(env):
     """Add some variables to the environment."""
-    for key in env:
-        os.environ[key] = env[key]
+    for _ in env:
+        os.environ[_] = env[_]
 
 
 def unset_env(env):
     """Remove some variables from the environment."""
-    for key in env:
-        del os.environ[key]
+    for _ in env:
+        del os.environ[_]
+
+
+@pytest.fixture
+def audio_uri():
+    """Provide some handy audio file locations."""
+    return {
+        'RADIO': 'http://ice1.somafm.com/groovesalad-256-mp3',
+        'SONG': ''.join([
+            'https://archive.org/download/',
+            'gd1977-05-08.shure57.stevenson.29303.flac16/',
+            'gd1977-05-08d02t04.flac'
+        ])
+    }
 
 
 @pytest.fixture
