@@ -11,7 +11,8 @@ Options:
   --help              Show this message and exit.
 
 """
-from reel import get_xdg_cache_dir, Path
+from reel import Path
+from reel.config import get_xdg_cache_dir
 from reel.proc import Source
 
 

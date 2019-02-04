@@ -6,7 +6,7 @@ import blessings
 import trio
 import trio_click as click
 
-from reel import get_xdg_cache_dir
+from reel.config import get_xdg_cache_dir
 
 from tapedeck.search import find_tunes
 

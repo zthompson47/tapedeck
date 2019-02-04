@@ -15,7 +15,8 @@ async def test_tapedeck_logfile(caplog, xdg):
     filename = 'abracadabra.log'
     logfile = await tapedeck.config.logfile(filename)
     LOGGER.debug('Got logfile: %s', logfile)
-    assert logfile == xdg['XDG_CONFIG_HOME'] / 'tapedeck' / filename
+    xdg_logfile = xdg['XDG_DATA_HOME'] / 'tapedeck' / filename
+    assert await logfile.resolve() == await xdg_logfile.resolve()  # resolve?
     assert logfile.parent.exists()
     assert caplog
 
@@ -52,7 +53,7 @@ async def test_subprocess_logging(caplog, xdg):
     assert not found_version
 
     # The internal subprocess log ended up in the tmp xdg home.
-    logpath = await reel.get_xdg_config_dir('tapedeck') / 'tapedeck.log'
+    logpath = await reel.config.get_xdg_data_dir('tapedeck') / 'tapedeck.log'
     assert await logpath.exists()
     assert tapedeck.__version__ in await logpath.read_text()
 

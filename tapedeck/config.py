@@ -6,7 +6,7 @@ import reel
 
 async def env(var=None):
     """Return the configuration based on current environment."""
-    log_dir = await reel.get_xdg_config_dir('tapedeck')  # ... data_home
+    log_dir = await reel.config.get_xdg_data_dir('tapedeck')
     log_level = os.environ.get('TAPEDECK_LOG_LEVEL')
     if log_level:
         log_level = log_level.upper()
