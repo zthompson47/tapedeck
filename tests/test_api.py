@@ -1,32 +1,13 @@
 # pylint: disable=W0401, W0611, W0614, W0621
 """Test the API."""
 import reel
-from reel import (
+from reel.config import (
     get_config,
     get_xdg_config_dir,
 )
 from reel.cmd import *
 from reel.io import *
 from reel.proc import *
-
-
-def test_import():
-    """Import the reel module."""
-    assert reel
-    assert set(reel.__all__) >= set([
-        'cmd', 'io', 'proc',
-        'Path',
-    ])
-    # pylint: disable=protected-access
-    assert set(reel._config.__all__) >= set([
-        'get_config',
-        'get_package_dir', 'get_package_name',
-        'get_xdg_home', 'get_xdg_config_dir',
-        'get_config', 'get_xdg_cache_dir',
-    ])
-    assert reel.cmd.__all__ == ['ffmpeg', 'sox']
-    assert reel.io.__all__ == ['InputStream', 'OutputStream', 'StreamIO']
-    assert reel.proc.__all__ == ['Daemon', 'Destination', 'ProcBase', 'Source']
 
 
 async def test_shell_commands():

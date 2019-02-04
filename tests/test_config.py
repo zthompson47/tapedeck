@@ -4,7 +4,7 @@ import pathlib
 
 import trio
 
-from reel import (
+from reel.config import (
     get_config,
     get_package_dir,
     get_package_name,
@@ -13,8 +13,9 @@ from reel import (
     get_xdg_data_dir,
     get_xdg_runtime_dir,
     get_xdg_home,
-    Path,
 )
+
+from reel import Path
 
 from .conftest import set_env, unset_env
 

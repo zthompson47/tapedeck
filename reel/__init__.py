@@ -7,18 +7,13 @@ import subprocess
 
 import trio
 
-from . import _config
-from ._config import *
+from . import config
 from ._path import Path
+
 from ._version import __version__  # noqa: F401
 from .proc import Destination, Source  # noqa: F401
 
 # pylint: disable=W0212
-
-__all__ = [
-    'cmd', 'io', 'proc',
-    'Path',
-] + _config.__all__
 
 LOGGING_LEVEL = os.environ.get(
     'REEL_LOGGING_LEVEL',
@@ -26,7 +21,7 @@ LOGGING_LEVEL = os.environ.get(
 ).upper()
 LOGGING_DIR = os.environ.get(
     'REEL_LOGGING_DIR',
-    trio.run(get_xdg_config_dir)
+    trio.run(config.get_xdg_config_dir)
 )
 LOGGING_FILE = os.environ.get(
     'REEL_LOGGING_FILE',

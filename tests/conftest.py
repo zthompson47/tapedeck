@@ -13,7 +13,7 @@ import pytest
 import trio
 
 import reel
-from reel import _config as config
+from reel import config
 from reel import cmd
 from reel.io import NullDestStream
 
