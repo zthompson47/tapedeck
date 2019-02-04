@@ -10,12 +10,13 @@ from reel import (
     get_package_name,
     get_xdg_cache_dir,
     get_xdg_config_dir,
+    get_xdg_data_dir,
+    get_xdg_runtime_dir,
     get_xdg_home,
     Path,
 )
-from tests.fixtures import (
-    config_icecast, env_home, set_env, unset_env
-)
+
+from .conftest import set_env, unset_env
 
 
 async def test_fixture_env_home_works(env_home):
@@ -124,3 +125,31 @@ async def test_get_xdg_cache_dir(env_home):
     # Make sure get_xdg_cache_dir returns a resolved path.
     xdg_cache_home = await Path(env_home['XDG_CACHE_HOME']).resolve()
     assert cache_dir.parent == xdg_cache_home
+
+
+async def test_get_xdg_data_dir(env_home):
+    """Create a data directory for an app."""
+    set_env(env_home)
+
+    # Check that a directory was created.
+    data_dir = await get_xdg_data_dir('_testapp_')
+    assert await data_dir.exists()
+    assert data_dir.name == '_testapp_'
+
+    # Make sure get_xdg_data_dir returns a resolved path.
+    xdg_data_home = await Path(env_home['XDG_DATA_HOME']).resolve()
+    assert data_dir.parent == xdg_data_home
+
+
+async def test_get_xdg_runtime_dir(env_home):
+    """Create a runtime directory for an app."""
+    set_env(env_home)
+
+    # Check that a directory was created.
+    runtime_dir = await get_xdg_runtime_dir('_testapp_')
+    assert await runtime_dir.exists()
+    assert runtime_dir.name == '_testapp_'
+
+    # Make sure get_xdg_runtime_dir returns a resolved path.
+    xdg_runtime_home = await Path(env_home['XDG_RUNTIME_DIR']).resolve()
+    assert runtime_dir.parent == xdg_runtime_home

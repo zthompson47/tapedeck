@@ -13,6 +13,7 @@ __all__ = [
     'get_package_dir', 'get_package_name',
     'get_xdg_home', 'get_xdg_config_dir',
     'get_config', 'get_xdg_cache_dir',
+    'get_xdg_data_dir', 'get_xdg_runtime_dir',
 ]
 
 
@@ -86,3 +87,33 @@ async def get_xdg_cache_dir(app=None):
     if not await cache_dir.exists():
         await cache_dir.mkdir()
     return await cache_dir.resolve()
+
+
+async def get_xdg_data_dir(app=None):
+    """Return a data directory for this app.
+
+    Create the directory if it does not exist.
+
+    """
+    if app is None:
+        app = await get_package_name()
+    data_home = Path(await get_xdg_home('XDG_DATA_HOME'))
+    data_dir = data_home / app
+    if not await data_dir.exists():
+        await data_dir.mkdir()
+    return await data_dir.resolve()
+
+
+async def get_xdg_runtime_dir(app=None):
+    """Return a runtime directory for this app.
+
+    Create the directory if it does not exist.
+
+    """
+    if app is None:
+        app = await get_package_name()
+    runtime_home = Path(await get_xdg_home('XDG_RUNTIME_DIR'))
+    runtime_dir = runtime_home / app
+    if not await runtime_dir.exists():
+        await runtime_dir.mkdir()
+    return await runtime_dir.resolve()
