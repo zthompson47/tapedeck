@@ -1,27 +1,50 @@
-"""Command line interface for reel."""
+"""Command line interface to :mod:`reel`."""
+import argparse
 import logging
+import os
+import sys
 
+import pkg_resources
 import trio
-import trio_click as click
 
 import reel
 
-logging.basicConfig(filename=reel.LOGGING_FILE, level=reel.LOGGING_LEVEL)
+if 'REEL_LOG_LEVEL' in os.environ:
+    LOG_DIR = trio.run(reel.config.get_xdg_data_dir, 'reel')
+    LOG_FILE = LOG_DIR / 'cli.log'
+    LOG_LEVEL = os.environ.get('REEL_LOG_LEVEL').upper()
+    logging.basicConfig(filename=LOG_FILE, level=LOG_LEVEL)
+LOGGER = logging.getLogger(__name__)
+LOGGER.debug('Begin logging for reel <~-~-~(~<~(o~>)~)~-~-~>')
 
 
-@click.command()
-@click.option('-v', '--version', is_flag=True,
-              help='Print the version number and exit.')
-@click.option('-c', '--config', is_flag=True,
-              help='Print the configuration.')
-async def main(**kwargs: str) -> None:
-    """Run reel from the command line."""
-    if kwargs['version']:
-        click.echo(reel.__version__)
-    if kwargs['config']:
-        click.echo(f'REEL_LOGGING_DIR={reel.LOGGING_DIR}')
-        click.echo(f'REEL_LOGGING_FILE={reel.LOGGING_FILE}')
-        click.echo(f'REEL_LOGGING_LEVEL={reel.LOGGING_LEVEL}')
+async def main() -> int:
+    """Test."""
+    await trio.sleep(0)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-c', '--config', action='store_true',
+        help='print the configuration'
+    )
+    parser.add_argument(
+        '-v', '--version', action='store_true',
+        help='print the version'
+    )
+    args = parser.parse_args()
+    if args.config:
+        print(f'REEL_LOGGING_DIR={reel.LOGGING_DIR}')
+        print(f'REEL_LOGGING_FILE={reel.LOGGING_FILE}')
+        print(f'REEL_LOGGING_LEVEL={reel.LOGGING_LEVEL}')
+    if args.version:
+        print(pkg_resources.get_distribution('reel').version)
+
+    return 0
+
+
+def enter():
+    """Run the main program as an ``entry_point`` for :mod:`setuptools`."""
+    sys.exit(trio.run(main))
+
 
 if __name__ == '__main__':
-    trio.run(main())
+    enter()

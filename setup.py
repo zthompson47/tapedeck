@@ -1,13 +1,10 @@
 """Install the reel package."""
 from setuptools import find_packages, setup
 
-# pylint: disable=exec-used
-exec(open("reel/_version.py", encoding="utf-8").read())  # __version__
-
 setup(
     license='MIT',
     name='reel',
-    version=__version__,  # noqa: F821 # pylint: disable=undefined-variable
+    version_command='git describe --abbrev=0',
     author='Zach Thompson',
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/reel',
@@ -19,13 +16,8 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    entry_points={
-        'console_scripts': ['reel=reel.cli:main'],
-    },
-    install_requires=[
-        'trio>=0.10.0',
-        'trio-click>=7.0.2',
-    ],
+    entry_points={'console_scripts': ['reel=reel.cli:enter']},
+    install_requires=['trio>=0.10.0'],
     zip_safe=False,
     packages=find_packages(),
 )

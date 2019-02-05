@@ -59,6 +59,12 @@ def unset_env(env):
         del os.environ[_]
 
 
+@pytest.fixture(params=['python -m reel.cli', 'reel'])
+def cli_cmd(request):
+    """."""
+    return request.param
+
+
 @pytest.fixture
 def audio_uri():
     """Provide some handy audio file locations."""
