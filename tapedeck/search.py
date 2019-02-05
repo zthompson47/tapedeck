@@ -66,7 +66,7 @@ async def find_tunes(music_dir: str,
 
 def is_audio(filename: str) -> bool:
     """Check for audio file extensions."""
-    for ext in ['.flac', '.mp3', '.wav', '.shn', '.aac', '.m4a']:
+    for ext in ['.flac', '.mp3', '.wav', '.shn', '.aac', '.m4a']:  # aiff
         if filename.lower().endswith(ext):
             return True
     return False

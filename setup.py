@@ -17,7 +17,10 @@ setup(
         "Operating System :: OS Independent",
     ],
     entry_points={
-        'console_scripts': ['tapedeck=tapedeck.cli.main:tapedeck_cli'],
+        'console_scripts': [
+            'tapedeck=tapedeck.cli.main:tapedeck_cli',
+            'tdplay=tapedeck.cli.play:play',
+        ],
     },
     install_requires=[
         'trio>=0.10.0',

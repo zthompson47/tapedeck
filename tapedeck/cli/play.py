@@ -15,7 +15,10 @@ T = blessings.Terminal()
 
 
 # pylint: disable=too-many-branches,too-many-locals,too-many-arguments
-@click.command(options_metavar='[options]', help='¤ Play Music')  # noqa: C901
+@click.command(  # noqa: C901
+    options_metavar='[options]',
+    help=f'{T.blue}¤ {T.yellow}Play Music{T.normal}'
+)
 @click.argument('source', metavar='<source>', required=False)
 @click.option('-o', '--output', default='speakers',
               help='Output destination', show_default=True)

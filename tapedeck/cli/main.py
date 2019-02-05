@@ -23,7 +23,7 @@ T = blessings.Terminal()
              context_settings=dict(help_option_names=['--help']),
              options_metavar='[options]',
              name='asdf',
-             help='''¤_ Tapedeck _¤
+             help=f'''{T.blue}¤_ {T.yellow}Tapedeck {T.blue}_¤{T.normal}
 
                      Play your music across a variety of
                      sources and destinations.  Share torrents
