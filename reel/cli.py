@@ -4,7 +4,6 @@ import logging
 import os
 import sys
 
-import pkg_resources
 import trio
 
 import reel
@@ -37,7 +36,7 @@ async def main() -> int:
             print(f'REEL_LOG_FILE={LOG_FILE}')
             print(f'REEL_LOG_LEVEL={LOG_LEVEL}')
     if args.version:
-        print(pkg_resources.get_distribution('reel').version)
+        print(reel.__version__)
 
     return 0
 

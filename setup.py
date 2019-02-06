@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 setup(
     license='MIT',
     name='reel',
-    version_command='git describe --abbrev=0',
+    version=open('VERSION', 'r').read().strip(),
     author='Zach Thompson',
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/reel',

@@ -1,4 +1,3 @@
 setuptools
 wheel
 twine
-setuptools-version-command

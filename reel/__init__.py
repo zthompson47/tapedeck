@@ -6,13 +6,15 @@ import os
 import shlex
 import subprocess
 
+import pkg_resources
 import trio
 
 from . import config
 from ._path import Path
 
-from ._version import __version__  # noqa: F401
 from .proc import Destination, Source  # noqa: F401
+
+__version__ = pkg_resources.get_distribution(__name__).version
 
 # pylint: disable=W0212
 
