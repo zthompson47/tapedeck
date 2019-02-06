@@ -2,12 +2,11 @@
 import random
 
 import blessings
-import trio
 import trio_click as click
 
+import reel
 from reel.config import get_xdg_cache_dir
 from reel.cmd import ffmpeg, sox
-from reel.io import StreamIO, NullDestStream
 
 from tapedeck.search import find_tunes, is_audio
 
@@ -41,55 +40,83 @@ async def play(source, output, memory, shuffle, host, port, recursive):
         async with await cache_file.open('r') as out:
             lines = (await out.read()).split('\n')[0:-1]
         track = lines[int(memory) - 1]
-        music_path = trio.Path(track[track.find(' ') + 1:])
+        music_path = reel.Path(track[track.find(' ') + 1:])
     else:
-        music_path = trio.Path(source)
+        music_path = reel.Path(source)
 
-    if await trio.Path(music_path).is_dir():
+    if await reel.Path(music_path).is_dir():
         playlist_folders = [music_path]
         if recursive:
             # Run find_tunes on this dir to get all music folders.
             results = await find_tunes(music_path)
             for folder in results:
-                playlist_folders.append(trio.Path(folder.path))
+                playlist_folders.append(reel.Path(folder.path))
 
         # in a directory, queue each song file
         for folder in playlist_folders:
-            songs = [_ for _ in await folder.iterdir() if await _.is_file()]
+            songs = [_ for _ in await folder.iterdir() if _.is_file()]
             songs.sort()
             for song in songs:
                 if is_audio(str(song)):
-                    playlist.append(await song.resolve())
+                    playlist.append(song)
     else:
         # Otherwise, just queue the uri.
         playlist.append(source)
-
-    out = None
-    if output == 'speakers':
-        out = sox.play()
-    elif output == 'udp':
-        if host is None or port is None:
-            raise click.BadOptionUsage('-o', 'udp needs host and port')
-        out = ffmpeg.udp(host=host, port=port)
-    else:
-        # Check for file output.
-        out_path = trio.Path(output)
-        if output == '/dev/null':
-            out = NullDestStream()
-        elif await out_path.is_file() or await out_path.is_dir():
-            out = ffmpeg.to_file(out_path)
 
     # Shuffle the playlist.
     if shuffle:
         random.shuffle(playlist)  # ... tests needed ...
 
-    async with out:
-        for song in playlist:
-            if isinstance(song, str):
-                click.echo(f'{T.blue}{song}{T.normal}')
-            else:
-                album_name = f'{T.blue}{song.parent.name}{T.yellow} / '
-                song_name = f'{T.blue}{song.name}{T.normal}'
-                click.echo(album_name + song_name)
-            async with await ffmpeg.stream(str(song)) as src:
-                await StreamIO(src, out).flow()
+    # Choose the output.
+    out = None
+    if output == 'speakers':
+        out = sox.speakers()
+    elif output == 'udp':
+        if host is None or port is None:
+            raise click.BadOptionUsage('-o', 'udp needs host and port')
+        out = ffmpeg.to_udp(host=host, port=port)
+    else:
+        # Check for file output.
+        out_path = reel.Path(output)
+        if (output == '/dev/null' or
+                await out_path.is_file() or
+                await out_path.is_dir()):
+            out = ffmpeg.to_file2(out_path)
+
+    # Create the playlist.
+    plst = reel.Reel(
+        [ffmpeg.read(track) for track in playlist],
+        announce_to=click.echo
+    )
+
+    # Fire away!!
+    async with plst | out as transport:
+        await transport.play()
+
+OLD = '''
+#     out = None
+#     if output == 'speakers':
+#         out = sox.play()
+#     elif output == 'udp':
+#         if host is None or port is None:
+#             raise click.BadOptionUsage('-o', 'udp needs host and port')
+#         out = ffmpeg.udp(host=host, port=port)
+#     else:
+#         # Check for file output.
+#         out_path = reel.Path(output)
+#         if output == '/dev/null':
+#             out = NullDestStream()
+#         elif await out_path.is_file() or await out_path.is_dir():
+#             out = ffmpeg.to_file(out_path)
+#
+#     async with out:
+#         for song in playlist:
+#             if isinstance(song, str):
+#                 click.echo(f'{T.blue}{song}{T.normal}')
+#             else:
+#                 album_name = f'{T.blue}{song.parent.name}{T.yellow} / '
+#                 song_name = f'{T.blue}{song.name}{T.normal}'
+#                 click.echo(album_name + song_name)
+#             async with await ffmpeg.stream(str(song)) as src:
+#                 await StreamIO(src, out).flow()
+'''
