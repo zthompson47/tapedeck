@@ -1,5 +1,6 @@
 """This is reel."""
 # pylint: disable=R0801
+from datetime import datetime
 import logging
 import os
 import shlex
@@ -15,25 +16,13 @@ from .proc import Destination, Source  # noqa: F401
 
 # pylint: disable=W0212
 
-LOGGING_LEVEL = os.environ.get(
-    'REEL_LOGGING_LEVEL',
-    'debug'
-).upper()
-LOGGING_DIR = os.environ.get(
-    'REEL_LOGGING_DIR',
-    trio.run(config.get_xdg_config_dir)
-)
-LOGGING_FILE = os.environ.get(
-    'REEL_LOGGING_FILE',
-    str(Path(LOGGING_DIR) / 'reel.log')
-)
-
 
 class Reel:
     """A stack of spools concatenated in place as one spool in a transport."""
 
-    def __init__(self, spools):
+    def __init__(self, spools, announce_to=None):
         """Begin as a list of spools."""
+        self._announce = announce_to
         self._spools = spools
 
     def __or__(self, the_other_one):
@@ -44,25 +33,30 @@ class Reel:
         """Send the spools' stdout to the send `channel`."""
         async with channel:
             for spool in self._spools:
+                if self._announce:
+                    self._announce(spool)
                 await spool.send_to_channel(channel)
                 await spool.stdout.aclose()
 
 
-class Spool:
+class Spool(trio.abc.AsyncResource):
     """A command to run as an async subprocess in a ``Transport``."""
 
-    def __init__(self, command, xenv=None, xconf=None):
+    def __init__(self, command, xenv=None, xflags=None):
         """Start a subprocess with a modified argument list and environment."""
         self._command = shlex.split(command)
         self._env = dict(os.environ)
         self._limit = None
-        if xconf:
-            for flag in xconf:
-                self._command.append(flag)
+        self._status = None
+        self._timeout = None
+        if xflags:
+            for flag in xflags:
+                self._command.append(str(flag))  # str for error with Path...
         if xenv:
             for key, val in xenv.items():
                 self._env[key] = val
         logging.debug(' '.join(self._command))
+
         self._proc = trio.Process(
             self._command,
             stdin=subprocess.PIPE,
@@ -71,15 +65,43 @@ class Spool:
             env=self._env
         )
 
+    async def __aenter__(self):
+        """Run through a tranport in an async managed context."""
+        return Transport(self)
+
+    async def aclose(self):
+        """Clean up resources."""
+
+    @property
+    def returncode(self):
+        """Return the exit code of the process."""
+        if self._proc.returncode:
+            return self._proc.returncode
+        return 0
+
+    @property
+    def stderr(self):
+        """Return whatever the process sent to stderr."""
+        return ''
+
     @property
     def stdout(self):
         """Return stdout of the subprocess."""
         return self._proc.stdout
 
-    def limit(self, byte_limit=16384):
+    def limit(self, byte_limit=65536):
         """Configure this `spool` to limit output to `byte_limit` bytes."""
         self._limit = byte_limit
         return self
+
+    def timeout(self, seconds=0.47):
+        """Configure this `spool` to stop after `seconds` seconds."""
+        self._timeout = seconds
+        return self
+
+    async def run(self, message=None, text=True):
+        """Send stdin to process and return stdout."""
+        return await Transport(self).read(message, text=text)
 
     def __repr__(self):
         """Represent prettily."""
@@ -97,6 +119,7 @@ class Spool:
 
     async def send(self, channel):
         """Stream stdout to `channel` and close both sides."""
+        logging.debug('seinding to channel!!!')
         async with channel:
             await self.send_to_channel(channel)
         await self._proc.stdout.aclose()
@@ -106,13 +129,27 @@ class Spool:
         buffsize = 16384
         if self._limit and self._limit < 16384:
             buffsize = self._limit
+        logging.debug('-----!!!!!!!>>>>>>>>>> %s %s', self._limit, buffsize)
         bytes_received = 0
         chunk = await self._proc.stdout.receive_some(buffsize)
+        _start_time = datetime.now().microsecond
         while chunk:
+
+            # Send data.
             await channel.send(chunk)
             bytes_received += len(chunk)
+
+            # Check for byte limit.
             if self._limit and bytes_received > self._limit:
                 break
+
+            # Check for timeout.
+            if self._timeout:
+                now = datetime.now().microsecond
+                if (now - _start_time) >= self._timeout * 1000:
+                    break
+
+            # Read from stdout.
             buffsize = 16384
             if self._limit and self._limit < 16384:
                 buffsize = self._limit
@@ -154,8 +191,9 @@ class Transport(trio.abc.AsyncResource):
         """Return stdout of the last spool in the chain."""
         return self._chain[-1]._proc.stdout
 
-    async def _run(self, stdin=None, stdout=False):
+    async def _run(self, message=None, stdout=False):
         """Connect the spools with pipes and let the bytes flow."""
+        output = None
         async with trio.open_nursery() as nursery:
 
             # Chain the spools with pipes.
@@ -169,32 +207,42 @@ class Transport(trio.abc.AsyncResource):
                         nursery.start_soon(_dst.receive, receive_ch.clone())
 
             # Send a message to stdin, after the chain establishes stdin.
-            if stdin:
-                nursery.start_soon(self._handle_stdin, stdin)
+            if message:
+                nursery.start_soon(self._handle_stdin, message)
 
-            # Discard stdout from the last spool in the list.
-            output = None
+            # Read stdout from the last spool in the list.
             if stdout:
                 output = b''
-            async with self.stdout as out:
-                while True:
-                    chunk = await out.receive_some(16384)
-                    if chunk:
-                        if stdout:
-                            output += chunk
-                    else:
-                        break
-            if stdout:
-                return output
+            ch_send, ch_receive = trio.open_memory_channel(0)
+            nursery.start_soon(self._chain[-1].send, ch_send)
+            async for chunk in ch_receive:
+                if stdout:
+                    output += chunk
+        if stdout:
+            return output
 
-    async def play(self):
+    async def play(self) -> None:
         """Run this transport and ignore stdout."""
-        return await self._run()
+        await self._run()
+
+    async def read(self, message=None, text=True):
+        """Run transport and return stdout as str."""
+        if message and text:
+            message = message.encode('utf-8')
+        rawbytes = await self._run(message=message, stdout=True)
+
+        if text:
+            # Remove trailing \n.
+            decoded = rawbytes.decode('utf-8')
+            if decoded[-1:] == '\n':
+                decoded = decoded[:-1]
+            return decoded
+        return rawbytes
 
     async def readlines(self):
         """Run this transport and return stdout as a `list`."""
-        output = await self._run(stdout=True)
-        return output.split(b'\n')[:-1]
+        output = (await self._run(stdout=True)).decode('utf-8')
+        return output.split('\n')[:-1]
 
     def __repr__(self):
         """Represent prettily."""

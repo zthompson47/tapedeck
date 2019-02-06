@@ -14,20 +14,20 @@ async def test_pipe_operator():
     remove_grep = reel.Spool(f'grep -v grep')
     find_cat = reel.Spool('grep cat')
 
-    # One way
+    # One way to make a transport
     transport = reel.Transport(read_file, remove_grep, find_cat)
 
     # Another way
     chain = [read_file, remove_grep, find_cat]
     transport_chain = reel.Transport(chain)
 
-    # Or ...
+    # Or:
     async with read_file | remove_grep | find_cat as out:
         assert repr(transport) == repr(transport_chain) == repr(out)
         lines = await out.readlines()
         assert len(lines) == 2
         for line in lines:
-            assert b'cat' in line
+            assert 'cat' in line
 
 
 async def test_play_music_even_better(env_audio_dest):  # noqa: F811

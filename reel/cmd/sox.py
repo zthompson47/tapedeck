@@ -13,7 +13,7 @@ def speakers():
              '--endian', 'little',
              '-c', '2',
              '-']
-    return reel.Spool(cmd, xconf=flags)
+    return reel.Spool(cmd, xflags=flags)
 
 
 def play():

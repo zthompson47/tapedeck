@@ -32,9 +32,10 @@ async def main() -> int:
     )
     args = parser.parse_args()
     if args.config:
-        print(f'REEL_LOGGING_DIR={reel.LOGGING_DIR}')
-        print(f'REEL_LOGGING_FILE={reel.LOGGING_FILE}')
-        print(f'REEL_LOGGING_LEVEL={reel.LOGGING_LEVEL}')
+        if 'REEL_LOG_LEVEL' in os.environ:
+            print(f'REEL_LOG_DIR={LOG_DIR}')
+            print(f'REEL_LOG_FILE={LOG_FILE}')
+            print(f'REEL_LOG_LEVEL={LOG_LEVEL}')
     if args.version:
         print(pkg_resources.get_distribution('reel').version)
 

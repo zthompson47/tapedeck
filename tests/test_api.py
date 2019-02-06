@@ -12,16 +12,18 @@ from reel.proc import *
 
 async def test_shell_commands():
     """Run a few shell commands."""
-    assert 'rutabaga' in await Source(f'grep utabag {__file__}').read_text()
+    assert 'rutabaga' in await reel.Spool(f'grep utabag {__file__}').run()
 
-    found = Source('find .', xconf=['-type', 'f'])
-    assert __file__ in await found.read_list(through=reel.Path.canon)
+    async with reel.Spool('find .', xflags=['-type', 'f']) as found:
+        lines = await found.readlines()
+        found_resolved = [await reel.Path.canon(_) for _ in lines]
+        assert __file__ in found_resolved
 
-    assert float((await Source('python -V').read_text())[7:10]) >= 3.5
+    assert float((await reel.Spool('python -V').run())[7:10]) >= 3.5
 
     xconf = ['-c', "import os; print(os.environ['_ASDF'])"]
     env = {'_ASDF': 'asdf'}
-    assert await Source('python', xconf=xconf, xenv=env).read_text() == 'asdf'
+    assert await reel.Spool('python', xflags=xconf, xenv=env).run() == 'asdf'
 
     # fname = 'test.flac'
     # assert await Source(f'flac -t {fname}').read_bool()
@@ -46,15 +48,15 @@ async def test_server(config_icecast):
     xconf = ['-c', str(config)]
     async with Daemon('icecast', xconf=xconf) as icecast:
         await icecast.start()
-        procs = await Source('ps ax').read_list()
+        async with reel.Spool('ps ax') as procs:
+            found = False
+            for proc in await procs.readlines():
+                if 'icecast' in proc:
+                    found = True
+            assert found
+    async with reel.Spool('ps ax') as procs:
         found = False
-        for proc in procs:
+        for proc in await procs.readlines():
             if 'icecast' in proc:
                 found = True
-        assert found
-    procs = await Source('ps ax').read_list()
-    found = False
-    for proc in procs:
-        if 'icecast' in proc:
-            found = True
-    assert not found
+        assert not found
