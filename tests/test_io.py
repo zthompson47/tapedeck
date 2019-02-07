@@ -3,7 +3,6 @@
 import logging
 
 import reel
-from reel.cmd import ffmpeg, sox
 
 
 async def test_pipe_operator():
@@ -30,7 +29,7 @@ async def test_pipe_operator():
             assert 'cat' in line
 
 
-async def test_play_music_even_better(env_audio_dest):  # noqa: F811
+async def test_play_music_even_better(audio_dest):  # noqa: F811
     """Try pipe operators.
 
     This method is not gapless.  Reconnecting to the speaker
@@ -40,12 +39,13 @@ async def test_play_music_even_better(env_audio_dest):  # noqa: F811
     """
     logging.debug('////////////// gaps //////////////////')
     for part in [f'/Users/zach/out00{_}.wav' for _ in range(0, 6)]:
-        async with ffmpeg.read(part).limit(1024**2) | sox.speakers() as player:
+        src = reel.cmd.ffmpeg.read(part).limit(1024**2)
+        async with src | audio_dest() as player:
             assert isinstance(player, reel.Transport)
             await player.play()
 
 
-async def test_play_neil_with_pipes(env_audio_dest, audio_uri):  # noqa: F811
+async def test_play_neil_with_pipes(audio_dest, audio_uri):  # noqa: F811
     """Try pipe operators on the *Come on Baby Let's Go Downtown* intro.
 
     This method is gapless.  The `Transport` can keep the speaker
@@ -53,13 +53,11 @@ async def test_play_neil_with_pipes(env_audio_dest, audio_uri):  # noqa: F811
 
     """
     logging.debug('////////////// nogaps ////////////////')
-    playlist = reel.Reel([ffmpeg.read(_).limit(1024**2) for _ in [
+    playlist = reel.Reel([reel.cmd.ffmpeg.read(_).limit(1024**2) for _ in [
         '/Users/zach/out000.wav', '/Users/zach/out001.wav',
         '/Users/zach/out002.wav', '/Users/zach/out003.wav',
         '/Users/zach/out004.wav', '/Users/zach/out005.wav',
         audio_uri['SONG'], audio_uri['RADIO'],
     ]])
-    async with env_audio_dest as destination:
-        assert destination
-        async with playlist | sox.speakers() as player:
-            await player.play()
+    async with playlist | audio_dest() as player:
+        await player.play()

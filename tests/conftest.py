@@ -15,7 +15,6 @@ import trio
 import reel
 from reel import config
 from reel import cmd
-from reel.io import NullDestStream
 
 # Log debug messages for testing.
 LOG_DIR = trio.run(config.get_xdg_data_dir, 'reel')
@@ -24,7 +23,7 @@ logging.basicConfig(filename=LOG_FILE, level='DEBUG')
 LOGGER = logging.getLogger(__name__)
 LOGGER.debug('Begin logging for tests <~~~~~~(~<~(o~>)~>~~~~~>')
 
-# Remove any existing REEL_[^TESTS_]* config vars.
+# Remove existing config vars except for testing.
 for key in os.environ.keys():
     if key.startswith('REEL_'):
         if not key.startswith('REEL_TESTS_'):
@@ -59,6 +58,27 @@ def unset_env(env):
         del os.environ[_]
 
 
+@pytest.fixture
+def audio_dest():
+    """Return an audio connection factory."""
+    def audio_dest_fn():
+        dest = os.environ.get('REEL_TESTS_AUDIO_DEST', '/dev/null')
+        out = None
+        if dest == 'speakers':
+            out = cmd.sox.speakers()
+        elif dest == 'udp':
+            out = cmd.ffmpeg.udp('127.0.0.1', '9876')
+        else:
+            # Check for file output.
+            out_path = reel.Path(dest)
+            if (dest == '/dev/null' or
+                    trio.run(out_path.is_file) or
+                    trio.run(out_path.is_dir)):
+                out = reel.cmd.ffmpeg.to_file2(out_path)
+        return out
+    return audio_dest_fn
+
+
 @pytest.fixture(params=['python -m reel.cli', 'reel'])
 def cli_cmd(request):
     """."""
@@ -76,44 +96,6 @@ def audio_uri():
             'gd1977-05-08d02t04.flac'
         ])
     }
-
-
-@pytest.fixture
-def test_audio_dest():
-    """Return an audio output for testing."""
-    dest = os.environ.get('REEL_TESTING_AUDIO_DEST', '/dev/null')
-    out = None
-    if dest == 'speakers':
-        out = cmd.sox.play()
-    elif dest == 'udp':
-        out = cmd.ffmpeg.udp('0.0.0.0', '8771')
-    else:
-        # Check for file output.
-        out_path = reel.Path(dest)
-        if dest == '/dev/null':
-            out = NullDestStream()
-        elif trio.run(out_path.is_file) or trio.run(out_path.is_dir):
-            out = cmd.ffmpeg.to_file(out_path)
-    return out
-
-
-@pytest.fixture
-def env_audio_dest():
-    """Return an audio output for testing."""
-    dest = os.environ.get('REEL_TESTING_AUDIO_DEST', '/dev/null')
-    out = None
-    if dest == 'speakers':
-        out = cmd.sox.play()
-    elif dest == 'udp':
-        out = cmd.ffmpeg.udp('0.0.0.0', '8771')
-    else:
-        # Check for file output.
-        out_path = reel.Path(dest)
-        if dest == '/dev/null':
-            out = NullDestStream()
-        elif trio.run(out_path.is_file) or trio.run(out_path.is_dir):
-            out = cmd.ffmpeg.to_file(out_path)
-    return out
 
 
 @pytest.fixture(scope="session")

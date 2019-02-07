@@ -43,6 +43,9 @@ def to_file2(path):
         '-ar', '44.1k',  # sample rate
         '-f', 's16le',  # 16 bit little-endian
         '-i', '-',  # receive from stdin
+        '-f', 's16le',  # 16 bit little-endian
+        '-ar', '44.1k',  # sample rate
+        '-y',  # overwrite output file
         '-c:a', 'copy',  # stream copy audio
         path,
     ]
