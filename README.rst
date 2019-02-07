@@ -1,8 +1,21 @@
 Reel
 ========
 
-A package for async subprocesses.
+A package for asynchronous subprocess pipelines::
 
+   import reel
+
+   tracks = ['track01', 'track02', 'http://w.w.w/track03']
+   plst = reel.Reel(
+       [reel.cmd.ffmpeg.read(_) for _ in tracks],
+       announce_to=print
+   )
+   dest = reel.cmd.sox.speakers()
+   norm = reel.cmd.ffmpeg.norm()
+   vol = reel.cmd.ffmpeg.volume(1.0)
+
+   async with plst | norm | vol | dest as transport:
+       await transport.play()
 
 Motivation
 ----------
@@ -10,7 +23,7 @@ Motivation
 This project is a simplified version of Python subprocess control with
 asynchronous support.  It is being developed to support a music streaming
 package which uses ffmpeg and other shell commands to get music from
-various sources to various destinations.
+various sources to various destinations through various channels.
 
 Logging
 -------
