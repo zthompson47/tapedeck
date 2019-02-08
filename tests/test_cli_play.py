@@ -5,10 +5,8 @@ import pytest
 
 import reel
 
-# pylint: disable=unused-argument
 
-
-async def test_play(env_audio_dest, uri):
+async def test_play(env_audio_dest):
     """Stream from source to destination."""
     audio_uri = '/Users/zach/out000.wav'
     player = reel.Spool(
@@ -19,6 +17,7 @@ async def test_play(env_audio_dest, uri):
     assert player.returncode <= 0  # ... maybe it should not be an erorr?
 
 
+@pytest.mark.xfail(strict=True)  # until player.timeout(4.7) closes correctly
 async def test_play_directory(env_audio_dest):
     """Detect a directory and play each song."""
     directory = shlex.quote(
@@ -32,15 +31,14 @@ async def test_play_directory(env_audio_dest):
     # ... need to test sort ...
 
 
-async def test_play_shuffle(music_dir):
+async def test_play_shuffle():
     """Shuffle a playlist."""
 
 
-async def test_play_loop(music_dir):
+async def test_play_loop():
     """Repeat a playlist forever."""
 
 
-@pytest.mark.xfail(strict=True)  # until Spool.returncode works
 async def test_host_port_env_config():
     """Use default host and port from environment variables."""
     audio_uri = '/Users/zach/out000.wav'
