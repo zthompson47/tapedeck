@@ -9,7 +9,7 @@ async def test_class_spool(capsys):
     src = reel.Spool('python   -m   reel.cli  -v')  # ... make separate tests
     version = await src.run()
     assert src.returncode == 0
-    assert src.stderr == ''
+    assert src.stderr is None
     assert version == reel.__version__
 
     # not sure why here..  from another test, but test logging somwhere?
@@ -56,4 +56,4 @@ async def test_stderr():
     assert not await not_here.run()  # no output
     # assert not_here.stderr  # some error about a missing file
     assert not_here.returncode  # error present
-    # assert 'not_here' in not_here.stderr
+    assert 'not_here' in not_here.stderr

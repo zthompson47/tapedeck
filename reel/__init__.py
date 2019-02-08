@@ -43,6 +43,11 @@ class Reel:
         for spool in self._spools:
             await spool.aclose()
 
+    async def handle_stderr(self, nursery):
+        """Read stderr, called as a task by a Transport in a nursery."""
+        for spool in self._spools:
+            nursery.start_soon(spool.handle_stderr, nursery)
+
 
 class Spool(trio.abc.AsyncResource):
     """A command to run as an async subprocess in a ``Transport``."""
@@ -53,6 +58,7 @@ class Spool(trio.abc.AsyncResource):
         self._env = dict(os.environ)
         self._limit = None
         self._status = None
+        self._stderr = None
         self._timeout = None
         if xflags:
             for flag in xflags:
@@ -66,7 +72,7 @@ class Spool(trio.abc.AsyncResource):
             self._command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             env=self._env
         )
 
@@ -87,7 +93,9 @@ class Spool(trio.abc.AsyncResource):
     @property
     def stderr(self):
         """Return whatever the process sent to stderr."""
-        return ''
+        if self._stderr:
+            return self._stderr.decode('utf-8')
+        return None
 
     @property
     def stdout(self):
@@ -160,6 +168,20 @@ class Spool(trio.abc.AsyncResource):
                 buffsize = self._limit
             chunk = await self._proc.stdout.receive_some(buffsize)
 
+    async def _handle_stderr(self):
+        """Read stderr in a function so that the nursery has a function."""
+        while True:
+            chunk = await self._proc.stderr.receive_some(16384)
+            if not chunk:
+                break
+            if not self._stderr:
+                self._stderr = b''
+            self._stderr += chunk
+
+    async def handle_stderr(self, nursery):
+        """Read stderr, called as a task by a Transport in a nursery."""
+        nursery.start_soon(self._handle_stderr)
+
 
 class Transport(trio.abc.AsyncResource):
     """A device for running spools."""
@@ -211,9 +233,13 @@ class Transport(trio.abc.AsyncResource):
                         nursery.start_soon(_src.send, send_ch.clone())
                         nursery.start_soon(_dst.receive, receive_ch.clone())
 
-            # Send a message to stdin, after the chain establishes stdin.
+            # Queue the message to stdin.
             if message:
                 nursery.start_soon(self._handle_stdin, message)
+
+            # Handle stderr streams.
+            for spool in self._chain:
+                nursery.start_soon(spool.handle_stderr, nursery)
 
             # Read stdout from the last spool in the list.
             if stdout:
@@ -224,10 +250,11 @@ class Transport(trio.abc.AsyncResource):
                 if stdout:
                     output += chunk
 
-            # Close the subprocesses.
-            for spool in self._chain:
-                logging.debug('wtf?????????????????????????????????')
-                await spool.aclose()
+        # Close the subprocesses.
+        for spool in self._chain:
+            logging.debug('wtf?????????????????????????????????')
+            await spool.aclose()
+
         if stdout:
             return output
 
