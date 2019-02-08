@@ -7,7 +7,6 @@ from trio import Path
 
 from reel import cmd
 from reel.cmd import ffmpeg, sox
-from reel.io import NullDestStream, StreamIO
 
 BYTE_LIMIT = 1000000
 

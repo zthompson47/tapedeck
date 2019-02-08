@@ -67,7 +67,7 @@ def audio_dest():
         if dest == 'speakers':
             out = cmd.sox.speakers()
         elif dest == 'udp':
-            out = cmd.ffmpeg.udp('127.0.0.1', '9876')
+            out = cmd.ffmpeg.to_udp('127.0.0.1', '9876')
         else:
             # Check for file output.
             out_path = reel.Path(dest)
