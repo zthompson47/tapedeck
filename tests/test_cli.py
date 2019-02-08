@@ -1,12 +1,7 @@
 """Test suite for the tapedeck command line interface."""
-import os
-
-import pytest
 from trio_click.testing import CliRunner
 
-from reel import cmd
-from reel.proc import Source
-from reel.tools import resolve
+import reel
 
 import tapedeck
 
@@ -34,23 +29,23 @@ async def test_version():
 
 async def test_version_with_dist():
     """Show the version number with the distributed executable."""
-    dist = Source('tapedeck --version')
-    version = await dist.read_text()
-    assert dist.status == 0
+    dist = reel.Spool('tapedeck --version')
+    version = await dist.run()
+    assert dist.returncode == 0
     assert tapedeck.__version__ in version
 
 
 async def test_no_args_external():
     """Run the CLI externally with no arguments."""
-    noargs = Source('python -m tapedeck.cli.main')
+    noargs = reel.Spool('python -m tapedeck.cli.main')
     output = await noargs.run()
-    assert noargs.status == 0
+    assert noargs.returncode == 0
     assert output == ''
 
 
 async def test_version_external():
     """Show the version number by running the actual CLI."""
-    version = Source('python -m tapedeck.cli.main --version')
-    output = await version.read_text()
-    assert version.status == 0
+    version = reel.Spool('python -m tapedeck.cli.main --version')
+    output = await version.run()
+    assert version.returncode == 0
     assert tapedeck.__version__ in output

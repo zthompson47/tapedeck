@@ -46,8 +46,6 @@ async def tapedeck_cli(config, version, log_to_stderr):
 
     if config:
         for key, val in (await tapedeck.config.env()).items():
-            if not val:
-                val = ''
             click.echo(f'{T.blue}{key}{T.normal}={T.yellow}{val}{T.normal}')
 
 

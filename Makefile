@@ -35,11 +35,7 @@ clean-dist:
 clean: clean-coverage clean-tools clean-dist
 
 other_files = sitecustomize.py setup.py
-disabled = 'wrong-import-order,\
-		    no-value-for-parameter,\
-		    unused-import,\
-		    unused-argument,\
-		    redefined-outer-name'
+disabled = ''
 lint:
 	python -m flake8 --max-complexity 10 $(project) tests $(other_files)
 	python -m pydocstyle $(project) tests $(other_files)

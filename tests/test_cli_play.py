@@ -1,11 +1,11 @@
 """Tests for the 'tapedeck play' cli command."""
-import os
 import shlex
 
 import pytest
 
 import reel
-from reel.proc import Source
+
+# pylint: disable=unused-argument
 
 
 async def test_play(env_audio_dest, uri):
@@ -52,7 +52,7 @@ async def test_host_port_env_config():
     # assert 'udp needs host and port' in player.err  # ... CAN'T GET STDERR
 
     # Set a host and port.
-    x_env = {'TAPEDECK_UDP_HOST': '0.0.0.0', 'TAPEDECK_UDP_PORT': '9876'}
+    x_env = {'TAPEDECK_UDP_HOST': '127.0.0.1', 'TAPEDECK_UDP_PORT': '9876'}
     player = reel.Spool(f'tapedeck play {audio_uri} -o udp', x_env)
     # await player.run()
     # assert player.status <= 0

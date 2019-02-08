@@ -3,8 +3,6 @@ import logging
 import os
 from typing import List
 
-from reel.tools import resolve
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -56,7 +54,7 @@ async def find_tunes(music_dir: str,
                 text_files.append(fname)
         if song_files:
             folder = Folder(
-                path=await resolve(dirname),  # ... test absolute path ...
+                path=os.path.abspath(dirname),
                 song_files=song_files,
                 text_files=text_files,
             )
@@ -66,7 +64,7 @@ async def find_tunes(music_dir: str,
 
 def is_audio(filename: str) -> bool:
     """Check for audio file extensions."""
-    for ext in ['.flac', '.mp3', '.wav', '.shn', '.aac', '.m4a']:  # aiff
+    for ext in ['.flac', '.mp3', '.wav', '.shn', '.aac', '.m4a', '.aiff']:
         if filename.lower().endswith(ext):
             return True
     return False

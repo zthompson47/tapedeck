@@ -1,5 +1,5 @@
 """Tests for the tapedeck.search module."""
-import pytest
+# import pytest
 
 from reel import Path
 
