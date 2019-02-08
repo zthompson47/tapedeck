@@ -7,3 +7,4 @@ htmlcov/
 .coverage
 .coverage.*
 .mypy_cache/
+docs/_build/
