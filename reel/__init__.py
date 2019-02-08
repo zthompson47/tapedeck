@@ -38,6 +38,11 @@ class Reel:
                 await spool.send_to_channel(channel)
                 await spool.stdout.aclose()
 
+    async def aclose(self):
+        """Close the spools."""
+        for spool in self._spools:
+            await spool.aclose()
+
 
 class Spool(trio.abc.AsyncResource):
     """A command to run as an async subprocess in a ``Transport``."""
@@ -70,14 +75,14 @@ class Spool(trio.abc.AsyncResource):
         return Transport(self)
 
     async def aclose(self):
-        """Clean up resources."""
+        """Wait for the process to end and close it."""
+        self._proc.wait()
+        await self._proc.aclose()
 
     @property
     def returncode(self):
         """Return the exit code of the process."""
-        if self._proc.returncode:
-            return self._proc.returncode
-        return 0
+        return self._proc.returncode
 
     @property
     def stderr(self):
@@ -218,6 +223,11 @@ class Transport(trio.abc.AsyncResource):
             async for chunk in ch_receive:
                 if stdout:
                     output += chunk
+
+            # Close the subprocesses.
+            for spool in self._chain:
+                logging.debug('wtf?????????????????????????????????')
+                await spool.aclose()
         if stdout:
             return output
 
