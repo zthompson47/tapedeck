@@ -1,5 +1,6 @@
-Reel
-========
+====
+reel
+====
 
 A package for asynchronous subprocess pipelines::
 
@@ -17,13 +18,27 @@ A package for asynchronous subprocess pipelines::
    async with plst | norm | vol | dest as transport:
        await transport.play()
 
+
 Motivation
 ----------
 
 This project is a simplified version of Python subprocess control with
-asynchronous support.  It is being developed to support a music streaming
-package which uses ffmpeg and other shell commands to get music from
-various sources to various destinations through various channels.
+pipes and asynchronous support.  It is being developed to support a music
+streaming package which uses ffmpeg and other shell commands to get music
+from various sources to various destinations.
+
+
+Mythology
+---------
+
+The end goal is something like this::
+
+   import reel
+
+
+reel.Spool
+~~~~~~~~~~
+
 
 Logging
 -------
