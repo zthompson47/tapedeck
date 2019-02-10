@@ -13,8 +13,8 @@ if 'REEL_LOG_LEVEL' in os.environ:
     LOG_FILE = LOG_DIR / 'cli.log'
     LOG_LEVEL = os.environ.get('REEL_LOG_LEVEL').upper()
     logging.basicConfig(filename=LOG_FILE, level=LOG_LEVEL)
-LOGGER = logging.getLogger(__name__)
-LOGGER.debug('Begin logging for reel <~-~-~(~<~(o~>)~)~-~-~>')
+LOG = logging.getLogger(__name__)
+LOG.debug('Begin logging for reel <~-~-~(~<~(o~>)~)~-~-~>')
 
 
 async def main() -> int:
@@ -30,13 +30,21 @@ async def main() -> int:
         help='print the version'
     )
     args = parser.parse_args()
+
     if args.config:
+        LOG.debug('args.config: %s', args.config)
         if 'REEL_LOG_LEVEL' in os.environ:
             print(f'REEL_LOG_DIR={LOG_DIR}')
             print(f'REEL_LOG_FILE={LOG_FILE}')
             print(f'REEL_LOG_LEVEL={LOG_LEVEL}')
-    if args.version:
+
+    elif args.version:
+        LOG.debug('args.version: %s', args.version)
         print(reel.__version__)
+
+    else:
+        LOG.debug('no args')
+        print('leer')
 
     return 0
 

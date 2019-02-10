@@ -54,6 +54,6 @@ async def test_stderr():
     """Run a process and read stderr."""
     not_here = reel.Spool('ls /not_here_i_hope')
     assert not await not_here.run()  # no output
-    # assert not_here.stderr  # some error about a missing file
+    assert not_here.stderr  # some error about a missing file
     assert not_here.returncode  # error present
     assert 'not_here' in not_here.stderr

@@ -7,9 +7,8 @@ import shlex
 
 import trio
 
-__all__ = ['Daemon', 'ProcBase']
-LIMIT = 163840
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
+LOG.debug('<><><><><><><><><><><>>>>>>> PROC,PY <<<<')
 
 
 class ProcBase(metaclass=ABCMeta):

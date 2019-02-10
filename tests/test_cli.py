@@ -7,7 +7,7 @@ async def test_no_args(cli_cmd):
     noargs = reel.Spool(cli_cmd)
     output = await noargs.run()
     assert noargs.returncode == 0
-    assert output == ''
+    assert output == 'leer'
 
 
 async def test_version(cli_cmd):
