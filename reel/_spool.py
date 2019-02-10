@@ -34,9 +34,13 @@ class Spool(trio.abc.AsyncResource):
 
         self._proc = None
 
+    def __str__(self):
+        """Print the command."""
+        return ' '.join(self._command)
+
     def __repr__(self):
         """Represent prettily."""
-        return f"Spool('{' '.join(self._command)}')"
+        return f"Spool('{str(self)}')"
 
     def __or__(self, the_other_one):
         """Create a `Transport` out of the first two spools in the chain."""
@@ -48,8 +52,8 @@ class Spool(trio.abc.AsyncResource):
 
     async def aclose(self):
         """Wait for the process to end and close it."""
-        await self._proc.wait()
-        await self._proc.aclose()
+        await self.proc.wait()
+        await self.proc.aclose()
 
     @property
     def proc(self):
@@ -93,12 +97,17 @@ class Spool(trio.abc.AsyncResource):
         """Read stderr in a function so that the nursery has a function."""
         LOG.debug('()()()()()()()()()(~> IN _HANDLE_STDERR')
         while True:
-            chunk = await self._proc.stderr.receive_some(16384)
-            if not chunk:
+            try:
+                chunk = await self._proc.stderr.receive_some(16384)
+            except trio.ClosedResourceError as err:
+                LOG.debug(str(err))
                 break
-            if not self._stderr:
-                self._stderr = b''
-            self._stderr += chunk
+            else:
+                if not chunk:
+                    break
+                if not self._stderr:
+                    self._stderr = b''
+                self._stderr += chunk
 
     def handle_stderr(self, nursery):
         """Read stderr, called as a task by a Transport in a nursery."""

@@ -33,8 +33,8 @@ class Transport(trio.abc.AsyncResource):
         async with self.stdin as stdin:
             try:
                 await stdin.send_all(message)
-            except trio.BrokenResourceError:
-                LOG.error('trio.BrokenResourceError')
+            except trio.BrokenResourceError as err:
+                LOG.error(str(err))
 
     @property
     def stdout(self):

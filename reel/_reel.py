@@ -5,9 +5,10 @@ from . _transport import Transport
 class Reel:
     """A stack of spools concatenated in place as one spool in a transport."""
 
-    def __init__(self, spools, announce_to=None):
+    def __init__(self, spools, announce_to=None, a_announce_to=None):
         """Begin as a list of spools."""
         self._announce = announce_to
+        self._a_announce = a_announce_to
         self._spools = spools
         self._nursery = None
 
@@ -20,11 +21,6 @@ class Reel:
         for spool in self._spools:
             await spool.aclose()
 
-    # async def handle_stderr(self, nursery):
-    #     """Read stderr, called as a task by a Transport in a nursery."""
-    #     for spool in self._spools:
-    #         nursery.start_soon(spool.handle_stderr, nursery)
-
     def start_process(self, nursery):
         """Don't do anything - the spool starts in send..."""
         self._nursery = nursery
@@ -36,5 +32,10 @@ class Reel:
                 spool.start_process(self._nursery)
                 if self._announce:
                     self._announce(spool)
+                elif self._a_announce:
+                    await self._a_announce(spool)
                 await spool.send_no_close(channel)
-                await spool.stdout.aclose()
+                await spool.proc.stdout.aclose()
+                await spool.proc.stderr.aclose()
+                await spool.proc.stdin.aclose()
+                await spool.proc.aclose()
