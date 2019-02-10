@@ -25,8 +25,8 @@ setup(
     install_requires=[
         'trio>=0.10.0',
         'trio-click>=7.0.2',
-        'reel',
-        'blessings',
+        'reel==0.0.5',
+        'blessings>=1.7',
     ],
     zip_safe=False,
     packages=find_packages(),
