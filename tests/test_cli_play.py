@@ -1,9 +1,17 @@
 """Tests for the 'tapedeck play' cli command."""
+import logging
 import shlex
 
-import pytest
+import trio
 
 import reel
+
+import tapedeck
+
+LOG_FILE = trio.run(tapedeck.config.logfile, 'tests.log')
+logging.basicConfig(filename=LOG_FILE, level='DEBUG')
+LOG = logging.getLogger(__name__)
+LOG.debug('Begin logging for test_cli_play ((o))')
 
 
 async def test_play(env_audio_dest):
@@ -17,18 +25,19 @@ async def test_play(env_audio_dest):
     assert player.returncode <= 0  # ... maybe it should not be an erorr?
 
 
-@pytest.mark.xfail(strict=True)  # until player.timeout(4.7) closes correctly
 async def test_play_directory(env_audio_dest):
     """Detect a directory and play each song."""
     directory = shlex.quote(
         '/Users/zach/tunes/1972 - #1 Record [2009 Remaster]'
-    )  # ... test more ...
+    )  # ... test more with quoting and bad characters in filenames ...
     player = reel.Spool(
         f'python -m tapedeck.cli.main play {directory} -o {env_audio_dest}'
     )
     await player.timeout(4.7).run()
-    assert player.returncode <= 0  # ... maybe it should not be an erorr? ...
+    LOG.debug("error: %s", player.stderr)
+    assert player.returncode > 0
     # ... need to test sort ...
+    # weird how pytest will x-pass even with undefined vars etc
 
 
 async def test_play_shuffle():

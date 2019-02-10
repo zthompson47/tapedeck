@@ -1,14 +1,26 @@
 """The ``tapedeck`` cli 'play' command."""
+import logging
 import random
+import sys
 
 import blessings
+import trio
 import trio_click as click
 
 import reel
 from reel.config import get_xdg_cache_dir
 from reel.cmd import ffmpeg, sox
 
+import tapedeck
 from tapedeck.search import find_tunes, is_audio
+
+LOG_LEVEL = trio.run(tapedeck.config.env, 'TAPEDECK_LOG_LEVEL')
+if LOG_LEVEL:
+    LOG_FILE = trio.run(tapedeck.config.logfile, 'tapedeck.log')
+    logging.basicConfig(level=LOG_LEVEL, filename=LOG_FILE)
+LOGGER = logging.getLogger(__name__)
+LOGGER.addHandler(logging.StreamHandler(sys.stderr))
+LOGGER.debug('--------->> PLAY!!')
 
 T = blessings.Terminal()
 
