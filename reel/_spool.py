@@ -146,12 +146,20 @@ class Spool(trio.abc.AsyncResource):
             buffsize = self._limit
         LOG.debug('-----!!!!!!!>>>>>>>>>> %s %s', self._limit, buffsize)
         bytes_received = 0
-        chunk = await self._proc.stdout.receive_some(buffsize)
+
+        # <=~ Receive data.
+        try:
+            chunk = await self._proc.stdout.receive_some(buffsize)
+        except trio.ClosedResourceError as err:
+            LOG.exception(err)
+            return
+
         _start_time = datetime.now().microsecond
         while chunk:
 
-            # Send data.
+            # ~=> Send data.
             await channel.send(chunk)
+
             bytes_received += len(chunk)
 
             # Check for byte limit.
@@ -164,8 +172,10 @@ class Spool(trio.abc.AsyncResource):
                 if (now - _start_time) >= self._timeout * 1000:
                     break
 
-            # Read from stdout.
+            # Cap buffer at limit.
             buffsize = 16384
             if self._limit and self._limit < 16384:
                 buffsize = self._limit
+
+            # <=~ Receive data.
             chunk = await self._proc.stdout.receive_some(buffsize)

@@ -117,7 +117,7 @@ def config_icecast(tmp_path_factory):
         admin_email='sushi@trident.sea',
         password='hack-it-up',
         hostname='127.0.0.1',
-        port='8555',
+        port='8666',
         logdir=str(tmp_path_factory.mktemp('icecast_log')),
     )
 

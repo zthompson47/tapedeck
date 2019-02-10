@@ -19,14 +19,31 @@ class Transport(trio.abc.AsyncResource):
         else:
             self._chain = list(args)
 
-    def _append(self, spool):
-        """Add a spool to this transport chain."""
-        self._chain.append(spool)
+    def __repr__(self):
+        """Represent prettily."""
+        return str(self._chain)
+
+    def __or__(self, the_other_one):
+        """Store all the chained spools and reels in this transport."""
+        self._append(the_other_one)
+        return self
+
+    async def aclose(self):
+        """Clean up resources."""
 
     @property
     def stdin(self):
         """Return stdin of the first spool in the chain."""
         return self._chain[0].proc.stdin
+
+    @property
+    def stdout(self):
+        """Return stdout of the last spool in the chain."""
+        return self._chain[-1].proc.stdout
+
+    def _append(self, spool):
+        """Add a spool to this transport chain."""
+        self._chain.append(spool)
 
     async def _handle_stdin(self, message):
         """Send a message to stdin."""
@@ -34,12 +51,7 @@ class Transport(trio.abc.AsyncResource):
             try:
                 await stdin.send_all(message)
             except trio.BrokenResourceError as err:
-                LOG.error(str(err))
-
-    @property
-    def stdout(self):
-        """Return stdout of the last spool in the chain."""
-        return self._chain[-1].proc.stdout
+                LOG.exception(err)
 
     async def _run(self, message=None, stdout=False):
         """Connect the spools with pipes and let the bytes flow."""
@@ -77,6 +89,21 @@ class Transport(trio.abc.AsyncResource):
         if stdout:
             return output
 
+    def start_daemon(self, nursery):
+        """Run this transport in the background and return."""
+        nursery.start_soon(self._run)
+
+    async def stop(self):
+        """Stop this transport."""
+        LOG.debug('{}{}{}{}{}{}{}{}{}{}{}{} Transport.stop!!!!!!!!!!!!!')
+        for spool in self._chain:
+            LOG.debug('>>> %s %s', type(spool), spool)
+            # if isinstance(spool, reel._spool.Spool):
+            await spool.proc.stdin.aclose()
+            await spool.proc.stdout.aclose()
+            await spool.proc.stderr.aclose()
+            spool.proc.kill()
+
     async def play(self) -> None:
         """Run this transport and ignore stdout."""
         await self._run()
@@ -101,15 +128,3 @@ class Transport(trio.abc.AsyncResource):
         """Run this transport and return stdout as a `list`."""
         output = (await self._run(stdout=True)).decode('utf-8')
         return output.split('\n')[:-1]
-
-    def __repr__(self):
-        """Represent prettily."""
-        return str(self._chain)
-
-    def __or__(self, the_other_one):
-        """Store all the chained spools and reels in this transport."""
-        self._append(the_other_one)
-        return self
-
-    async def aclose(self):
-        """Clean up resources."""

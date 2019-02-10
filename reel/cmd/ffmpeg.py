@@ -16,6 +16,25 @@ def read(uri):
     return reel.Spool(cmd, xflags=flags)
 
 
+def to_icecast(host, port, mount, password):
+    """Stream audio to an icecast server."""
+    cmd = 'ffmpeg'
+    flags = [
+        '-re',
+        '-ac', '2',
+        '-ar', '44.1k',
+        '-f', 's16le',
+        '-i', '-',
+        '-vn',
+        '-codec:a', 'libvorbis',
+        '-q:a', '8.0',
+        '-content_type', 'audio/ogg',
+        '-f', 'ogg',
+        f'icecast://source:{password}@{host}:{port}/{mount}'
+    ]
+    return reel.Spool(cmd, xflags=flags)
+
+
 def to_udp(host, port):
     """Stream audio over udp."""
     cmd = 'ffmpeg'
