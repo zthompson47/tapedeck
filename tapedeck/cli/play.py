@@ -8,7 +8,9 @@ import trio
 import trio_click as click
 
 import reel
-from reel.config import get_xdg_cache_dir
+from reel.config import (
+    get_xdg_cache_dir, get_xdg_config_dir, get_xdg_data_dir, get_config
+)
 from reel.cmd import ffmpeg, sox
 
 import tapedeck
@@ -18,9 +20,9 @@ LOG_LEVEL = trio.run(tapedeck.config.env, 'TAPEDECK_LOG_LEVEL')
 if LOG_LEVEL:
     LOG_FILE = trio.run(tapedeck.config.logfile, 'tapedeck.log')
     logging.basicConfig(level=LOG_LEVEL, filename=LOG_FILE)
-LOGGER = logging.getLogger(__name__)
-LOGGER.addHandler(logging.StreamHandler(sys.stderr))
-LOGGER.debug('--------->> PLAY!!')
+LOG = logging.getLogger(__name__)
+LOG.addHandler(logging.StreamHandler(sys.stderr))
+LOG.debug('--------->> PLAY!!')
 
 T = blessings.Terminal()
 
@@ -87,6 +89,13 @@ async def play(source, output, memory, shuffle, host, port, recursive):
         if host is None or port is None:
             raise click.BadOptionUsage('-o', 'udp needs host and port')
         out = ffmpeg.to_udp(host=host, port=port)
+    elif output == 'icecast':
+        out = ffmpeg.to_icecast(
+            host=host,
+            port=port,
+            mount='asdf',
+            password='hack-it-up'
+        )
     else:
         # Check for file output.
         out_path = reel.Path(output)
@@ -101,34 +110,24 @@ async def play(source, output, memory, shuffle, host, port, recursive):
         announce_to=click.echo
     )
 
-    # Fire away!!
-    async with plst | out as transport:
-        await transport.play()
+    # Start an icecast daemon.
+    config_icecast = dict(
+        location='Neptune',
+        admin_email='sushi@trident.sea',
+        password='hack-it-up',
+        hostname='127.0.0.1',
+        port='8555',
+        logdir=str(await get_xdg_data_dir()),
+    )
+    config_dir = await get_xdg_config_dir()
+    config = await get_config(config_dir, 'icecast.xml', **config_icecast)
+    flags = ['-c', str(config)]
+    LOG.debug(flags)
+    async with reel.Spool('icecast', xflags=flags) as icecast:
+        async with trio.open_nursery() as nursery:
+            icecast.start_daemon(nursery)
 
-OLD = '''
-#     out = None
-#     if output == 'speakers':
-#         out = sox.play()
-#     elif output == 'udp':
-#         if host is None or port is None:
-#             raise click.BadOptionUsage('-o', 'udp needs host and port')
-#         out = ffmpeg.udp(host=host, port=port)
-#     else:
-#         # Check for file output.
-#         out_path = reel.Path(output)
-#         if output == '/dev/null':
-#             out = NullDestStream()
-#         elif await out_path.is_file() or await out_path.is_dir():
-#             out = ffmpeg.to_file(out_path)
-#
-#     async with out:
-#         for song in playlist:
-#             if isinstance(song, str):
-#                 click.echo(f'{T.blue}{song}{T.normal}')
-#             else:
-#                 album_name = f'{T.blue}{song.parent.name}{T.yellow} / '
-#                 song_name = f'{T.blue}{song.name}{T.normal}'
-#                 click.echo(album_name + song_name)
-#             async with await ffmpeg.stream(str(song)) as src:
-#                 await StreamIO(src, out).flow()
-'''
+            # Play the playlist!
+            async with plst | out as transport:
+                await transport.play()
+            await icecast.stop()
