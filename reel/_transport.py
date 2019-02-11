@@ -48,10 +48,7 @@ class Transport(trio.abc.AsyncResource):
     async def _handle_stdin(self, message):
         """Send a message to stdin."""
         async with self.stdin as stdin:
-            try:
-                await stdin.send_all(message)
-            except trio.BrokenResourceError as err:
-                LOG.exception(err)
+            await stdin.send_all(message)
 
     async def _run(self, message=None, stdout=False):
         """Connect the spools with pipes and let the bytes flow."""
