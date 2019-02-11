@@ -33,9 +33,12 @@ async def test_play_directory(env_audio_dest):
     player = reel.Spool(
         f'python -m tapedeck.cli.main play {directory} -o {env_audio_dest}'
     )
-    await player.timeout(4.7).run()
+    await player.timeout(20).run()
     LOG.debug("error: %s", player.stderr)
-    assert player.returncode > 0
+
+    # Either finishes cleanly or times out.
+    assert player.returncode == 0 or player.returncode == -9
+
     # ... need to test sort ...
     # weird how pytest will x-pass even with undefined vars etc
 
