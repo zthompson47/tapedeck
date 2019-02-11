@@ -1,5 +1,5 @@
 """Spool class."""
-from datetime import datetime
+from time import time
 import logging
 import os
 import shlex
@@ -95,12 +95,11 @@ class Spool(trio.abc.AsyncResource):
 
     async def _handle_stderr(self):
         """Read stderr in a function so that the nursery has a function."""
-        LOG.debug('()()()()()()()()()(~> IN _HANDLE_STDERR')
         while True:
             try:
                 chunk = await self._proc.stderr.receive_some(16384)
             except trio.ClosedResourceError as err:
-                LOG.debug(str(err))
+                LOG.debug('_handle_stderr: %s', str(err))
                 break
             else:
                 if not chunk:
@@ -111,7 +110,6 @@ class Spool(trio.abc.AsyncResource):
 
     def handle_stderr(self, nursery):
         """Read stderr, called as a task by a Transport in a nursery."""
-        LOG.debug('()()()()()()()()()(~> IN HANDLE_STDERR')
         nursery.start_soon(self._handle_stderr)
 
     def start_process(self, nursery):
@@ -123,7 +121,6 @@ class Spool(trio.abc.AsyncResource):
             stderr=subprocess.PIPE,
             env=self._env
         )
-        LOG.debug('()()()()()()()()()(~> IN HANDLE_STDERR')
         self.handle_stderr(nursery)
 
     async def receive(self, channel):
@@ -134,17 +131,18 @@ class Spool(trio.abc.AsyncResource):
 
     async def send(self, channel):
         """Stream stdout to `channel` and close both sides."""
-        LOG.debug('seinding to channel!!!')
         async with channel:
             await self.send_no_close(channel)
         await self._proc.stdout.aclose()
+        await self._proc.stderr.aclose()
+        await self._proc.stdin.aclose()
+        self._proc.kill()
 
     async def send_no_close(self, channel):
         """Stream stdout to `channel` without closing either side."""
         buffsize = 16384
         if self._limit and self._limit < 16384:
             buffsize = self._limit
-        LOG.debug('-----!!!!!!!>>>>>>>>>> %s %s', self._limit, buffsize)
         bytes_received = 0
 
         # <=~ Receive data.
@@ -154,7 +152,7 @@ class Spool(trio.abc.AsyncResource):
             LOG.exception(err)
             return
 
-        _start_time = datetime.now().microsecond
+        _start_time = time()
         while chunk:
 
             # ~=> Send data.
@@ -168,8 +166,7 @@ class Spool(trio.abc.AsyncResource):
 
             # Check for timeout.
             if self._timeout:
-                now = datetime.now().microsecond
-                if (now - _start_time) >= self._timeout * 1000:
+                if (time() - _start_time) >= self._timeout:
                     break
 
             # Cap buffer at limit.
