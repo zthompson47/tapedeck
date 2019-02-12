@@ -7,12 +7,13 @@ import subprocess
 
 import trio
 
+from . _reel import ReelResident
 from . _transport import Transport
 
 LOG = logging.getLogger(__name__)
 
 
-class Spool(trio.abc.AsyncResource):
+class Spool(trio.abc.AsyncResource, ReelResident):
     """A command to run as an async subprocess in a ``Transport``."""
 
     def __init__(self, command, xenv=None, xflags=None):
@@ -20,6 +21,7 @@ class Spool(trio.abc.AsyncResource):
         self._command = shlex.split(command)
         self._env = dict(os.environ)
         self._limit = None
+        self._proc = None
         self._status = None
         self._stderr = None
         self._timeout = None
@@ -30,9 +32,8 @@ class Spool(trio.abc.AsyncResource):
         if xenv:
             for key, val in xenv.items():
                 self._env[key] = val
+        super().__init__()
         LOG.debug(' '.join(self._command))
-
-        self._proc = None
 
     def __str__(self):
         """Print the command."""
@@ -52,7 +53,6 @@ class Spool(trio.abc.AsyncResource):
 
     async def aclose(self):
         """Wait for the process to end and close it."""
-        await self.proc.wait()
         await self.proc.aclose()
 
     @property
@@ -108,11 +108,20 @@ class Spool(trio.abc.AsyncResource):
                     self._stderr = b''
                 self._stderr += chunk
 
+    async def _handle_stdin(self, message):
+        """Handle stdin."""
+        async with self.proc.stdin as stdin:
+            await stdin.send_all(message)
+
     def handle_stderr(self, nursery):
-        """Read stderr, called as a task by a Transport in a nursery."""
+        """Read stderr, called as a task in a nursery."""
         nursery.start_soon(self._handle_stderr)
 
-    def start_process(self, nursery):
+    def handle_stdin(self, nursery, message):
+        """Feed stdin, called as a task in a nursery."""
+        nursery.start_soon(self._handle_stdin, message)
+
+    def start_process(self, nursery, message=None):
         """Initialize the subprocess and run the command."""
         self._proc = trio.Process(
             self._command,
@@ -121,6 +130,8 @@ class Spool(trio.abc.AsyncResource):
             stderr=subprocess.PIPE,
             env=self._env
         )
+        if message:
+            self.handle_stdin(nursery, message)
         self.handle_stderr(nursery)
 
     async def receive(self, channel):
@@ -132,11 +143,8 @@ class Spool(trio.abc.AsyncResource):
     async def send(self, channel):
         """Stream stdout to `channel` and close both sides."""
         async with channel:
-            await self.send_no_close(channel)
-        await self._proc.stdout.aclose()
-        await self._proc.stderr.aclose()
-        await self._proc.stdin.aclose()
-        self._proc.kill()
+            async with self.proc:
+                await self.send_no_close(channel)
 
     async def send_no_close(self, channel):
         """Stream stdout to `channel` without closing either side."""

@@ -6,12 +6,29 @@ import trio
 LOG = logging.getLogger(__name__)
 
 
+class TransportResident(trio.abc.AsyncResource):
+    """Something that can live in a transport."""
+
+    def start_process(self, message=None):
+        """Start the subprocess and whatever pipes this thing needs to run."""
+
+    def send(self, channel):
+        """Send data to the channel and close both sides."""
+
+    def receive(self, channel):
+        """Receive data from the channel and leave connections open."""
+
+    def aclose(self):
+        """Clean up!!."""
+
+
 class Transport(trio.abc.AsyncResource):
     """A device for running spools."""
 
     def __init__(self, *args):
         """Create a transport chain from a list of spools."""
         self._nursery = None
+        self._output = None
         if len(args) == 1 and isinstance(args[0], list):
             self._chain = []
             for spool in args[0]:
@@ -30,34 +47,24 @@ class Transport(trio.abc.AsyncResource):
 
     async def aclose(self):
         """Clean up resources."""
-
-    @property
-    def stdin(self):
-        """Return stdin of the first spool in the chain."""
-        return self._chain[0].proc.stdin
-
-    @property
-    def stdout(self):
-        """Return stdout of the last spool in the chain."""
-        return self._chain[-1].proc.stdout
+        # Not needed for tests:
+        # for spool in self._chain:
+        #     await spool.aclose()
 
     def _append(self, spool):
         """Add a spool to this transport chain."""
         self._chain.append(spool)
 
-    async def _handle_stdin(self, message):
-        """Send a message to stdin."""
-        async with self.stdin as stdin:
-            await stdin.send_all(message)
-
-    async def _run(self, message=None, stdout=False):
+    async def _run(self, message=None):
         """Connect the spools with pipes and let the bytes flow."""
-        output = None
         async with trio.open_nursery() as nursery:
 
             # Chain the spools with pipes.
             for idx, spool in enumerate(self._chain):
-                spool.start_process(nursery)
+                if idx == 0:
+                    spool.start_process(nursery, message)
+                else:
+                    spool.start_process(nursery)
                 if idx < len(self._chain) - 1:
                     _src = spool
                     _dst = self._chain[idx + 1]
@@ -66,25 +73,15 @@ class Transport(trio.abc.AsyncResource):
                         nursery.start_soon(_src.send, send_ch.clone())
                         nursery.start_soon(_dst.receive, receive_ch.clone())
 
-            # Queue the message to stdin.
-            if message:
-                nursery.start_soon(self._handle_stdin, message)
-
             # Read stdout from the last spool in the list.
-            if stdout:
-                output = b''
             ch_send, ch_receive = trio.open_memory_channel(0)
             nursery.start_soon(self._chain[-1].send, ch_send)
             async for chunk in ch_receive:
-                if stdout:
-                    output += chunk
+                if not self._output:
+                    self._output = b''
+                self._output += chunk
 
-        # Close the subprocesses.
-        for spool in self._chain:
-            await spool.aclose()
-
-        if stdout:
-            return output
+        return self._output
 
     def start_daemon(self, nursery):
         """Run this transport in the background and return."""
@@ -92,14 +89,10 @@ class Transport(trio.abc.AsyncResource):
 
     async def stop(self):
         """Stop this transport."""
-        LOG.debug('{}{}{}{}{}{}{}{}{}{}{}{} Transport.stop!!!!!!!!!!!!!')
         for spool in self._chain:
-            LOG.debug('>>> %s %s', type(spool), spool)
-            # if isinstance(spool, reel._spool.Spool):
-            await spool.proc.stdin.aclose()
-            await spool.proc.stdout.aclose()
-            await spool.proc.stderr.aclose()
             spool.proc.kill()
+            await spool.proc.wait()
+            # await spool.proc.aclose()  # HANGS
 
     async def play(self) -> None:
         """Run this transport and ignore stdout."""
@@ -110,9 +103,9 @@ class Transport(trio.abc.AsyncResource):
         if message and text:
             message = message.encode('utf-8')
 
-        rawbytes = await self._run(message=message, stdout=True)
+        rawbytes = await self._run(message=message)
 
-        if text:
+        if text and rawbytes:
             decoded = rawbytes.decode('utf-8')
 
             # Remove trailing \n.
@@ -123,5 +116,5 @@ class Transport(trio.abc.AsyncResource):
 
     async def readlines(self):
         """Run this transport and return stdout as a `list`."""
-        output = (await self._run(stdout=True)).decode('utf-8')
+        output = (await self._run()).decode('utf-8')
         return output.split('\n')[:-1]
