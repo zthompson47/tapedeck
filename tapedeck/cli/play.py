@@ -26,6 +26,8 @@ LOG.debug('--------->> PLAY!!')
 
 T = blessings.Terminal()
 
+PORTS = range(8771, 8777)
+
 
 # pylint: disable=too-many-branches,too-many-locals,too-many-arguments
 @click.command(  # noqa: C901
@@ -91,8 +93,8 @@ async def play(source, output, memory, shuffle, host, port, recursive):
         out = ffmpeg.to_udp(host=host, port=port)
     elif output == 'icecast':
         out = ffmpeg.to_icecast(
-            host=host,
-            port=port,
+            host='127.0.0.1',
+            port='8777',
             mount='asdf',
             password='hack-it-up'
         )
@@ -116,7 +118,7 @@ async def play(source, output, memory, shuffle, host, port, recursive):
         admin_email='sushi@trident.sea',
         password='hack-it-up',
         hostname='127.0.0.1',
-        port='8555',
+        port='8777',
         logdir=str(await get_xdg_data_dir()),
     )
     config_dir = await get_xdg_config_dir()

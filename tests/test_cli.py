@@ -40,7 +40,7 @@ async def test_no_args_external():
     noargs = reel.Spool('python -m tapedeck.cli.main')
     output = await noargs.run()
     assert noargs.returncode == 0
-    assert output == ''
+    assert output is None
 
 
 async def test_version_external():
