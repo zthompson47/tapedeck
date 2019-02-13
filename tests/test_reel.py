@@ -25,7 +25,7 @@ async def test_kill_old_processes(audio_dest):
         assert player
 
 
-async def test_spool_has_next_in_reel():
+async def test_spool_has_next_track():
     """A spool in a reel has a reference to the next spool in the reel."""
     cmds = reel.Reel([reel.cmd.ffmpeg.read(_) for _ in [
         '/Users/zach/out000.wav', '/Users/zach/out001.wav',
@@ -33,8 +33,8 @@ async def test_spool_has_next_in_reel():
         '/Users/zach/out004.wav', '/Users/zach/out005.wav',
     ]])
     for idx, spool in enumerate(cmds.spools[:-1]):
-        assert spool.next_in_reel
-        assert spool.next_in_reel == cmds.spools[idx + 1]
+        assert spool.next_track
+        assert spool.next_track == cmds.spools[idx + 1]
 
 
 async def test_prefetch_next_track(audio_dest):
@@ -49,10 +49,10 @@ async def test_prefetch_next_track(audio_dest):
             for line in await proclist.readlines():
                 if str(spool) in line:
                     found_spool = True
-                if str(spool.next_in_reel) in line:
+                if str(spool.next_track) in line:
                     found_next = True
             assert found_spool
-            if spool.next_in_reel:
+            if spool.next_track:
                 assert found_next
 
     playlist = reel.Reel([reel.cmd.ffmpeg.read(_) for _ in [

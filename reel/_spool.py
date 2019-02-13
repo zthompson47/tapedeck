@@ -7,13 +7,13 @@ import subprocess
 
 import trio
 
-from . _reel import ReelResident
-from . _transport import Transport
+from ._reel import Track
+from ._transport import Transport
 
 LOG = logging.getLogger(__name__)
 
 
-class Spool(trio.abc.AsyncResource, ReelResident):
+class Spool(trio.abc.AsyncResource, Track):
     """A command to run as an async subprocess in a ``Transport``."""
 
     def __init__(self, command, xenv=None, xflags=None):
@@ -72,11 +72,6 @@ class Spool(trio.abc.AsyncResource, ReelResident):
             return self._stderr.decode('utf-8')
         return None
 
-    @property
-    def stdout(self):
-        """Return stdout of the subprocess."""
-        return self._proc.stdout
-
     def limit(self, byte_limit=65536):
         """Configure this `spool` to limit output to `byte_limit` bytes."""
         self._limit = byte_limit
@@ -121,7 +116,7 @@ class Spool(trio.abc.AsyncResource, ReelResident):
         """Feed stdin, called as a task in a nursery."""
         nursery.start_soon(self._handle_stdin, message)
 
-    def start_process(self, nursery, message=None):
+    def start_process(self, nursery, stdin=None):
         """Initialize the subprocess and run the command."""
         self._proc = trio.Process(
             self._command,
@@ -130,8 +125,8 @@ class Spool(trio.abc.AsyncResource, ReelResident):
             stderr=subprocess.PIPE,
             env=self._env
         )
-        if message:
-            self.handle_stdin(nursery, message)
+        if stdin:
+            self.handle_stdin(nursery, stdin)
         self.handle_stderr(nursery)
 
     async def receive(self, channel):
@@ -145,6 +140,10 @@ class Spool(trio.abc.AsyncResource, ReelResident):
         async with channel:
             async with self.proc:
                 await self.send_no_close(channel)
+
+    async def send_chunk(self, channel):
+        """Send a quantum of stuff to the channel."""
+        # WTFWTFWTF?!?
 
     async def send_no_close(self, channel):
         """Stream stdout to `channel` without closing either side."""

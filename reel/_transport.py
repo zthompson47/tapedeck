@@ -1,4 +1,6 @@
 """Transport class."""
+import abc
+
 import logging
 
 import trio
@@ -6,20 +8,24 @@ import trio
 LOG = logging.getLogger(__name__)
 
 
-class TransportResident(trio.abc.AsyncResource):
-    """Something that can live in a transport."""
+class Streamer(metaclass=abc.ABCMeta):
+    """Something that can stream i/o in a transport."""
 
-    def start_process(self, message=None):
-        """Start the subprocess and whatever pipes this thing needs to run."""
+    @abc.abstractmethod
+    def start_process(self, nursery, stdin=None):
+        """Start whatever this thing needs to run.
 
-    def send(self, channel):
+        Called before send or receive.
+
+        """
+
+    @abc.abstractmethod
+    async def send(self, channel):
         """Send data to the channel and close both sides."""
 
+    @abc.abstractmethod
     def receive(self, channel):
         """Receive data from the channel and leave connections open."""
-
-    def aclose(self):
-        """Clean up!!."""
 
 
 class Transport(trio.abc.AsyncResource):

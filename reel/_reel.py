@@ -1,42 +1,43 @@
 """Reel class."""
-from . _transport import Transport
+from ._transport import Streamer, Transport
 
 
-class ReelResident:
+class Track:
     """Something that can be placed in a Reel."""
 
     def __init__(self):
         """Set up the Reel hooks."""
-        self._next_in_reel = None
+        self._next_track = None
 
     @property
-    def next_in_reel(self):
+    def next_track(self):
         """Return the next in line in this Reel."""
-        return self._next_in_reel
+        return self._next_track
 
-    @next_in_reel.setter
-    def next_in_reel(self, resident):
+    @next_track.setter
+    def next_track(self, track):
         """Set the next in line in this Reel."""
-        self._next_in_reel = resident
+        self._next_track = track
 
     def what(self):
         """Do something for pylint."""
 
 
-class Reel:
+class Reel(Streamer):
     """A stack of spools concatenated in place as one spool in a transport."""
 
-    def __init__(self, spools, announce_to=None, a_announce_to=None):
-        """Begin as a list of spools."""
-        self._announce = announce_to
+    def __init__(self, tracks, announce_to=None, a_announce_to=None):
+        """Begin as a list of tracks."""
         self._a_announce = a_announce_to
-        self._spools = spools
-        self._message = None
+        self._announce = announce_to
+        self._now_playing = None
         self._nursery = None
+        self._stdin = None
+        self._tracks = tracks
 
-        # Chain the spools together with references.
-        for idx, spool in enumerate(self._spools[:-1]):
-            spool.next_in_reel = self._spools[idx + 1]
+        # Create a list of spools.
+        for idx, track in enumerate(self._tracks[:-1]):
+            track.next_track = self._tracks[idx + 1]
 
     def __or__(self, the_other_one):
         """Board the __or__ train, creating `Transport` as first in chain."""
@@ -44,36 +45,37 @@ class Reel:
 
     async def aclose(self):
         """Close the spools."""
-        for spool in self._spools:
-            await spool.aclose()
+        for track in self._tracks:
+            await track.aclose()
 
     @property
     def spools(self):
         """Return the list of spools."""
-        return self._spools
+        return self._tracks
 
-    def start_process(self, nursery, message=None):
-        """Don't do anything - the spool starts in send..."""
-        self._message = message
+    def start_process(self, nursery, stdin=None):
+        """Store information for send to use."""
+        self._stdin = stdin
         self._nursery = nursery
 
+    async def receive(self, channel):
+        """Receive input and send it to the current spool."""
+
     async def send(self, channel):
-        """Send the spools' stdout to the send `channel`."""
+        """Start each spool and send stdout to the `channel`."""
         async with channel:
 
-            # Start the first spool.
-            if self._spools:
-                self._spools[0].start_process(
-                    self._nursery, self._message
-                )
+            # while ...
 
-            for spool in self._spools:
+            # Start the first spool.
+            if self._tracks:
+                self._tracks[0].start_process(self._nursery, self._stdin)
+
+            for spool in self._tracks:
 
                 # Start the next process.
-                if spool.next_in_reel:
-                    spool.next_in_reel.start_process(
-                        self._nursery, self._message
-                    )
+                if spool.next_track:
+                    spool.next_track.start_process(self._nursery, self._stdin)
 
                 # Run the announce callback.
                 if self._announce:
