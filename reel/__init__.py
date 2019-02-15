@@ -2,6 +2,7 @@
 # import logging
 import pkg_resources as _pkg
 
+from . import cmd
 from . import config
 from . _path import Path
 from . _spool import Spool

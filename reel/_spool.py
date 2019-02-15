@@ -7,13 +7,12 @@ import subprocess
 
 import trio
 
-from ._reel import Track
 from ._transport import Transport
 
 LOG = logging.getLogger(__name__)
 
 
-class Spool(trio.abc.AsyncResource, Track):
+class Spool(trio.abc.AsyncResource):
     """A command to run as an async subprocess in a ``Transport``."""
 
     def __init__(self, command, xenv=None, xflags=None):
@@ -53,7 +52,15 @@ class Spool(trio.abc.AsyncResource, Track):
 
     async def aclose(self):
         """Wait for the process to end and close it."""
-        await self.proc.aclose()
+        if self.proc:
+            await self.proc.aclose()
+
+    @property
+    def pid(self):
+        """Return the process pid."""
+        if self._proc:
+            return self._proc.pid
+        return None
 
     @property
     def proc(self):
@@ -90,9 +97,12 @@ class Spool(trio.abc.AsyncResource, Track):
 
     async def _handle_stderr(self):
         """Read stderr in a function so that the nursery has a function."""
+        logging.debug('HHAANDLE_STDERR!!!!! %s', self)
         while True:
             try:
+                logging.debug('HHAAN!TRY!!! %s', self)
                 chunk = await self._proc.stderr.receive_some(16384)
+                logging.debug('HHAAN!AFTY!!! %s %s', self, chunk)
             except trio.ClosedResourceError as err:
                 LOG.debug('_handle_stderr: %s', str(err))
                 break
@@ -116,8 +126,9 @@ class Spool(trio.abc.AsyncResource, Track):
         """Feed stdin, called as a task in a nursery."""
         nursery.start_soon(self._handle_stdin, message)
 
-    def start_process(self, nursery, stdin=None):
+    def start(self, nursery, stdin=None):
         """Initialize the subprocess and run the command."""
+        logging.debug('=-=-=-=-= START-SPOOL %s', self)
         self._proc = trio.Process(
             self._command,
             stdin=subprocess.PIPE,

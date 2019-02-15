@@ -7,6 +7,7 @@ import reel
 
 async def test_pipe_operator():
     """Overload the ``__or__`` operator to make piping streams look cool."""
+    logging.debug('+++++++++++++++++++++>> BEGIN TEST_PIPE_OPERATOR')
 
     # Spool some commands
     read_file = reel.Spool(f'cat {__file__}')
@@ -31,6 +32,7 @@ async def test_pipe_operator():
 
 async def test_play_music_even_better(audio_dest):  # noqa: F811
     """Try pipe operators.
+    logging.debug('+++++++++++++++++++++>> BEGIN TEST_PLAY_MUSIC_EVEN_BETTER')
 
     This method is not gapless.  Reconnecting to the speaker
     on each iteration can (will?) definitely produce some noise.
@@ -52,6 +54,7 @@ async def test_play_neil_with_pipes(audio_dest, audio_uri):  # noqa: F811
     open while switching files.
 
     """
+    logging.debug('+++++++++++++++++++++>> BEGIN TEST_PLAY_NEIL_WITH_PIPES')
     logging.debug('////////////// nogaps ////////////////')
     playlist = reel.Reel([reel.cmd.ffmpeg.read(_).limit(1024**2) for _ in [
         '/Users/zach/out000.wav', '/Users/zach/out001.wav',

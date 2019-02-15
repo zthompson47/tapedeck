@@ -1,5 +1,5 @@
 """Use the sox play utility."""
-import reel
+from .._spool import Spool
 
 
 def speakers():
@@ -12,4 +12,4 @@ def speakers():
              '--endian', 'little',
              '-c', '2',
              '-']
-    return reel.Spool(cmd, xflags=flags)
+    return Spool(cmd, xflags=flags)

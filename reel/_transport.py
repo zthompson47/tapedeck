@@ -12,7 +12,7 @@ class Streamer(metaclass=abc.ABCMeta):
     """Something that can stream i/o in a transport."""
 
     @abc.abstractmethod
-    def start_process(self, nursery, stdin=None):
+    def start(self, nursery, stdin=None):
         """Start whatever this thing needs to run.
 
         Called before send or receive.
@@ -68,9 +68,9 @@ class Transport(trio.abc.AsyncResource):
             # Chain the spools with pipes.
             for idx, spool in enumerate(self._chain):
                 if idx == 0:
-                    spool.start_process(nursery, message)
+                    spool.start(nursery, message)
                 else:
-                    spool.start_process(nursery)
+                    spool.start(nursery)
                 if idx < len(self._chain) - 1:
                     _src = spool
                     _dst = self._chain[idx + 1]
@@ -122,5 +122,8 @@ class Transport(trio.abc.AsyncResource):
 
     async def readlines(self):
         """Run this transport and return stdout as a `list`."""
-        output = (await self._run()).decode('utf-8')
+        result = await self._run()
+        if not result:
+            result = b''
+        output = result.decode('utf-8')
         return output.split('\n')[:-1]

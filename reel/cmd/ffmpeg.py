@@ -1,5 +1,5 @@
 """Various ffmpeg command line tools."""
-import reel
+from .._spool import Spool
 
 
 def read(uri):
@@ -13,7 +13,7 @@ def read(uri):
         '-acodec', 'pcm_s16le',  # wav format
         '-',  # stream to stdout
     ]
-    return reel.Spool(cmd, xflags=flags)
+    return Spool(cmd, xflags=flags)
 
 
 def to_icecast(host, port, mount, password):
@@ -32,7 +32,7 @@ def to_icecast(host, port, mount, password):
         '-f', 'ogg',
         f'icecast://source:{password}@{host}:{port}/{mount}'
     ]
-    return reel.Spool(cmd, xflags=flags)
+    return Spool(cmd, xflags=flags)
 
 
 def to_udp(host, port):
@@ -50,7 +50,7 @@ def to_udp(host, port):
         '-f', 'mp3',  # mp3 format
         f'udp://{host}:{port}',  # receiver address
     ]
-    return reel.Spool(cmd, xflags=flags)
+    return Spool(cmd, xflags=flags)
 
 
 def to_file2(path):
@@ -67,4 +67,4 @@ def to_file2(path):
         '-c:a', 'copy',  # stream copy audio
         path,
     ]
-    return reel.Spool(cmd, xflags=flags)
+    return Spool(cmd, xflags=flags)

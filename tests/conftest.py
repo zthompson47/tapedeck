@@ -8,26 +8,25 @@ import logging
 import os
 from tempfile import mkdtemp
 
-# import numpy as np
 import pytest
 import trio
 
 import reel
-from reel import config
-from reel import cmd
+from reel import Reel
+from reel.cmd import ffmpeg, sox
 
 # Log debug messages for testing.
-LOG_DIR = trio.run(config.get_xdg_data_dir, 'reel')
+LOG_DIR = trio.run(reel.config.get_xdg_data_dir, 'reel')
 LOG_FILE = LOG_DIR / 'tests.log'
 logging.basicConfig(filename=LOG_FILE, level='DEBUG')
 LOGGER = logging.getLogger(__name__)
 LOGGER.debug('Begin logging for tests <~~~~~~(~<~(o~>)~>~~~~~>')
 
 # Remove existing config vars except for testing.
-for key in os.environ.keys():
-    if key.startswith('REEL_'):
-        if not key.startswith('REEL_TESTS_'):
-            del os.environ[key]
+for _env_key in os.environ.keys():
+    if _env_key.startswith('REEL_'):
+        if not _env_key.startswith('REEL_TESTS_'):
+            del os.environ[_env_key]
 
 # Create home directories for testing.
 XDG = {
@@ -38,8 +37,8 @@ XDG = {
 }
 
 # Set xdg environment variables.
-for key, val in XDG.items():
-    os.environ[key] = val
+for _key, _val in XDG.items():
+    os.environ[_key] = _val
 
 # Enable full test coverage for subprocesses.
 os.environ['COVERAGE_PROCESS_START'] = 'setup.cfg'
@@ -48,14 +47,24 @@ os.environ['PYTHONPATH'] = '.'  # to find sitecustomize.py
 
 def set_env(env):
     """Add some variables to the environment."""
-    for _ in env:
-        os.environ[_] = env[_]
+    for key in env:
+        os.environ[key] = env[key]
 
 
 def unset_env(env):
     """Remove some variables from the environment."""
-    for _ in env:
-        del os.environ[_]
+    for key in env:
+        del os.environ[key]
+
+
+@pytest.fixture
+def neil_reel():
+    """Return an audio stream of a short intro split into many files."""
+    return Reel([ffmpeg.read(track) for track in [
+        '/Users/zach/out000.wav', '/Users/zach/out001.wav',
+        '/Users/zach/out002.wav', '/Users/zach/out003.wav',
+        '/Users/zach/out004.wav', '/Users/zach/out005.wav',
+    ]])
 
 
 @pytest.fixture
@@ -65,16 +74,16 @@ def audio_dest():
         dest = os.environ.get('REEL_TESTS_AUDIO_DEST', '/dev/null')
         out = None
         if dest == 'speakers':
-            out = cmd.sox.speakers()
+            out = sox.speakers()
         elif dest == 'udp':
-            out = cmd.ffmpeg.to_udp('127.0.0.1', '9876')
+            out = ffmpeg.to_udp('127.0.0.1', '9876')
         else:
             # Check for file output.
             out_path = reel.Path(dest)
             if (dest == '/dev/null' or
                     trio.run(out_path.is_file) or
                     trio.run(out_path.is_dir)):
-                out = reel.cmd.ffmpeg.to_file2(out_path)
+                out = ffmpeg.to_file2(out_path)
         return out
     return audio_dest_fn
 
