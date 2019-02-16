@@ -111,9 +111,7 @@ async def test_reel_manages_spool_send(neil_reel):
                 assert found_it
 
             # Play the reel so we can exit.
-            send_ch, receive_ch = trio.open_memory_channel(0)
-            async with send_ch, receive_ch:
-                nursery.start_soon(neil_reel.send, send_ch)
-                async for chunk in receive_ch:
-                    if chunk:
-                        assert chunk
+            while True:
+                chunk = await neil_reel.receive_some(16384)
+                if not chunk:
+                    break

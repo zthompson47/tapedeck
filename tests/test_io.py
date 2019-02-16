@@ -60,7 +60,7 @@ async def test_play_neil_with_pipes(audio_dest, audio_uri):  # noqa: F811
         '/Users/zach/out000.wav', '/Users/zach/out001.wav',
         '/Users/zach/out002.wav', '/Users/zach/out003.wav',
         '/Users/zach/out004.wav', '/Users/zach/out005.wav',
-        audio_uri['SONG'], audio_uri['RADIO'],
+        # audio_uri['SONG'], audio_uri['RADIO'],
     ]])
     async with playlist | audio_dest() as player:
         await player.play()

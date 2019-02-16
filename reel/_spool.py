@@ -93,16 +93,12 @@ class Spool(trio.abc.AsyncResource):
         """Send stdin to process and return stdout."""
         return await Transport(self).read(message, text=text)
 
-    # ~= Transport hooks =~
-
     async def _handle_stderr(self):
         """Read stderr in a function so that the nursery has a function."""
-        logging.debug('HHAANDLE_STDERR!!!!! %s', self)
+        LOG.debug('HHAANDLE_STDERR!!!!! %s', self)
         while True:
             try:
-                logging.debug('HHAAN!TRY!!! %s', self)
                 chunk = await self._proc.stderr.receive_some(16384)
-                logging.debug('HHAAN!AFTY!!! %s %s', self, chunk)
             except trio.ClosedResourceError as err:
                 LOG.debug('_handle_stderr: %s', str(err))
                 break
@@ -128,7 +124,7 @@ class Spool(trio.abc.AsyncResource):
 
     def start(self, nursery, stdin=None):
         """Initialize the subprocess and run the command."""
-        logging.debug('=-=-=-=-= START-SPOOL %s', self)
+        LOG.debug('=-=-=-=-= START-SPOOL %s', self)
         self._proc = trio.Process(
             self._command,
             stdin=subprocess.PIPE,
@@ -152,33 +148,29 @@ class Spool(trio.abc.AsyncResource):
             async with self.proc:
                 await self.send_no_close(channel)
 
-    async def send_chunk(self, channel):
-        """Send a quantum of stuff to the channel."""
-        # WTFWTFWTF?!?
+    async def receive_some(self, max_bytes):
+        """Return a chunk of data from the output of this stream."""
+        return await self._proc.stdout.receive_some(max_bytes)
 
     async def send_no_close(self, channel):
         """Stream stdout to `channel` without closing either side."""
         buffsize = 16384
-        if self._limit and self._limit < 16384:
-            buffsize = self._limit
         bytes_received = 0
 
-        # <=~ Receive data.
-        try:
-            chunk = await self._proc.stdout.receive_some(buffsize)
-        except trio.ClosedResourceError as err:
-            LOG.exception(err)
-            return
+        # Don't receive more than the bytes limit.
+        if self._limit and self._limit < 16384:
+            buffsize = self._limit
 
+        # <=~ Receive data.
         _start_time = time()
+        chunk = await self.receive_some(buffsize)
         while chunk:
 
             # ~=> Send data.
             await channel.send(chunk)
 
-            bytes_received += len(chunk)
-
             # Check for byte limit.
+            bytes_received += len(chunk)
             if self._limit and bytes_received > self._limit:
                 break
 
@@ -193,4 +185,4 @@ class Spool(trio.abc.AsyncResource):
                 buffsize = self._limit
 
             # <=~ Receive data.
-            chunk = await self._proc.stdout.receive_some(buffsize)
+            chunk = await self.receive_some(buffsize)
