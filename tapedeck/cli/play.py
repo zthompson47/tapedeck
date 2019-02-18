@@ -104,7 +104,7 @@ async def play(source, output, memory, shuffle, host, port, recursive):
         if (output == '/dev/null' or
                 await out_path.is_file() or
                 await out_path.is_dir()):
-            out = ffmpeg.to_file2(out_path)
+            out = ffmpeg.to_file(out_path)
 
     # Create the playlist.
     plst = reel.Reel(
