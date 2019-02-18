@@ -119,33 +119,16 @@ class Reel(trio.abc.AsyncResource, Streamer):
         )
 
     async def skip_to_next_track(self, close=True):
-        """Begin playing the track immediately."""
+        """Begin playing the next track immediately."""
         LOG.debug(
             '[ REEL %d SKIP_TO_NEXT_TRACK %s %s ]',
             len(self._tracks),
             self._current_track,
             self._next_track
         )
-
-        # copied from above...
-        # _next = None
-        # if self._next_track:
-        #     _next = self._next_track + 1
-        # self._current_track = self._next_track
-        # if _next and _next < len(self._tracks):
-        #     self._next_track = _next
-        # else:
-        #     self._next_track = None
-
-        # self.current_track.start(self._nursery)
-        # async with trio.Lock():
-        LOG.debug('11111111111111111111111111111111111111111')
         if close:
-            LOG.debug('22222222222222222222222222222222222222222')
             await self.current_track.aclose()
-        LOG.debug('33333333333333333333333333333333333333333')
         self._start_next_track()
-        LOG.debug('44444444444444444444444444444444444444444')
 
     async def receive_from_channel(self, channel):
         """Receive input and send it to the current spool."""
@@ -154,21 +137,9 @@ class Reel(trio.abc.AsyncResource, Streamer):
             str(self._current_track)
         )
         async with channel:
-            LOG.debug(
-                '[ REEL track[%s] receive_from_channel() - IN CHANNEL ]',
-                str(self._current_track)
-            )
             async for chunk in channel:
-                LOG.debug(
-                    '[ REEL track[%s] receive_from_channel() - FOR CHUNK ]',
-                    str(self._current_track)
-                )
                 LOG.debug(b'ZZ' + chunk[:47] + chunk[-47:])
                 await self.send_all(chunk)
-                LOG.debug(
-                    '[ REEL track[%s] receive_from_channel() - SENt ]',
-                    str(self._current_track)
-                )
 
     async def send_all(self, chunk):
         """Receive input and send it to the current spool."""
