@@ -76,12 +76,21 @@ class Reel(trio.abc.AsyncResource, Streamer):
 
     def start(self, nursery, stdin=None):
         """Store information for send to use."""
+        LOG.debug('[ START REEL %d ]', len(self._tracks))
         self._nursery = nursery
         self._stdin = stdin
         self._start_next_track()
 
     def _start_next_track(self):
         """Set the current/next track so send has something to send."""
+        LOG.debug(
+            '[ REEL %d START NEXT_TRACK %s %s ]',
+            len(self._tracks),
+            str(self._current_track),
+            str(self._next_track)
+        )
+
+        # Start at the beginning without a current track.
         if not self.current_track:
             if self._tracks:
                 self._current_track = 0
@@ -102,8 +111,76 @@ class Reel(trio.abc.AsyncResource, Streamer):
         if self.next_track:
             self.next_track.start(self._nursery, self._stdin)
 
-    async def receive(self, channel):
+        LOG.debug(
+            '[ REEL %d STARTED NEXT_TRACK %s %s ]',
+            len(self._tracks),
+            str(self._current_track),
+            str(self._next_track)
+        )
+
+    async def skip_to_next_track(self, close=True):
+        """Begin playing the track immediately."""
+        LOG.debug(
+            '[ REEL %d SKIP_TO_NEXT_TRACK %s %s ]',
+            len(self._tracks),
+            self._current_track,
+            self._next_track
+        )
+
+        # copied from above...
+        # _next = None
+        # if self._next_track:
+        #     _next = self._next_track + 1
+        # self._current_track = self._next_track
+        # if _next and _next < len(self._tracks):
+        #     self._next_track = _next
+        # else:
+        #     self._next_track = None
+
+        # self.current_track.start(self._nursery)
+        # async with trio.Lock():
+        LOG.debug('11111111111111111111111111111111111111111')
+        if close:
+            LOG.debug('22222222222222222222222222222222222222222')
+            await self.current_track.aclose()
+        LOG.debug('33333333333333333333333333333333333333333')
+        self._start_next_track()
+        LOG.debug('44444444444444444444444444444444444444444')
+
+    async def receive_from_channel(self, channel):
         """Receive input and send it to the current spool."""
+        LOG.debug(
+            '[ REEL track[%s] receive_from_channel() ]',
+            str(self._current_track)
+        )
+        async with channel:
+            LOG.debug(
+                '[ REEL track[%s] receive_from_channel() - IN CHANNEL ]',
+                str(self._current_track)
+            )
+            async for chunk in channel:
+                LOG.debug(
+                    '[ REEL track[%s] receive_from_channel() - FOR CHUNK ]',
+                    str(self._current_track)
+                )
+                LOG.debug(b'ZZ' + chunk[:47] + chunk[-47:])
+                await self.send_all(chunk)
+                LOG.debug(
+                    '[ REEL track[%s] receive_from_channel() - SENt ]',
+                    str(self._current_track)
+                )
+
+    async def send_all(self, chunk):
+        """Receive input and send it to the current spool."""
+        LOG.debug(
+            '[ REEL track[%s] send_all !! len %d ]',
+            str(self._current_track),
+            len(chunk)
+        )
+        if self.current_track:  # race??  next line could be error?
+            LOG.debug('[ REEL send_all !! len %d ALMOST !!]', len(chunk))
+            await self.current_track.send_all(chunk)
+        LOG.debug('[ REEL send_all !! len %d DONE !!]', len(chunk))
 
     async def receive_some(self, max_bytes):
         """Return a chunk of data from the output of this stream."""
@@ -131,7 +208,7 @@ class Reel(trio.abc.AsyncResource, Streamer):
         # Send empty byte as EOF.
         return b''
 
-    async def send(self, channel):
+    async def send_to_channel(self, channel):
         """Start each spool and send stdout to the `channel`."""
         async with channel:
             while self.current_track:

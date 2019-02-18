@@ -20,7 +20,7 @@ LOG_DIR = trio.run(reel.config.get_xdg_data_dir, 'reel')
 LOG_FILE = LOG_DIR / 'tests.log'
 logging.basicConfig(filename=LOG_FILE, level='DEBUG')
 LOGGER = logging.getLogger(__name__)
-LOGGER.debug('Begin logging for tests <~~~~~~(~<~(o~>)~>~~~~~>')
+LOGGER.debug('<~~~~~~(~<~(o~>)~>~~~~~> BEGIN REEL TESTS LOGGING')
 
 # Remove existing config vars except for testing.
 for _env_key in os.environ.keys():
@@ -83,7 +83,7 @@ def audio_dest():
             if (dest == '/dev/null' or
                     trio.run(out_path.is_file) or
                     trio.run(out_path.is_dir)):
-                out = ffmpeg.to_file2(out_path)
+                out = ffmpeg.to_file(out_path)
         return out
     return audio_dest_fn
 

@@ -53,7 +53,7 @@ def to_udp(host, port):
     return Spool(cmd, xflags=flags)
 
 
-def to_file2(path):
+def to_file(path):
     """Stream to a file."""
     cmd = 'ffmpeg'
     flags = [

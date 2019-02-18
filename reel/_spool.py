@@ -32,7 +32,7 @@ class Spool(trio.abc.AsyncResource):
             for key, val in xenv.items():
                 self._env[key] = val
         super().__init__()
-        LOG.debug(' '.join(self._command))
+        LOG.debug(self.__repr__())
 
     def __str__(self):
         """Print the command."""
@@ -95,12 +95,12 @@ class Spool(trio.abc.AsyncResource):
 
     async def _handle_stderr(self):
         """Read stderr in a function so that the nursery has a function."""
-        LOG.debug('HHAANDLE_STDERR!!!!! %s', self)
+        LOG.debug('< _STDERR %s >', self)
         while True:
             try:
                 chunk = await self._proc.stderr.receive_some(16384)
             except trio.ClosedResourceError as err:
-                LOG.debug('_handle_stderr: %s', str(err))
+                LOG.debug('< _handle_stderr: %s >', str(err))
                 break
             else:
                 if not chunk:
@@ -124,7 +124,6 @@ class Spool(trio.abc.AsyncResource):
 
     def start(self, nursery, stdin=None):
         """Initialize the subprocess and run the command."""
-        LOG.debug('=-=-=-=-= START-SPOOL %s', self)
         self._proc = trio.Process(
             self._command,
             stdin=subprocess.PIPE,
@@ -136,17 +135,21 @@ class Spool(trio.abc.AsyncResource):
             self.handle_stdin(nursery, stdin)
         self.handle_stderr(nursery)
 
-    async def receive(self, channel):
+    async def receive_from_channel(self, channel):
         """Send the output of the receive `channel` to this spool's stdin."""
         async for chunk in channel:
             await self._proc.stdin.send_all(chunk)
         await self._proc.stdin.aclose()  # ??? unless last in chain
 
-    async def send(self, channel):
+    async def send_to_channel(self, channel):
         """Stream stdout to `channel` and close both sides."""
         async with channel:
             async with self.proc:
                 await self.send_no_close(channel)
+
+    async def send_all(self, chunk):
+        """Send a chunk of data to stdin."""
+        await self._proc.stdin.send_all(chunk)
 
     async def receive_some(self, max_bytes):
         """Return a chunk of data from the output of this stream."""

@@ -20,12 +20,16 @@ class Streamer(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def send(self, channel):
+    async def send_to_channel(self, channel):
         """Send data to the channel and close both sides."""
 
     @abc.abstractmethod
-    def receive(self, channel):
+    def receive_from_channel(self, channel):
         """Receive data from the channel and leave connections open."""
+
+    @abc.abstractmethod
+    def receive_some(self, max_bytes):
+        """Return a chunk of data from this stream's output."""
 
 
 class Transport(trio.abc.AsyncResource):
@@ -76,12 +80,16 @@ class Transport(trio.abc.AsyncResource):
                     _dst = self._chain[idx + 1]
                     send_ch, receive_ch = trio.open_memory_channel(0)
                     async with send_ch, receive_ch:
-                        nursery.start_soon(_src.send, send_ch.clone())
-                        nursery.start_soon(_dst.receive, receive_ch.clone())
+                        nursery.start_soon(
+                            _src.send_to_channel, send_ch.clone()
+                        )
+                        nursery.start_soon(
+                            _dst.receive_from_channel, receive_ch.clone()
+                        )
 
             # Read stdout from the last spool in the list.
             ch_send, ch_receive = trio.open_memory_channel(0)
-            nursery.start_soon(self._chain[-1].send, ch_send)
+            nursery.start_soon(self._chain[-1].send_to_channel, ch_send)
             async for chunk in ch_receive:
                 if not self._output:
                     self._output = b''
