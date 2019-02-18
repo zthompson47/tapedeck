@@ -5,7 +5,6 @@ import sys
 
 import blessings
 import trio
-import trio_click as click
 
 import reel
 from reel.config import (
@@ -22,47 +21,30 @@ if LOG_LEVEL:
     logging.basicConfig(level=LOG_LEVEL, filename=LOG_FILE)
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.StreamHandler(sys.stderr))
-LOG.debug('--------->> PLAY!!')
 
 T = blessings.Terminal()
 
 PORTS = range(8771, 8777)
 
 
-# pylint: disable=too-many-branches,too-many-locals,too-many-arguments
-@click.command(  # noqa: C901
-    options_metavar='[options]',
-    help=f'{T.blue}¤ {T.yellow}Play Music{T.normal}'
-)
-@click.argument('source', metavar='<source>', required=False)
-@click.option('-o', '--output', default='speakers',
-              help='Output destination', show_default=True)
-@click.option('-s', '--shuffle', help='Shuffle order of tracks', is_flag=True)
-@click.option('-r', '--recursive', help='Play subfolders', is_flag=True)
-# @click.option('-m', '--memory',\
-# help='Play tracks from last search', type=int)
-@click.option('-m', '--memory', help='Play track from memory', type=int)
-@click.option('-h', '--host', envvar='TAPEDECK_UDP_HOST',
-              help='Network streaming host')
-@click.option('-p', '--port', envvar='TAPEDECK_UDP_PORT',
-              help='Network streaming port', type=int)
-async def play(source, output, memory, shuffle, host, port, recursive):
+# pylint: disable=too-many-locals, too-many-branches
+async def play(args):
     """Build a playlist and play it."""
     playlist = []
 
-    if memory:
+    if args.memory:
         # Find the track filename by index in the cached search results.
         cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
         async with await cache_file.open('r') as out:
             lines = (await out.read()).split('\n')[0:-1]
-        track = lines[int(memory) - 1]
+        track = lines[int(args.memory) - 1]
         music_path = reel.Path(track[track.find(' ') + 1:])
     else:
-        music_path = reel.Path(source)
+        music_path = reel.Path(args.track)
 
     if await reel.Path(music_path).is_dir():
         playlist_folders = [music_path]
-        if recursive:
+        if args.recursive:
             # Run find_tunes on this dir to get all music folders.
             results = await find_tunes(music_path)
             for folder in results:
@@ -77,21 +59,21 @@ async def play(source, output, memory, shuffle, host, port, recursive):
                     playlist.append(song)
     else:
         # Otherwise, just queue the uri.
-        playlist.append(source)
+        playlist.append(args.track)
 
     # Shuffle the playlist.
-    if shuffle:
+    if args.shuffle:
         random.shuffle(playlist)  # ... tests needed ...
 
     # Choose the output.
     out = None
-    if output == 'speakers':
+    if args.output == 'speakers':
         out = sox.speakers()
-    elif output == 'udp':
-        if host is None or port is None:
-            raise click.BadOptionUsage('-o', 'udp needs host and port')
-        out = ffmpeg.to_udp(host=host, port=port)
-    elif output == 'icecast':
+    elif args.output == 'udp':
+        if args.host is None or args.port is None:
+            raise Exception('-o', 'udp needs host and port')
+        out = ffmpeg.to_udp(host=args.host, port=args.port)
+    elif args.output == 'icecast':
         out = ffmpeg.to_icecast(
             host='127.0.0.1',
             port='8777',
@@ -100,8 +82,8 @@ async def play(source, output, memory, shuffle, host, port, recursive):
         )
     else:
         # Check for file output.
-        out_path = reel.Path(output)
-        if (output == '/dev/null' or
+        out_path = reel.Path(args.output)
+        if (args.output == '/dev/null' or
                 await out_path.is_file() or
                 await out_path.is_dir()):
             out = ffmpeg.to_file(out_path)
@@ -109,7 +91,7 @@ async def play(source, output, memory, shuffle, host, port, recursive):
     # Create the playlist.
     plst = reel.Reel(
         [ffmpeg.read(track) for track in playlist],
-        announce_to=click.echo
+        announce_to=print
     )
 
     # Start an icecast daemon.

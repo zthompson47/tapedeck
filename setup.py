@@ -20,13 +20,13 @@ setup(
         'console_scripts': [
             'tapedeck=tapedeck.cli.main:tapedeck_cli',
             'tdplay=tapedeck.cli.play:play',
+            'tdsearch=tapedeck.cli.search:search',
         ],
     },
     install_requires=[
-        'trio>=0.10.0',
-        'trio-click>=7.0.2',
-        'reel==0.0.5',
         'blessings>=1.7',
+        'reel==0.0.5',
+        'trio>=0.10.0',
     ],
     zip_safe=False,
     packages=find_packages(),

@@ -4,35 +4,23 @@ import pathlib
 
 import blessings
 import trio
-import trio_click as click
 
 from reel.config import get_xdg_cache_dir
 
 from tapedeck.search import find_tunes
 
+LOG = logging.getLogger(__name__)
 T = blessings.Terminal()
 
 
-@click.command(
-    options_metavar='[options]',
-    help=f'{T.blue}¤ {T.yellow}Search For Music{T.normal}'
-)
-@click.argument('directory', metavar='[directory]', required=False)
-@click.option('-d', '--follow-dots', is_flag=True,
-              help='Search hidden dot-directories.')
-@click.option('-l', '--follow-links', is_flag=True,
-              help='Search symlinked directories.')
-@click.option('-m', '--memory', is_flag=True,
-              help='Show last search from memory')
-async def search(directory, follow_links, follow_dots, memory):
+async def search(args):
     """Search for music."""
-    click.echo('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', err=True)
-    if memory:
+    if args.memory:
         # Read the cached search file.
         cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
         async with await cache_file.open('r') as out:
             lines = (await out.read()).split('\n')[0:-1]
-        logging.debug(lines)
+        LOG.debug(lines)
 
         # Print the cached search to a pager.
         output = []
@@ -42,14 +30,15 @@ async def search(directory, follow_links, follow_dots, memory):
             filename = line[line.find(' ') + 1:]  # e.g. '/full/path'
             path = trio.Path(filename)
             output.append(f'{T.green}{index} {T.blue}{path.name}{T.normal}')
-        click.echo_via_pager('\n'.join(output))
+        print('\n'.join(output))
         return
 
     results = await find_tunes(
-        directory,
-        followlinks=follow_links,
-        followdots=follow_dots
+        args.directory,
+        followlinks=args.follow_links,
+        followdots=args.follow_dots
     )
+
     # Sort search results by lowercase folder name.
     results.sort(key=lambda _: pathlib.Path(_.path).name.lower())
 
@@ -57,12 +46,13 @@ async def search(directory, follow_links, follow_dots, memory):
     for folder in results:
         idx += 1
         path = trio.Path(folder.path)
-        click.echo(f'  {T.green}{idx}. {T.blue}{path.name}{T.normal}')
+        print(f'  {T.green}{idx}. {T.blue}{path.name}{T.normal}')
 
     # Store results in a cache file.
     cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
     async with await cache_file.open('w') as out:
         idx = 0
+
         # Sort alphabetically, case insensitive. ... test needed ...
         for folder in results:
             idx += 1

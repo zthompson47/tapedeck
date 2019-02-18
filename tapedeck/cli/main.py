@@ -1,40 +1,93 @@
 """Command line interface to ``tapedeck``."""
+import argparse
+import logging
+import sys
+
 import blessings
-import trio_click as click
+import trio
 
 import tapedeck
 from . import play, search
 
+LOG = logging.getLogger(__name__)
 T = blessings.Terminal()
 
 
-@click.group(invoke_without_command=True,
-             context_settings=dict(help_option_names=['--help']),
-             options_metavar='[options]',
-             name='asdf',
-             help=f'''{T.blue}¤_ {T.yellow}Tapedeck {T.blue}_¤{T.normal}
+def tapedeck_cli() -> int:
+    """Enter the tapedeck cli."""
+    parser = argparse.ArgumentParser()
 
-                     Play your music across a variety of
-                     sources and destinations.  Share torrents
-                     and stream live music.  It's like a fresh
-                     box of blank tapes.
-                  ''')
-@click.help_option('--help', help='Display help message and exit')
-@click.option('--config', is_flag=True, help='Print configuration and exit')
-@click.option('--version', is_flag=True, help='Print version number and exit')
-async def tapedeck_cli(config, version):
-    """Run the tapedeck cli."""
-    if version:
-        click.echo(f'{T.blue}¤_tapedeck_¤ ', nl=False)
-        click.echo(f'{T.yellow}v{tapedeck.__version__}{T.normal}')
+    # o=~ TAPEDECK ~=o
 
-    if config:
-        for key, val in (await tapedeck.config.env()).items():
-            click.echo(f'{T.blue}{key}{T.normal}={T.yellow}{val}{T.normal}')
+    parser.add_argument(
+        '-c', '--config', action='store_true',
+        help='print the configuration and exit'
+    )
+    parser.add_argument(
+        '-v', '--version', action='store_true',
+        help='print the version and exit'
+    )
+    subparsers = parser.add_subparsers()
+
+    # o=~ TDPLAY ~=o
+
+    tdplay = subparsers.add_parser('play')
+    tdplay.add_argument('track', metavar='TRACK', nargs='?')
+    tdplay.add_argument(
+        '-o', '--output', default='speakers',
+        help='output destination'
+    )
+    tdplay.add_argument(
+        '-s', '--shuffle', action='store_true', help='shuffle order of tracks'
+    )
+    tdplay.add_argument(
+        '-r', '--recursive', action='store_true', help='play subfolders'
+    )
+    tdplay.add_argument(
+        '-m', '--memory', metavar='MEMORY', type=int,
+        help='play track number from last search'
+    )
+    tdplay.add_argument(
+        '--host', type=str, help='network streaming host'
+    )
+    tdplay.add_argument(
+        '--port', type=str, help='network streaming port'
+    )
+    tdplay.set_defaults(func=play.play)
+
+    # o=~ TDSEARCH ~=o
+
+    tdsearch = subparsers.add_parser('search')
+    tdsearch.add_argument('directory', metavar='DIRECTORY', nargs='?')
+    tdsearch.add_argument(
+        '-d', '--follow-dots', action='store_true',
+        help='search hidden dot-directories'
+    )
+    tdsearch.add_argument(
+        '-l', '--follow-links', action='store_true',
+        help='search symlinked directories'
+    )
+    tdsearch.add_argument(
+        '-m', '--memory', action='store_true',
+        help='print last search and exit'
+    )
+    tdsearch.set_defaults(func=search.search)
+
+    args = parser.parse_args()
+    if args.version:
+        print(f'{T.blue}¤_tapedeck_¤ ', end='')
+        print(f'{T.yellow}v{tapedeck.__version__}{T.normal}')
+    elif args.config:
+        for key, val in trio.run(tapedeck.config.env).items():
+            print(f'{T.blue}{key}{T.normal}={T.yellow}{val}{T.normal}')
+    elif hasattr(args, 'func') and args.func:
+        trio.run(args.func, args)
 
 
-tapedeck_cli.add_command(play.play)
-tapedeck_cli.add_command(search.search)
+def enter():
+    """Run sync for setuptools."""
+    sys.exit(tapedeck_cli())
+
 
 if __name__ == '__main__':
-    tapedeck_cli()  # pylint: disable=no-value-for-parameter
+    enter()

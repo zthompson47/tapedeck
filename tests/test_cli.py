@@ -1,6 +1,4 @@
 """Test suite for the tapedeck command line interface."""
-from trio_click.testing import CliRunner
-
 import reel
 
 import tapedeck
@@ -9,22 +7,6 @@ import tapedeck
 import tapedeck.cli
 import tapedeck.cli.main
 # ???
-
-CMD = CliRunner()
-
-
-async def test_no_args():
-    """Run tapedeck with no arguments."""
-    result = await CMD.invoke(tapedeck.cli.main.tapedeck_cli)
-    assert result.exit_code == 0
-    assert result.output == ''
-
-
-async def test_version():
-    """Show the version number."""
-    result = await CMD.invoke(tapedeck.cli.main.tapedeck_cli, ['--version'])
-    assert result.exit_code == 0
-    assert tapedeck.__version__ in result.output
 
 
 async def test_version_with_dist():
