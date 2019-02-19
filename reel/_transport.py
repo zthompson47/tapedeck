@@ -45,10 +45,20 @@ class Transport(trio.abc.AsyncResource):
                 self._chain.append(spool)
         else:
             self._chain = list(args)
+        LOG.debug(self.__repr__())
+
+    def __str__(self):
+        """Print prettily."""
+        return self.__repr__()
 
     def __repr__(self):
         """Represent prettily."""
-        return str(self._chain)
+        result = 'Transport([ '
+        for thing in self._chain:
+            result += thing.__repr__()
+            result += ','
+        result += ' ])'
+        return result
 
     def __or__(self, the_other_one):
         """Store all the chained spools and reels in this transport."""
@@ -67,6 +77,7 @@ class Transport(trio.abc.AsyncResource):
 
     async def _run(self, message=None):
         """Connect the spools with pipes and let the bytes flow."""
+        LOG.debug('{ TRANSPORT _run %s }', self._chain)
         async with trio.open_nursery() as nursery:
 
             # Chain the spools with pipes.

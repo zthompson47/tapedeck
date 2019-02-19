@@ -21,6 +21,19 @@ class Reel(trio.abc.AsyncResource, Streamer):
         self._stdin = None
         self._tracks = tracks
 
+    def __str__(self):
+        """Print the command."""
+        return self.__repr__()
+
+    def __repr__(self):
+        """Represent prettily."""
+        result = 'Reel([ '
+        for track in self._tracks:
+            result += track.__repr__()
+            result += ','
+        result += ' ])'
+        return result
+
     def __or__(self, the_other_one):
         """Board the __or__ train, creating `Transport` as first in chain."""
         return Transport(self, the_other_one)

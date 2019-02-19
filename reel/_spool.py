@@ -107,6 +107,7 @@ class Spool(trio.abc.AsyncResource):
                     break
                 if not self._stderr:
                     self._stderr = b''
+                # LOG.debug(chunk)
                 self._stderr += chunk
 
     async def _handle_stdin(self, message):
