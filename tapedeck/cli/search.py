@@ -79,12 +79,14 @@ async def search(args):
             idx += 1
             await out.write(f'{idx}. {str(folder.path)}\n')
 
+    return 0
+
 
 def enter():
     """Entry point for setuptools console_scripts."""
-    parser = argparse.ArgumentParser()
-    load_args(parser)
-    args = parser.parse_args()
+    tdsearch = argparse.ArgumentParser()
+    load_args(tdsearch)
+    args = tdsearch.parse_args()
     sys.exit(trio.run(search, args))
 
 

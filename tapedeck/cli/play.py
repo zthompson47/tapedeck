@@ -55,14 +55,6 @@ def load_args(tdplay):
     tdplay.set_defaults(func=play)
 
 
-def enter():
-    """Entry point for setuptools console_scripts."""
-    parser = argparse.ArgumentParser()
-    load_args(parser)
-    args = parser.parse_args()
-    trio.run(play, args)
-
-
 # pylint: disable=too-many-locals, too-many-branches
 async def play(args):
     """Build a playlist and play it."""
@@ -119,10 +111,11 @@ async def play(args):
     else:
         # Check for file output.
         out_path = reel.Path(args.output)
-        if (args.output == '/dev/null' or
-                await out_path.is_file() or
-                await out_path.is_dir()):
-            out = ffmpeg.to_file(out_path)
+        LOG.debug('///////!!!!++++++++++++/////>>> %s ', str(out_path))
+        # if (args.output == '/dev/null' or
+        #         await out_path.is_file() or
+        #         await out_path.is_dir()):
+        out = ffmpeg.to_file(out_path)
 
     # Create the playlist.
     plst = reel.Reel(
@@ -151,6 +144,17 @@ async def play(args):
             async with plst | out as transport:
                 await transport.play()
             await icecast.stop()
+
+    return 0
+
+
+def enter():
+    """Entry point for setuptools console_scripts."""
+    tdplay = argparse.ArgumentParser()
+    load_args(tdplay)
+    args = tdplay.parse_args()
+    sys.exit(trio.run(play, args))
+
 
 if __name__ == '__main__':
     enter()

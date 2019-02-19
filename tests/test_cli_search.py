@@ -88,3 +88,16 @@ async def test_cached_results(music_dir):
         async with cmd2 as cached_search:
             cached_results = await cached_search.readlines()
             assert len(cached_results) == 3
+
+
+async def test_cached_results_with_tdsearch(music_dir):
+    """Show the prior search."""
+    cmd = reel.Spool(f'tdsearch {str(music_dir)}')
+    async with cmd as search:
+        results = await search.readlines()
+        assert len(results) == 3
+
+        cmd2 = reel.Spool('tdsearch -m')
+        async with cmd2 as cached_search:
+            cached_results = await cached_search.readlines()
+            assert len(cached_results) == 3
