@@ -5,6 +5,7 @@ import shlex
 import trio
 
 import reel
+from reel import Spool
 
 import tapedeck
 
@@ -23,6 +24,13 @@ async def test_play(env_audio_dest):
     # await player.run(timeout=4.7)  # ... needs clean kill
     await player.timeout(4.7).run()
     assert player.returncode <= 0  # ... maybe it should not be an erorr?
+
+
+async def test_tdplay(audio_uris, env_audio_dest):
+    """Stream some audio to nowhere with ``tdplay``."""
+    audio_clip = Spool(f"tdplay {audio_uris['wav0']} -o {env_audio_dest}")
+    await audio_clip.run()
+    assert audio_clip.returncode <= 0
 
 
 async def test_play_directory(env_audio_dest):

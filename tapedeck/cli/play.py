@@ -1,4 +1,5 @@
 """The ``tapedeck`` cli 'play' command."""
+import argparse
 import logging
 import random
 import sys
@@ -12,7 +13,7 @@ from reel.config import (
 )
 from reel.cmd import ffmpeg, sox
 
-import tapedeck
+import tapedeck.config
 from tapedeck.search import find_tunes, is_audio
 
 LOG_LEVEL = trio.run(tapedeck.config.env, 'TAPEDECK_LOG_LEVEL')
@@ -25,6 +26,41 @@ LOG.addHandler(logging.StreamHandler(sys.stderr))
 T = blessings.Terminal()
 
 PORTS = range(8771, 8777)
+
+
+def load_args(tdplay):
+    """Parse arguments for the ``tapedeck play`` subcomand."""
+    # o=~ tdplay ~=o
+    tdplay.add_argument('track', metavar='TRACK', nargs='?')
+    tdplay.add_argument(
+        '-o', '--output', default='speakers',
+        help='output destination'
+    )
+    tdplay.add_argument(
+        '-s', '--shuffle', action='store_true', help='shuffle order of tracks'
+    )
+    tdplay.add_argument(
+        '-r', '--recursive', action='store_true', help='play subfolders'
+    )
+    tdplay.add_argument(
+        '-m', '--memory', metavar='MEMORY', type=int,
+        help='play track number from last search'
+    )
+    tdplay.add_argument(
+        '--host', type=str, help='network streaming host'
+    )
+    tdplay.add_argument(
+        '--port', type=str, help='network streaming port'
+    )
+    tdplay.set_defaults(func=play)
+
+
+def enter():
+    """Entry point for setuptools console_scripts."""
+    parser = argparse.ArgumentParser()
+    load_args(parser)
+    args = parser.parse_args()
+    trio.run(play, args)
 
 
 # pylint: disable=too-many-locals, too-many-branches
@@ -115,3 +151,6 @@ async def play(args):
             async with plst | out as transport:
                 await transport.play()
             await icecast.stop()
+
+if __name__ == '__main__':
+    enter()

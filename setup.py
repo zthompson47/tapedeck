@@ -19,8 +19,8 @@ setup(
     entry_points={
         'console_scripts': [
             'tapedeck=tapedeck.cli.main:tapedeck_cli',
-            'tdplay=tapedeck.cli.play:play',
-            'tdsearch=tapedeck.cli.search:search',
+            'tdplay=tapedeck.cli.play:enter',
+            'tdsearch=tapedeck.cli.search:enter',
         ],
     },
     install_requires=[

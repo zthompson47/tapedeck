@@ -1,4 +1,16 @@
-"""Command line interface to ``tapedeck``."""
+"""Command line interface for the ¤_tapedeck_¤ music player.
+
+usage: tapedeck [-h] [-c] [-v] {play,search} ...
+
+positional arguments:
+  {play,search}
+
+optional arguments:
+  -h, --help     show this help message and exit
+  -c, --config   print the configuration and exit
+  -v, --version  print the version and exit
+
+"""
 import argparse
 import logging
 import sys
@@ -7,7 +19,6 @@ import blessings
 import trio
 
 import tapedeck
-from . import play, search
 
 LOG = logging.getLogger(__name__)
 T = blessings.Terminal()
@@ -16,9 +27,6 @@ T = blessings.Terminal()
 def tapedeck_cli() -> int:
     """Enter the tapedeck cli."""
     parser = argparse.ArgumentParser()
-
-    # o=~ TAPEDECK ~=o
-
     parser.add_argument(
         '-c', '--config', action='store_true',
         help='print the configuration and exit'
@@ -29,49 +37,11 @@ def tapedeck_cli() -> int:
     )
     subparsers = parser.add_subparsers()
 
-    # o=~ TDPLAY ~=o
-
     tdplay = subparsers.add_parser('play')
-    tdplay.add_argument('track', metavar='TRACK', nargs='?')
-    tdplay.add_argument(
-        '-o', '--output', default='speakers',
-        help='output destination'
-    )
-    tdplay.add_argument(
-        '-s', '--shuffle', action='store_true', help='shuffle order of tracks'
-    )
-    tdplay.add_argument(
-        '-r', '--recursive', action='store_true', help='play subfolders'
-    )
-    tdplay.add_argument(
-        '-m', '--memory', metavar='MEMORY', type=int,
-        help='play track number from last search'
-    )
-    tdplay.add_argument(
-        '--host', type=str, help='network streaming host'
-    )
-    tdplay.add_argument(
-        '--port', type=str, help='network streaming port'
-    )
-    tdplay.set_defaults(func=play.play)
-
-    # o=~ TDSEARCH ~=o
+    tapedeck.cli.play.load_args(tdplay)
 
     tdsearch = subparsers.add_parser('search')
-    tdsearch.add_argument('directory', metavar='DIRECTORY', nargs='?')
-    tdsearch.add_argument(
-        '-d', '--follow-dots', action='store_true',
-        help='search hidden dot-directories'
-    )
-    tdsearch.add_argument(
-        '-l', '--follow-links', action='store_true',
-        help='search symlinked directories'
-    )
-    tdsearch.add_argument(
-        '-m', '--memory', action='store_true',
-        help='print last search and exit'
-    )
-    tdsearch.set_defaults(func=search.search)
+    tapedeck.cli.search.load_args(tdsearch)
 
     args = parser.parse_args()
     if args.version:

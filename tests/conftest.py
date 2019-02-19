@@ -52,6 +52,19 @@ def xdg():
 
 
 @pytest.fixture
+def audio_uris():
+    """Return some addresses of audio streams."""
+    return {
+        'wav0': '/Users/zach/out000.wav',
+        'wav1': '/Users/zach/out001.wav',
+        'wav2': '/Users/zach/out002.wav',
+        'wav3': '/Users/zach/out003.wav',
+        'wav4': '/Users/zach/out004.wav',
+        'wav5': '/Users/zach/out005.wav',
+    }
+
+
+@pytest.fixture
 def uri():
     """Return a list of music to play."""
     return type('Z', (object,), {

@@ -1,6 +1,8 @@
 """The ``tapedeck`` cli 'search' command."""
+import argparse
 import logging
 import pathlib
+import sys
 
 import blessings
 import trio
@@ -11,6 +13,25 @@ from tapedeck.search import find_tunes
 
 LOG = logging.getLogger(__name__)
 T = blessings.Terminal()
+
+
+def load_args(tdsearch):
+    """Parse the args."""
+    # o=~ tdsearch ~=o
+    tdsearch.add_argument('directory', metavar='DIRECTORY', nargs='?')
+    tdsearch.add_argument(
+        '-d', '--follow-dots', action='store_true',
+        help='search hidden dot-directories'
+    )
+    tdsearch.add_argument(
+        '-l', '--follow-links', action='store_true',
+        help='search symlinked directories'
+    )
+    tdsearch.add_argument(
+        '-m', '--memory', action='store_true',
+        help='print last search and exit'
+    )
+    tdsearch.set_defaults(func=search)
 
 
 async def search(args):
@@ -57,3 +78,15 @@ async def search(args):
         for folder in results:
             idx += 1
             await out.write(f'{idx}. {str(folder.path)}\n')
+
+
+def enter():
+    """Entry point for setuptools console_scripts."""
+    parser = argparse.ArgumentParser()
+    load_args(parser)
+    args = parser.parse_args()
+    sys.exit(trio.run(search, args))
+
+
+if __name__ == '__main__':
+    enter()

@@ -1,5 +1,6 @@
 """Test suite for the tapedeck command line interface."""
 import reel
+from reel import Spool
 
 import tapedeck
 
@@ -31,3 +32,22 @@ async def test_version_external():
     output = await version.run()
     assert version.returncode == 0
     assert tapedeck.__version__ in output
+
+
+async def test_subcommand_executables():
+    """Make sure the various executables can run."""
+    commands = [
+        'tapedeck -v', 'python -m tapedeck.cli.main -v',
+        'tapedeck -c', 'python -m tapedeck.cli.main -c',
+        'tapedeck play -h', 'python -m tapedeck.cli.play -h',
+        'tapedeck search -h', 'python -m tapedeck.cli.search -h',
+        'tdplay -h', 'tdsearch -h',
+        'python tapedeck/cli/main.py -h',
+        'python tapedeck/cli/play.py -h',
+        'python tapedeck/cli/search.py -h',
+    ]
+    for command in commands:
+        exe = Spool(command)
+        output = await exe.run()
+        assert exe.returncode == 0  # successful exit
+        assert len(output) > 3  # they all print something to stdout
