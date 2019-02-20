@@ -141,7 +141,15 @@ class Reel(trio.abc.AsyncResource, Streamer):
         )
         if close:
             await self.current_track.aclose()
-        self._start_next_track()
+
+        if self.next_track:
+            self._start_next_track()
+
+            # Announce the track change.
+            if self._announce:
+                self._announce(self.current_track)
+            elif self._a_announce:
+                await self._a_announce(self.current_track)
 
     async def receive_from_channel(self, channel):
         """Receive input and send it to the current spool."""
