@@ -22,6 +22,7 @@ async def test_play(env_audio_dest):
     )
     # await player.run(timeout=4.7)  # ... needs clean kill
     await player.timeout(4.7).run()
+    print(player.stderr)
     assert player.returncode <= 0  # ... maybe it should not be an erorr?
 
 

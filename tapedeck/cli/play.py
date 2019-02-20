@@ -1,13 +1,15 @@
+# pylint: disable=too-many-statements, broad-except
 """The ``tapedeck`` cli 'play' command."""
 import argparse
 import logging
 import random
 import sys
+import termios
 
 import blessings
-import kbhit
 import trio
 
+import kbhit
 import reel
 from reel.config import (
     get_xdg_cache_dir, get_xdg_config_dir, get_xdg_data_dir, get_config
@@ -22,7 +24,7 @@ if LOG_LEVEL:
     LOG_FILE = trio.run(tapedeck.config.logfile, 'tapedeck.log')
     logging.basicConfig(level=LOG_LEVEL, filename=LOG_FILE)
 LOG = logging.getLogger(__name__)
-LOG.addHandler(logging.StreamHandler(sys.stderr))
+# LOG.addHandler(logging.StreamHandler(sys.stderr))
 
 T = blessings.Terminal()
 
@@ -118,10 +120,15 @@ async def play(args):
         #         await out_path.is_dir()):
         out = ffmpeg.to_file(out_path)
 
+    def announcer(message):
+        """Receive messages and print them."""
+        LOG.debug('ANNOUNCER-MESSAGE >>>>!!>> %s', message)
+        print(message)
+
     # Create the playlist.
     plst = reel.Reel(
         [ffmpeg.read(track) for track in playlist],
-        announce_to=print
+        announce_to=announcer
     )
 
     # Start an icecast daemon.
@@ -137,6 +144,7 @@ async def play(args):
     config = await get_config(config_dir, 'icecast.xml', **config_icecast)
     flags = ['-c', str(config)]
     LOG.debug(flags)
+    lock = trio.Lock()
     async with reel.Spool('icecast', xflags=flags) as icecast:
         async with trio.open_nursery() as nursery:
             icecast.start_daemon(nursery)
@@ -145,18 +153,25 @@ async def play(args):
             async with plst | out as transport:
                 transport.start_daemon(nursery)
                 print('Playing...')
-                keyboard = kbhit.KBHit()
 
-                while True:
-                    if keyboard.kbhit():
-                        char = keyboard.getch()
-                        if ord(char) == ord('q'):
-                            break
-                    await trio.sleep(0.1)
+                try:
+                    keyboard = kbhit.KBHit()
+                    while True:
+                        if keyboard.kbhit():
+                            char = keyboard.getch()
+                            if ord(char) == ord('q'):
+                                break
+                            if ord(char) == ord('j'):
+                                # pylint: disable=not-async-context-manager
+                                async with lock:
+                                    await plst.skip_to_next_track(close=True)
+                        await trio.sleep(0.1)
+                    await transport.stop()
+                    print('Stopping...')
+                    keyboard.set_normal_term()
+                except termios.error:
+                    pass
 
-                print('Stopping...')
-                await transport.stop()
-                keyboard.set_normal_term()
             await icecast.stop()
     return 0
 
@@ -167,12 +182,12 @@ def enter():
     load_args(tdplay)
     args = tdplay.parse_args()
     returncode = 13
-    try:
-        returncode = trio.run(play, args)
-    except Exception:
-        pass
-    finally:
-        sys.exit(returncode)
+    # try:
+    returncode = trio.run(play, args)
+    # except Exception:
+    #     pass
+    # finally:
+    sys.exit(returncode)
 
 
 if __name__ == '__main__':
