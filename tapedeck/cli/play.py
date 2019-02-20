@@ -5,6 +5,7 @@ import random
 import sys
 
 import blessings
+import kbhit
 import trio
 
 import reel
@@ -142,9 +143,21 @@ async def play(args):
 
             # Play the playlist!
             async with plst | out as transport:
-                await transport.play()
-            await icecast.stop()
+                transport.start_daemon(nursery)
+                print('Playing...')
+                keyboard = kbhit.KBHit()
 
+                while True:
+                    if keyboard.kbhit():
+                        char = keyboard.getch()
+                        if ord(char) == ord('q'):
+                            break
+                    await trio.sleep(0.1)
+
+                print('Stopping...')
+                await transport.stop()
+                keyboard.set_normal_term()
+            await icecast.stop()
     return 0
 
 
@@ -153,7 +166,13 @@ def enter():
     tdplay = argparse.ArgumentParser()
     load_args(tdplay)
     args = tdplay.parse_args()
-    sys.exit(trio.run(play, args))
+    returncode = 13
+    try:
+        returncode = trio.run(play, args)
+    except Exception:
+        pass
+    finally:
+        sys.exit(returncode)
 
 
 if __name__ == '__main__':
