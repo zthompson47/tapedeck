@@ -115,9 +115,14 @@ class Transport(trio.abc.AsyncResource):
     async def stop(self):
         """Stop this transport."""
         for spool in self._chain:
-            spool.proc.kill()
-            await spool.proc.wait()
-            # await spool.proc.aclose()  # HANGS
+            try:
+                spool.proc.kill()
+                await spool.proc.wait()
+                # await spool.proc.aclose()  # HANGS
+            except AttributeError:
+                # need to check for a Reel and close...
+                # OR probably just need correct chain of aclose()...
+                pass
 
     async def play(self) -> None:
         """Run this transport and ignore stdout."""
