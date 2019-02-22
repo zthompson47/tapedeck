@@ -1,35 +1,11 @@
 """Transport class."""
-import abc
-
 import logging
 
 import trio
 
+# from ._track import Track
+
 LOG = logging.getLogger(__name__)
-
-
-class Streamer(metaclass=abc.ABCMeta):
-    """Something that can stream i/o in a transport."""
-
-    @abc.abstractmethod
-    def start(self, nursery, stdin=None):
-        """Start whatever this thing needs to run.
-
-        Called before send or receive.
-
-        """
-
-    @abc.abstractmethod
-    async def send_to_channel(self, channel):
-        """Send data to the channel and close both sides."""
-
-    @abc.abstractmethod
-    def receive_from_channel(self, channel):
-        """Receive data from the channel and leave connections open."""
-
-    @abc.abstractmethod
-    def receive_some(self, max_bytes):
-        """Return a chunk of data from this stream's output."""
 
 
 class Transport(trio.abc.AsyncResource):
@@ -82,8 +58,11 @@ class Transport(trio.abc.AsyncResource):
 
             # Chain the spools with pipes.
             for idx, spool in enumerate(self._chain):
+                LOG.debug('{ TRANSPORT _run %d %s }', idx, spool)
                 if idx == 0:
+                    LOG.debug('{ TRANSPORT _run near aa %d %s }', idx, spool)
                     spool.start(nursery, message)
+                    LOG.debug('{ TRANSPORT _run aft aa %d %s }', idx, spool)
                 else:
                     spool.start(nursery)
                 if idx < len(self._chain) - 1:
@@ -99,12 +78,16 @@ class Transport(trio.abc.AsyncResource):
                         )
 
             # Read stdout from the last spool in the list.
+            LOG.debug('TRANSPORT - about to read stdout of chain')
             ch_send, ch_receive = trio.open_memory_channel(0)
             nursery.start_soon(self._chain[-1].send_to_channel, ch_send)
             async for chunk in ch_receive:
+                LOG.debug('TRANSPORT - GOT chun.....')
+                LOG.debug(']}]}-->> %s', chunk)
                 if not self._output:
                     self._output = b''
                 self._output += chunk
+            LOG.debug('=================+++++++++++++++++++++++++++')
 
         return self._output
 
@@ -114,15 +97,20 @@ class Transport(trio.abc.AsyncResource):
 
     async def stop(self):
         """Stop this transport."""
-        for spool in self._chain:
-            try:
-                spool.proc.kill()
-                await spool.proc.wait()
-                # await spool.proc.aclose()  # HANGS
-            except AttributeError:
-                # need to check for a Reel and close...
-                # OR probably just need correct chain of aclose()...
-                pass
+        LOG.debug('{ stop %s }', self.__repr__())
+        for streamer in self._chain:
+            await streamer.stop()
+            # if isinstance(streamer, Track):
+            #     await streamer.stop()
+            # else:
+            #     try:
+            #         streamer.proc.kill()
+            #         await streamer.proc.wait()
+            #         # await spool.proc.aclose()  # HANGS
+            #     except AttributeError:
+            #         # need to check for a Reel and close...
+            #         # OR probably just need correct chain of aclose()...
+            #         pass
 
     async def play(self) -> None:
         """Run this transport and ignore stdout."""

@@ -125,6 +125,7 @@ class Spool(trio.abc.AsyncResource):
 
     def start(self, nursery, stdin=None):
         """Initialize the subprocess and run the command."""
+        LOG.debug('-- << SPOOL start about to run proc %s', self)
         self._proc = trio.Process(
             self._command,
             stdin=subprocess.PIPE,
@@ -135,6 +136,14 @@ class Spool(trio.abc.AsyncResource):
         if stdin:
             self.handle_stdin(nursery, stdin)
         self.handle_stderr(nursery)
+
+    async def stop(self):
+        """Stop it."""
+        try:
+            self.proc.kill()
+            await self.proc.wait()
+        except AttributeError as err:
+            LOG.exception(err)
 
     async def receive_from_channel(self, channel):
         """Send the output of the receive `channel` to this spool's stdin."""

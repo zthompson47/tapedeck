@@ -3,7 +3,8 @@ import logging
 
 import trio
 
-from ._transport import Streamer, Transport
+from ._streamer import Streamer
+from ._transport import Transport
 
 LOG = logging.getLogger(__name__)
 
@@ -93,6 +94,9 @@ class Reel(trio.abc.AsyncResource, Streamer):
         self._nursery = nursery
         self._stdin = stdin
         self._start_next_track()
+
+    async def stop(self):
+        """Stop it."""
 
     def _start_next_track(self):
         """Set the current/next track so send has something to send."""
