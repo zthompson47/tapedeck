@@ -54,7 +54,8 @@ async def test_subprocess_logging(caplog):
             if "tapedeck --v" in log.message:
                 found_one = True
     # assert found_one
-    assert not found_version
+    assert found_version
+    # ???
 
     # The internal subprocess log ended up in the tmp xdg home.
     logpath = await reel.config.get_xdg_data_dir('tapedeck') / 'tapedeck.log'
