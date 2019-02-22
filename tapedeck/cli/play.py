@@ -165,7 +165,7 @@ async def play(args):
                                 # pylint: disable=not-async-context-manager
                                 async with lock:
                                     await plst.skip_to_next_track(close=True)
-                        await trio.sleep(0.1)
+                        await trio.sleep(0.01)
                     await transport.stop()
                     print('Stopping...')
                     keyboard.set_normal_term()
