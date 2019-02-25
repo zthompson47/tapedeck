@@ -45,8 +45,9 @@ def tapedeck_cli() -> int:
 
     args = parser.parse_args()
     if args.version:
-        print(f'{T.blue}¤_tapedeck_¤ ', end='')
-        print(f'{T.yellow}v{tapedeck.__version__}{T.normal}')
+        # print(f'{T.blue}¤_tapedeck_¤ ', end='')
+        # print(f'{T.yellow}v{tapedeck.__version__}{T.normal}')
+        print(tapedeck.__version__)
     elif args.config:
         for key, val in trio.run(tapedeck.config.env).items():
             print(f'{T.blue}{key}{T.normal}={T.yellow}{val}{T.normal}')

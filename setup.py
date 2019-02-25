@@ -25,7 +25,7 @@ setup(
     },
     install_requires=[
         'blessings>=1.7',
-        'reel==0.0.5',
+        'reel>=0.0.5',
         'trio>=0.10.0',
     ],
     zip_safe=False,
