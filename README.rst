@@ -2,7 +2,7 @@
 reel
 ====
 
-A package for asynchronous subprocess pipelines::
+Async subprocess pipelines and stream transports::
 
    import reel
 
