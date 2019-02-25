@@ -28,7 +28,7 @@ async def test_tdplay(audio_uris, env_audio_dest):
 async def test_play_directory(env_audio_dest):
     """Detect a directory and play each song."""
     directory = shlex.quote(
-        '/Users/zach/tunes/1972 - #1 Record [2009 Remaster]'
+        '/Users/zach/outwav'
     )  # ... test more with quoting and bad characters in filenames ...
     player = Spool(
         f'python -m tapedeck.cli.main play {directory} -o {env_audio_dest}'
@@ -46,7 +46,7 @@ async def test_play_directory(env_audio_dest):
 async def test_play_directory_recursive(env_audio_dest):
     """Play a music directory and all subdirectories."""
     directory = shlex.quote(
-        '/Users/zach/tunes/1972 - #1 Record [2009 Remaster]'
+        '/Users/zach/outwav'
     )
     player = Spool(f'tdplay {directory} -o {env_audio_dest} -r')
     await player.run()
@@ -56,7 +56,7 @@ async def test_play_directory_recursive(env_audio_dest):
 async def test_play_shuffle(env_audio_dest):
     """Shuffle a playlist."""
     directory = shlex.quote(
-        '/Users/zach/tunes/1972 - #1 Record [2009 Remaster]'
+        '/Users/zach/outwav'
     )
     player = Spool(f'tdplay {directory} -o {env_audio_dest} -s')
     await player.run()
