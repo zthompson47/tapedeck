@@ -22,9 +22,14 @@ from tapedeck.search import find_tunes, is_audio
 LOG_LEVEL = trio.run(tapedeck.config.env, 'TAPEDECK_LOG_LEVEL')
 if LOG_LEVEL:
     LOG_FILE = trio.run(tapedeck.config.logfile, 'tapedeck.log')
-    logging.basicConfig(level=LOG_LEVEL, filename=LOG_FILE)
+    logging.basicConfig(
+        level=LOG_LEVEL,
+        filename=LOG_FILE,
+        format='%(process)d:%(levelname)s:%(module)s:%(message)s'
+    )
 LOG = logging.getLogger(__name__)
 # LOG.addHandler(logging.StreamHandler(sys.stderr))
+LOG.debug('[o_ NOW LOGGING tapedeck.cli.play _o]')
 
 T = blessings.Terminal()
 
@@ -61,6 +66,7 @@ def load_args(tdplay):
 # pylint: disable=too-many-locals, too-many-branches
 async def play(args):
     """Build a playlist and play it."""
+    LOG.debug('[o_ TAPEDECK cli.play _o]')
     playlist = []
 
     if args.memory:
@@ -98,6 +104,7 @@ async def play(args):
 
     # Choose the output.
     out = None
+    needs_icecast = False
     if args.output == 'speakers':
         out = sox.speakers()
     elif args.output == 'udp':
@@ -105,6 +112,7 @@ async def play(args):
             raise Exception('-o', 'udp needs host and port')
         out = ffmpeg.to_udp(host=args.host, port=args.port)
     elif args.output == 'icecast':
+        needs_icecast = True
         out = ffmpeg.to_icecast(
             host='127.0.0.1',
             port='8777',
@@ -147,16 +155,19 @@ async def play(args):
     lock = trio.Lock()
     async with reel.Spool('icecast', xflags=flags) as icecast:
         async with trio.open_nursery() as nursery:
-            icecast.start_daemon(nursery)
+            if needs_icecast:
+                icecast.start_daemon(nursery)
 
             # Play the playlist!
             async with plst | out as transport:
-                transport.start_daemon(nursery)
-                print('Playing...')
+                done_evt = transport.start_daemon(nursery)
+                LOG.debug('___ started transport')
 
                 try:
                     keyboard = kbhit.KBHit()
                     while True:
+                        if done_evt.is_set():
+                            break
                         if keyboard.kbhit():
                             char = keyboard.getch()
                             if ord(char) == ord('q'):
@@ -167,28 +178,36 @@ async def play(args):
                                     await plst.skip_to_next_track(close=True)
                         await trio.sleep(0.01)
                     await transport.stop()
-                    print('Stopping...')
                     keyboard.set_normal_term()
                 except termios.error:
-                    pass
+                    while not done_evt.is_set():
+                        await trio.sleep(0.01)
 
-            await icecast.stop()
+                LOG.debug('___ stopping transport')
+                await transport.stop()
+                LOG.debug('___ stopped transport')
+
+            LOG.debug('___ stopping icecast')
+            if needs_icecast:
+                await icecast.stop()
+            LOG.debug('___ stopped icecast')
+            LOG.debug('nursery: %s', nursery.child_tasks)
+        LOG.debug('___ out of nursery!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1')
     return 0
 
 
 def enter():
     """Entry point for setuptools console_scripts."""
+    LOG.debug('[o_o] enter')
     tdplay = argparse.ArgumentParser()
     load_args(tdplay)
     args = tdplay.parse_args()
-    returncode = 13
-    # try:
-    returncode = trio.run(play, args)
-    # except Exception:
-    #     pass
-    # finally:
-    sys.exit(returncode)
+    try:
+        sys.exit(trio.run(play, args))
+    except trio.ClosedResourceError as err:
+        LOG.exception(err)
 
 
 if __name__ == '__main__':
+    LOG.debug('[o_o] __main__')
     enter()

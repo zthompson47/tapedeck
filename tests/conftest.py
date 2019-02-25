@@ -18,7 +18,11 @@ import tapedeck
 
 # Log debug messages for testing.
 LOG_FILE = trio.run(tapedeck.config.logfile, 'tests.log')
-logging.basicConfig(filename=LOG_FILE, level='DEBUG')
+logging.basicConfig(
+    filename=LOG_FILE,
+    level='DEBUG',
+    format='%(process)d:%(levelname)s:%(module)s:%(message)s'
+)
 LOGGER = logging.getLogger(__name__)
 LOGGER.debug('Begin logging for tests ~-~=~-~=~-~=~!!((o))!!~=~-~=~-~=~')
 
@@ -26,7 +30,8 @@ LOGGER.debug('Begin logging for tests ~-~=~-~=~-~=~!!((o))!!~=~-~=~-~=~')
 for key in os.environ.keys():
     if key.startswith('TAPEDECK_'):
         if not key.startswith('TAPEDECK_TESTS_'):
-            del os.environ[key]
+            if not key.startswith('TAPEDECK_LOG_'):
+                del os.environ[key]
 
 # Create home directories for testing.
 XDG = {

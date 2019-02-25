@@ -87,11 +87,10 @@ async def test_tapedeck_cli_config_option(uri):
         config = {_.split('=')[0]: _.split('=')[1] for _ in lines}
         assert 'TAPEDECK_UDP_HOST' not in config.keys()
         assert 'TAPEDECK_UDP_PORT' not in config.keys()
-        assert len(config.keys()) == 1
+        assert len(config.keys()) == 2
         print(await tapedeck.config.env())
         for key, val in (await tapedeck.config.env()).items():
             assert config[key] == val
-            assert key == 'TAPEDECK_LOG_DIR'  # for now
 
     # Try running the cli with the returned config.
     command = f"tapedeck play {uri.RADIO} -o udp"

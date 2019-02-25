@@ -2,16 +2,10 @@
 import logging
 import shlex
 
-import trio
-
 from reel import Spool
 
-import tapedeck
-
-LOG_FILE = trio.run(tapedeck.config.logfile, 'tests.log')
-logging.basicConfig(filename=LOG_FILE, level='DEBUG')
 LOG = logging.getLogger(__name__)
-LOG.debug('Begin logging for test_cli_play ((o))')
+LOG.debug('Begin logging for test_cli_play ((o))!!!!!!!!')
 
 
 async def test_play(env_audio_dest):
@@ -20,10 +14,8 @@ async def test_play(env_audio_dest):
     player = Spool(
         f'python -m tapedeck.cli.main play {audio_uri} -o {env_audio_dest}'
     )
-    # await player.run(timeout=4.7)  # ... needs clean kill
     await player.timeout(4.7).run()
-    print(player.stderr)
-    assert player.returncode <= 0  # ... maybe it should not be an erorr?
+    assert player.returncode <= 0
 
 
 async def test_tdplay(audio_uris, env_audio_dest):
@@ -100,7 +92,7 @@ async def test_udp():
 
 
 async def test_icecast():
-    """Stream music through udp."""
+    """Stream music through icecast."""
     audio_uri = '/Users/zach/out000.wav'
     player = Spool(
         f'tapedeck play {audio_uri} -o icecast'
