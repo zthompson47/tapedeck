@@ -228,6 +228,22 @@ async def test_reels_can_receive_via_send_all(tmpdir, neil_reel):
 
         # The output file is structured differently than input data,
         # so for now it works to just compare the beginning and ending
-        # bytes.
+        # bytes.  I guess..??
         assert file2_bytes[:47] == chunk2[:47]
         assert file2_bytes[-47:] == chunk2[-47:]
+
+
+async def test_reel_daemon_playing(neil_reel, audio_dest):
+    """Detect when a reel is playing."""
+    got_here = False
+    got_there = False
+    async with neil_reel | audio_dest() as player:
+        async with trio.open_nursery() as nursery:
+            done_evt = player.start_daemon(nursery)
+            got_here = True
+            while True:
+                if done_evt.is_set():
+                    got_there = True
+                    break
+                await trio.sleep(0)
+    assert got_here and got_there

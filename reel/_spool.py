@@ -100,14 +100,13 @@ class Spool(trio.abc.AsyncResource):
             try:
                 chunk = await self._proc.stderr.receive_some(16384)
             except trio.ClosedResourceError as err:
-                LOG.debug('< _handle_stderr: %s >', str(err))
+                LOG.exception(err)
                 break
             else:
                 if not chunk:
                     break
                 if not self._stderr:
                     self._stderr = b''
-                # LOG.debug(chunk)
                 self._stderr += chunk
 
     async def _handle_stdin(self, message):
@@ -139,11 +138,14 @@ class Spool(trio.abc.AsyncResource):
 
     async def stop(self):
         """Stop it."""
-        try:
-            self.proc.kill()
-            await self.proc.wait()
-        except AttributeError as err:
-            LOG.exception(err)
+        if self.proc:
+            try:
+                self.proc.kill()
+                await self.proc.wait()
+            except AttributeError as err:
+                LOG.exception(err)
+        else:
+            LOG.debug('-- || SPOOL stop NO-PROC')
 
     async def receive_from_channel(self, channel):
         """Send the output of the receive `channel` to this spool's stdin."""
@@ -163,10 +165,12 @@ class Spool(trio.abc.AsyncResource):
 
     async def receive_some(self, max_bytes):
         """Return a chunk of data from the output of this stream."""
+        LOG.debug('receive_some')
         return await self._proc.stdout.receive_some(max_bytes)
 
     async def send_no_close(self, channel):
         """Stream stdout to `channel` without closing either side."""
+        LOG.debug('send_no_close')
         buffsize = 16384
         bytes_received = 0
 
@@ -176,7 +180,9 @@ class Spool(trio.abc.AsyncResource):
 
         # <=~ Receive data.
         _start_time = time()
+        LOG.debug('BEFORE self.receive_some')
         chunk = await self.receive_some(buffsize)
+        LOG.debug('AFTER self.receive_some')
         while chunk:
 
             # ~=> Send data.

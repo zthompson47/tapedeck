@@ -3,8 +3,6 @@ import logging
 
 import trio
 
-# from ._track import Track
-
 LOG = logging.getLogger(__name__)
 
 
@@ -13,6 +11,7 @@ class Transport(trio.abc.AsyncResource):
 
     def __init__(self, *args):
         """Create a transport chain from a list of spools."""
+        self._done_evt = None
         self._nursery = None
         self._output = None
         if len(args) == 1 and isinstance(args[0], list):
@@ -53,16 +52,16 @@ class Transport(trio.abc.AsyncResource):
 
     async def _run(self, message=None):
         """Connect the spools with pipes and let the bytes flow."""
-        LOG.debug('{ TRANSPORT _run %s }', self._chain)
+        LOG.debug('_run %s', self._chain)
         async with trio.open_nursery() as nursery:
 
             # Chain the spools with pipes.
             for idx, spool in enumerate(self._chain):
-                LOG.debug('{ TRANSPORT _run %d %s }', idx, spool)
+                LOG.debug('_run %d %s', idx, spool)
                 if idx == 0:
-                    LOG.debug('{ TRANSPORT _run near aa %d %s }', idx, spool)
+                    LOG.debug('_run near aa %d %s', idx, spool)
                     spool.start(nursery, message)
-                    LOG.debug('{ TRANSPORT _run aft aa %d %s }', idx, spool)
+                    LOG.debug('_run aft aa %d %s }', idx, spool)
                 else:
                     spool.start(nursery)
                 if idx < len(self._chain) - 1:
@@ -78,39 +77,38 @@ class Transport(trio.abc.AsyncResource):
                         )
 
             # Read stdout from the last spool in the list.
-            LOG.debug('TRANSPORT - about to read stdout of chain')
+            LOG.debug('about to read stdout of chain')
             ch_send, ch_receive = trio.open_memory_channel(0)
             nursery.start_soon(self._chain[-1].send_to_channel, ch_send)
             async for chunk in ch_receive:
-                LOG.debug('TRANSPORT - GOT chun.....')
+                LOG.debug('GOT chun.....')
                 LOG.debug(']}]}-->> %s', chunk)
                 if not self._output:
                     self._output = b''
                 self._output += chunk
-            LOG.debug('=================+++++++++++++++++++++++++++')
 
+            LOG.debug('about to send closed')
+            if self._done_evt:
+                LOG.debug('about to be done!!!!!!')
+                self._done_evt.set()
+            LOG.debug('about to be done part 2!!!!!!')
+
+        LOG.debug('returning output!!!!!! %s', self._output)
         return self._output
 
     def start_daemon(self, nursery):
         """Run this transport in the background and return."""
         nursery.start_soon(self._run)
 
+        # Set up an event to report done.
+        self._done_evt = trio.Event()
+        return self._done_evt
+
     async def stop(self):
         """Stop this transport."""
         LOG.debug('{ stop %s }', self.__repr__())
         for streamer in self._chain:
             await streamer.stop()
-            # if isinstance(streamer, Track):
-            #     await streamer.stop()
-            # else:
-            #     try:
-            #         streamer.proc.kill()
-            #         await streamer.proc.wait()
-            #         # await spool.proc.aclose()  # HANGS
-            #     except AttributeError:
-            #         # need to check for a Reel and close...
-            #         # OR probably just need correct chain of aclose()...
-            #         pass
 
     async def play(self) -> None:
         """Run this transport and ignore stdout."""
