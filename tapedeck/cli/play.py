@@ -167,7 +167,7 @@ async def play(args):
                     with Keyboard() as keyboard:
                         LOG.debug('___ in keyboard')
                         while True:
-                            await trio.sleep(0)  # checkpoint
+                            await trio.sleep(0.1)  # checkpoint
                             if done_evt.is_set():
                                 LOG.debug('___ done evt')
                                 break
