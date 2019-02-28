@@ -165,12 +165,12 @@ class Spool(trio.abc.AsyncResource):
 
     async def receive_some(self, max_bytes):
         """Return a chunk of data from the output of this stream."""
-        LOG.debug('receive_some')
+        # LOG.debug('receive_some')
         return await self._proc.stdout.receive_some(max_bytes)
 
     async def send_no_close(self, channel):
         """Stream stdout to `channel` without closing either side."""
-        LOG.debug('send_no_close')
+        # LOG.debug('send_no_close')
         buffsize = 16384
         bytes_received = 0
 
@@ -180,9 +180,9 @@ class Spool(trio.abc.AsyncResource):
 
         # <=~ Receive data.
         _start_time = time()
-        LOG.debug('BEFORE self.receive_some')
+        # LOG.debug('BEFORE self.receive_some')
         chunk = await self.receive_some(buffsize)
-        LOG.debug('AFTER self.receive_some')
+        # LOG.debug('AFTER self.receive_some')
         while chunk:
 
             # ~=> Send data.

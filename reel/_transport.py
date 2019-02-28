@@ -81,8 +81,8 @@ class Transport(trio.abc.AsyncResource):
             ch_send, ch_receive = trio.open_memory_channel(0)
             nursery.start_soon(self._chain[-1].send_to_channel, ch_send)
             async for chunk in ch_receive:
-                LOG.debug('GOT chun.....')
-                LOG.debug(']}]}-->> %s', chunk)
+                # LOG.debug('GOT chun.....')
+                # LOG.debug(']}]}-->> %s', chunk)
                 if not self._output:
                     self._output = b''
                 self._output += chunk
