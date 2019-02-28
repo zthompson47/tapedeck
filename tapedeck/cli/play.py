@@ -9,12 +9,12 @@ import termios
 import blessings
 import trio
 
-import kbhit
 import reel
 from reel.config import (
     get_xdg_cache_dir, get_xdg_config_dir, get_xdg_data_dir, get_config
 )
 from reel.cmd import ffmpeg, sox
+from reel.keyboard import Keyboard
 
 import tapedeck.config
 from tapedeck.search import find_tunes, is_audio
@@ -25,7 +25,7 @@ if LOG_LEVEL:
     logging.basicConfig(
         level=LOG_LEVEL,
         filename=LOG_FILE,
-        format='%(process)d:%(levelname)s:%(module)s:%(message)s'
+        format='[%(process)d:%(levelname)s:%(module)s] %(message)s'
     )
 LOG = logging.getLogger(__name__)
 # LOG.addHandler(logging.StreamHandler(sys.stderr))
@@ -164,21 +164,25 @@ async def play(args):
                 LOG.debug('___ started transport')
 
                 try:
-                    keyboard = kbhit.KBHit()
-                    while True:
-                        if done_evt.is_set():
-                            break
-                        if keyboard.kbhit():
-                            char = keyboard.getch()
-                            if ord(char) == ord('q'):
+                    with Keyboard() as keyboard:
+                        LOG.debug('___ in keyboard')
+                        while True:
+                            await trio.sleep(0)  # checkpoint
+                            if done_evt.is_set():
+                                LOG.debug('___ done evt')
                                 break
-                            if ord(char) == ord('j'):
-                                # pylint: disable=not-async-context-manager
-                                async with lock:
-                                    await plst.skip_to_next_track(close=True)
-                        await trio.sleep(0.01)
-                    await transport.stop()
-                    keyboard.set_normal_term()
+                            if keyboard.has_input():
+                                LOG.debug('___ has input')
+                                char = keyboard.get_char()
+                                if char == 'q':
+                                    break
+                                elif char == 'j':
+                                    # pylint: disable=not-async-context-manager
+                                    async with lock:
+                                        await plst.skip_to_next_track(
+                                            close=True
+                                        )
+
                 except termios.error:
                     while not done_evt.is_set():
                         await trio.sleep(0.01)
