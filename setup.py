@@ -20,5 +20,5 @@ setup(
     install_requires=['trio>=0.10.0'],
     zip_safe=False,
     packages=find_packages(),
-    include_package_data = True,
+    include_package_data=True,
 )
