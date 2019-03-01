@@ -4,48 +4,74 @@ Tapedeck
 Tapedeck finds and plays music across muiltiple sources and devices::
 
    $ pip install tapedeck
-   $ tapedeck play --recursive --shuffle ~/Music -o speakers
+
+
+One way to use it
+-----------------
+
+Perform a search::
+
+   $ tdsearch Music
+     1. Elegant Gypsy
+     2. Exile On Main St. (Remastered)
+     3. Highwayman
+     4. Roll On (Bonus Track Version)
+     5. Sleepless Nights
+     6. The Essential Donovan
+     7. Townes Van Zandt
+     8. Skull Fu^H^H and Roses
+   $ tdplay -m 7 -o icecast
+
+Play the stream remotely::
+
+   ~> tdplay http://192.168.1.100:8777/asdf  # ip address of your machine here
+
+View the cached search::
+
+   $ tdsearch -m
+     1. Elegant Gypsy
+     2. Exile On Main St. (Remastered)
+     3. Highwayman
+     4. Roll On (Bonus Track Version)
+     5. Sleepless Nights
+     6. The Essential Donovan
+     7. Townes Van Zandt
+     8. Skull Fu^H^H and Roses
+
 
 **And the band keeps playing on...**
    -- John Perry Barlow
 
-Usage
------
 
-Play a music folder::
+Motivation
+----------
 
-   $ tapedeck play shows/gd1980-07-01.139309.sbd.moore.berger.flac24/
-   gd1980-07-01.139309.sbd.moore.berger.flac24 / gd80-07-01s1t01.flac
-   gd1980-07-01.139309.sbd.moore.berger.flac24 / gd80-07-01s1t02.flac
+I have at least four avocado boxes of cd's in my basement, many of them
+damaged by decades of shipping around the country without their cases.
+A lot of them are ripped, and I also download live recordings thanks
+to `bt.etree.org <http://bt.etree.org>`_ all the time.  All this data
+has almost filled a terabyte cloud drive.  Plus it's scattered all over
+a pile of old hard drives and home directory backups.  Finally, I want an
+easy way to keep my old phone active as a stereo receiver via
+`VLC <http://www.videolan.org/index.html>`_.
 
-Find music and play a folder::
+So, Tapedeck strives to organize this type of music collection and
+provide a way for you to enjoy your music.
 
-   $ tapedeck search ~/Downloads
-    ...
-     4. ny1969-xx-xx/
-     5. ny1970-xx-xx/
-     6. oaitw1973-xx-xx/
-    ...
-   $ tapedeck play -c 5
 
-View the last search::
+History
+-------
 
-   $ tapedeck search -c
-    ...
-     4. ny1969-xx-xx/
-     5. ny1970-xx-xx/
-     6. oaitw1973-xx-xx/
-    ...
-   $
+I've had some scripts around for a while to manage my music, but I've never
+built them into anything bigger partly because they require some complicated
+programming techniques that I never really mastered.  Now that I have found
+some `easier ways to program <http://github.com/python-trio/trio>`_ this
+type of thing, I feel like I can put it all together into a nifty
+`python <http://www.python.org>`_ package.
 
-Stream music to a device::
 
-   $ tapedeck play . -o udp -h 192.168.1.100 -p 8771
-
-Installation
+Requirements
 ------------
-
-Follow the three-step installation process for your system:
 
 Mac
 ~~~
@@ -57,16 +83,11 @@ Mac
 
    $ brew install python3 ffmpeg sox aria2 postgresql icecast2
 
-3. Install ``tapedeck``::
-
-   $ pip3 install tapedeck
-
 Android
 ~~~~~~~
 
 1. Install termux
 2. Install deps
-3. ``pip install tapedeck``
 
 Windows
 ~~~~~~~
@@ -80,19 +101,16 @@ iPhone
 
 1. refer
 2. to
-3. above
+3. Windows
 
-Motivation
-----------
 
-After decades of various physical media and enough spooled tape
-to lasso the moon, we find ourselves at the internet.  Many large
-collections of live music are available online for free: LEGALLY
-traded by a resilient community of music fanatics.  Meanwhile, many
-of us now own multiple networked devices that are capable of music
-download, streaming, and playback.  We also own piles of media purchases
-that (hopefully) still exist in physical format to be ripped.
+Sources
+~~~~~~~
 
-Tapedeck strives to organize these collections of music and provide
-a way for the you to enjoy your stash.
+The source code for this project is hosted on both
+`github <http://github.com/>`_ and `pypi <http://pypi.org>`_:
 
+* `tapedeck on pypi <https://pypi.org/project/tapedeck/>`_
+* `tapedeck on github <https://github.com/zthompson47/tapedeck>`_
+* `reel on pypi <http://pypi.org/project/reel/>`_
+* `reel on github <http://github.com/zthompson47/reel>`_
