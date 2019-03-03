@@ -1,36 +1,70 @@
 """Tests for the keyboard module."""
-from contextlib import contextmanager
 import logging
-import os
-import pty
-import sys
 
-from reel.keyboard import Keyboard
+from reel.keyboard import (
+    Keyboard,
+    K_LEFT, K_RIGHT, K_UP, K_DOWN,
+    pty_stdin
+)
 
-LOGGER = logging.getLogger(__name__)
-
-
-@contextmanager
-def pty_stdin():
-    """Replace stdin with a pty in a context."""
-    _stashed_stdin = sys.stdin
-    master, slave = pty.openpty()
-    sys.stdin = open(master, 'rb')
-    yield slave
-    sys.stdin = _stashed_stdin
+LOG = logging.getLogger(__name__)
 
 
 def test_keyboard_context():
-    """Open a keyboard and writes some characters to it."""
-    with pty_stdin() as slave:
+    """Open a keyboard and write some characters to it."""
+    with pty_stdin('abc' * 1024) as stdin:
         with Keyboard() as keyboard:
-            os.write(slave, b'a')
             assert keyboard.has_input()
-            assert keyboard.get_char() == b'a'
-            bytes_written = os.write(slave, b'b')
-            assert bytes_written == 1
+            assert keyboard.get_char() == 'a'
             assert keyboard.has_input()
-            assert keyboard.get_char() == b'b'
-            os.write(slave, b'c')
+            assert keyboard.get_char() == 'b'
             assert keyboard.has_input()
-            assert keyboard.get_char() == b'c'
+            assert keyboard.get_char() == 'c'
+
+            stdin('x')  # goes to end of buffer
+
+            assert keyboard.has_input()
+            assert keyboard.get_char() == 'a'
+            assert keyboard.has_input()
+            assert keyboard.get_char() == 'b'
+            assert keyboard.has_input()
+            assert keyboard.get_char() == 'c'
+
+            for _ in range(1018):
+                assert keyboard.has_input()
+                assert keyboard.get_char()
+            assert keyboard.get_char() == 'x'
+
+            keyboard.drain()
+
+            stdin('de')
+            assert keyboard.has_input()
+            assert keyboard.get_char() == 'd'
+            assert keyboard.has_input()
+            assert keyboard.get_char() == 'e'
+
+            assert not keyboard.has_input()
+
+
+def test_arrows():
+    """Test the arrow keys."""
+    k_left = bytearray([27, 91, 68])
+    k_right = bytearray([27, 91, 67])
+    k_down = bytearray([27, 91, 66])
+    k_up = bytearray([27, 91, 65])
+    with pty_stdin(k_left) as stdin:
+        with Keyboard() as keyboard:
+            assert keyboard.has_input()
+            assert keyboard.get_char() == K_LEFT
+
+            stdin(k_right)
+            assert keyboard.has_input()
+            assert keyboard.get_char() == K_RIGHT
+
+            stdin(k_down)
+            assert keyboard.has_input()
+            assert keyboard.get_char() == K_DOWN
+
+            stdin(k_up)
+            assert keyboard.has_input()
+            assert keyboard.get_char() == K_UP
