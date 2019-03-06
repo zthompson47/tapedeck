@@ -68,3 +68,16 @@ def test_arrows():
             stdin(k_up)
             assert keyboard.has_input()
             assert keyboard.get_char() == K_UP
+
+
+async def test_keyboard_context_async():
+    """The keyboard can be opened as a channel."""
+    message = ['O', 'n', 'c', 'e', ' ', 'u', 'p']
+    with pty_stdin(''.join(message)) as stdin:
+        async with Keyboard() as keyboard:
+            async for key in keyboard:
+                assert key == message.pop(0)
+                if not message:
+                    stdin('q')
+                    assert await keyboard.next() == 'q'
+                    break
