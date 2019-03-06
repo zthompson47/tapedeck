@@ -163,7 +163,6 @@ class Reel(trio.abc.AsyncResource, Streamer):
         )
         async with channel:
             async for chunk in channel:
-                LOG.debug(b'ZZ' + chunk[:47] + chunk[-47:])
                 await self.send_all(chunk)
 
     async def send_all(self, chunk):
@@ -174,9 +173,7 @@ class Reel(trio.abc.AsyncResource, Streamer):
             len(chunk)
         )
         if self.current_track:  # race??  next line could be error?
-            LOG.debug('[ REEL send_all !! len %d ALMOST !!]', len(chunk))
             await self.current_track.send_all(chunk)
-        LOG.debug('[ REEL send_all !! len %d DONE !!]', len(chunk))
 
     async def receive_some(self, max_bytes):
         """Return a chunk of data from the output of this stream."""

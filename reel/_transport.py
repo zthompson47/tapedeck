@@ -59,9 +59,7 @@ class Transport(trio.abc.AsyncResource):
             for idx, spool in enumerate(self._chain):
                 LOG.debug('_run %d %s', idx, spool)
                 if idx == 0:
-                    LOG.debug('_run near aa %d %s', idx, spool)
                     spool.start(nursery, message)
-                    LOG.debug('_run aft aa %d %s }', idx, spool)
                 else:
                     spool.start(nursery)
                 if idx < len(self._chain) - 1:
@@ -81,19 +79,13 @@ class Transport(trio.abc.AsyncResource):
             ch_send, ch_receive = trio.open_memory_channel(0)
             nursery.start_soon(self._chain[-1].send_to_channel, ch_send)
             async for chunk in ch_receive:
-                # LOG.debug('GOT chun.....')
-                # LOG.debug(']}]}-->> %s', chunk)
                 if not self._output:
                     self._output = b''
                 self._output += chunk
 
-            LOG.debug('about to send closed')
             if self._done_evt:
-                LOG.debug('about to be done!!!!!!')
                 self._done_evt.set()
-            LOG.debug('about to be done part 2!!!!!!')
 
-        LOG.debug('returning output!!!!!! %s', self._output)
         return self._output
 
     def start_daemon(self, nursery):
