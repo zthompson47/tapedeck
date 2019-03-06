@@ -11,6 +11,8 @@ import termios
 import time
 import tty
 
+import trio
+
 LOG = logging.getLogger(__name__)
 
 K_UP = -1
@@ -24,25 +26,50 @@ class Keyboard:
 
     def __init__(self):
         """Store the term settings before going into cbreak mode."""
+        self._async_stdin = None
         self._buff = bytearray()
         self._stashed_term = None
 
+    def __aiter__(self):
+        """Return iterator object."""
+        self._async_stdin = trio.wrap_file(sys.stdin)
+        return self
+
+    async def next(self):
+        """."""
+        return await self.__anext__()
+
+    async def __anext__(self):
+        """Return the next item."""
+        return await self._async_stdin.read(1)
+
+    async def __aenter__(self):
+        """."""
+        self._stash_term()
+        return self
+
     def __enter__(self):
         """Save the current term and create a new one with no echo."""
-        self._stashed_term = termios.tcgetattr(sys.stdin)
+        self._stash_term()
 
         # Set stdin file descriptor to non-blocking mode.
         fileno = sys.stdin.fileno()
         flag = fcntl.fcntl(fileno, fcntl.F_GETFL)
         fcntl.fcntl(fileno, fcntl.F_SETFL, flag | os.O_NONBLOCK)
 
-        # Disable terminal echo and let ctl-c through.
-        tty.setcbreak(sys.stdin, termios.TCSANOW)
-
         # Buffer any existing data from this fd.
         self._buffer_input()
 
         return self
+
+    def _stash_term(self):
+        """Save the current term and create a new one with no echo."""
+        self._stashed_term = termios.tcgetattr(sys.stdin)
+        tty.setcbreak(sys.stdin, termios.TCSANOW)
+
+    async def __aexit__(self, *args):
+        """."""
+        self.__exit__(args)
 
     def __exit__(self, *args):
         """Bring back the original term settings."""
@@ -73,6 +100,10 @@ class Keyboard:
         self._buffer_input()
         if self._buff:
             char = bytes(chr(self._buff.pop(0)).encode('utf-8'))
+        if not char:
+            return None
+
+        # Arrow keys
         if ord(char) == 27:
             if len(self._buff) == 2:
                 next_two = self._buff[0:2]
