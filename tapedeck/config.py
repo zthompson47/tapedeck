@@ -1,6 +1,8 @@
 """Load the configuration environment."""
 import os
 
+from trio import Path
+
 import reel
 
 
@@ -28,4 +30,4 @@ async def env(var=None):
 
 async def logfile(name):
     """Return a Path to a log file."""
-    return reel.Path(await env('TAPEDECK_LOG_DIR')) / name
+    return Path(await env('TAPEDECK_LOG_DIR')) / name

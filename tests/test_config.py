@@ -53,8 +53,8 @@ async def test_subprocess_logging(caplog):
         if log.name == 'root':
             if "tapedeck --v" in log.message:
                 found_one = True
-    # assert found_one
-    assert found_version
+    assert not found_one
+    assert not found_version
     # ???
 
     # The internal subprocess log ended up in the tmp xdg home.

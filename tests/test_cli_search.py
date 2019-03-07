@@ -11,6 +11,8 @@ Options:
   --help              Show this message and exit.
 
 """
+from trio import Path
+
 import reel
 from reel.config import get_xdg_cache_dir
 
@@ -21,11 +23,11 @@ async def test_search(music_dir):
     async with cmd as search:
         # ... import coverage in default pyenv needed
         lines = await search.readlines()
-        results = [await reel.Path.canon(_) for _ in lines]
+        results = [await Path(_).resolve() for _ in lines]
         assert len(results) == 3
         found = False
         for path in results:
-            if path.endswith('subsubsubdir'):
+            if str(path).endswith('subsubsubdir'):
                 found = True
         assert found
         # assert search.returncode == 0
@@ -55,7 +57,7 @@ async def test_search_results(music_dir):
         for line in results:
             filename = line[line.find(' ') + 1:]  # remove index
             filenames.append(filename)
-            assert not reel.Path(filename).is_absolute()
+            assert not Path(filename).is_absolute()
 
         # Do not repeat results.
         assert sorted(filenames) == sorted(list(set(filenames)))
@@ -73,7 +75,7 @@ async def test_search_results(music_dir):
         for line in lines:
             filename = line[line.find(' ') + 1:]  # remove index
             filenames.append(filename)
-            assert reel.Path(filename).is_absolute()
+            assert Path(filename).is_absolute()
         assert sorted(filenames) == sorted(list(set(filenames)))
 
 

@@ -1,8 +1,4 @@
 """Tests for the tapedeck.search module."""
-# import pytest
-
-from reel import Path
-
 from tapedeck.search import find_tunes, is_audio, Folder
 
 
@@ -35,4 +31,4 @@ def test_folder_print(tmpdir):
     """Print the folder prettily, keeping final name in path."""
     folder = Folder(path=tmpdir)
     assert folder
-    assert Path(folder.path) in str(folder)
+    assert str(folder.path) in str(folder)

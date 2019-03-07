@@ -1,11 +1,11 @@
 """The ``tapedeck`` cli 'search' command."""
 import argparse
 import logging
-import pathlib
 import sys
 
 import blessings
 import trio
+from trio import Path
 
 from reel.config import get_xdg_cache_dir
 
@@ -61,7 +61,7 @@ async def search(args):
     )
 
     # Sort search results by lowercase folder name.
-    results.sort(key=lambda _: pathlib.Path(_.path).name.lower())
+    results.sort(key=lambda _: Path(_.path).name.lower())
 
     idx = 0
     for folder in results:

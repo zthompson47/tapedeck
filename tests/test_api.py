@@ -1,5 +1,5 @@
 """Test loading the tapedeck module."""
-from reel import Path
+from trio import Path
 
 import tapedeck
 

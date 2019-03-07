@@ -15,7 +15,6 @@ import argparse
 import logging
 import sys
 
-import blessings
 import trio
 
 import tapedeck
@@ -27,8 +26,6 @@ if LOG_LEVEL:
 LOG = logging.getLogger(__name__)
 # LOG.addHandler(logging.StreamHandler(sys.stderr))
 LOG.debug('[o_ NOW LOGGING tapedeck.cli.main _o]')
-
-T = blessings.Terminal()
 
 
 def tapedeck_cli() -> int:
@@ -53,12 +50,10 @@ def tapedeck_cli() -> int:
 
     args = parser.parse_args()
     if args.version:
-        # print(f'{T.blue}¤_tapedeck_¤ ', end='')
-        # print(f'{T.yellow}v{tapedeck.__version__}{T.normal}')
         print(tapedeck.__version__)
     elif args.config:
         for key, val in trio.run(tapedeck.config.env).items():
-            print(f'{T.blue}{key}{T.normal}={T.yellow}{val}{T.normal}')
+            print(f'{key}={val}')
     elif hasattr(args, 'func') and args.func:
         LOG.debug('RRRRRRUUUUNN FUNC  %s   WW', args.func)
         trio.run(args.func, args)

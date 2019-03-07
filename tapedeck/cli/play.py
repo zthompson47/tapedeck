@@ -8,6 +8,7 @@ import termios
 
 import blessings
 import trio
+from trio import Path
 
 import reel
 from reel.config import (
@@ -75,21 +76,21 @@ async def play(args):
         async with await cache_file.open('r') as out:
             lines = (await out.read()).split('\n')[0:-1]
         track = lines[int(args.memory) - 1]
-        music_path = reel.Path(track[track.find(' ') + 1:])
+        music_path = Path(track[track.find(' ') + 1:])
     else:
-        music_path = reel.Path(args.track)
+        music_path = Path(args.track)
 
-    if await reel.Path(music_path).is_dir():
+    if await Path(music_path).is_dir():
         playlist_folders = [music_path]
         if args.recursive:
             # Run find_tunes on this dir to get all music folders.
             results = await find_tunes(music_path)
             for folder in results:
-                playlist_folders.append(reel.Path(folder.path))
+                playlist_folders.append(Path(folder.path))
 
         # in a directory, queue each song file
         for folder in playlist_folders:
-            songs = [_ for _ in await folder.iterdir() if _.is_file()]
+            songs = [_ for _ in await folder.iterdir() if await _.is_file()]
             songs.sort()
             for song in songs:
                 if is_audio(str(song)):
@@ -121,7 +122,7 @@ async def play(args):
         )
     else:
         # Check for file output.
-        out_path = reel.Path(args.output)
+        out_path = Path(args.output)
         LOG.debug('///////!!!!++++++++++++/////>>> %s ', str(out_path))
         # if (args.output == '/dev/null' or
         #         await out_path.is_file() or
@@ -161,28 +162,21 @@ async def play(args):
             # Play the playlist!
             async with plst | out as transport:
                 done_evt = transport.start_daemon(nursery)
-                LOG.debug('___ started transport')
-
                 try:
-                    with Keyboard() as keyboard:
-                        LOG.debug('___ in keyboard')
-                        while True:
-                            await trio.sleep(0.1)  # checkpoint
-                            if done_evt.is_set():
-                                LOG.debug('___ done evt')
+                    async with Keyboard() as keyboard:
+                        async for key in keyboard:
+                            # if done_evt.is_set():
+                            #     LOG.debug('___ done evt')
+                            #     break
+                            # if keyboard.has_input():
+                            #     LOG.debug('___ has input')
+                            #     char = keyboard.get_char()
+                            if key == 'q':
                                 break
-                            if keyboard.has_input():
-                                LOG.debug('___ has input')
-                                char = keyboard.get_char()
-                                if char == 'q':
-                                    break
-                                elif char == 'j':
-                                    # pylint: disable=not-async-context-manager
-                                    async with lock:
-                                        await plst.skip_to_next_track(
-                                            close=True
-                                        )
-
+                            elif key == 'j':
+                                # pylint: disable=not-async-context-manager
+                                async with lock:
+                                    await plst.skip_to_next_track(close=True)
                 except termios.error:
                     while not done_evt.is_set():
                         await trio.sleep(0.01)

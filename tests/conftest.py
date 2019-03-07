@@ -10,8 +10,7 @@ from tempfile import mkdtemp
 
 import pytest
 import trio
-
-from reel import Path
+from trio import Path
 
 import tapedeck
 
@@ -43,7 +42,7 @@ XDG = {
 
 # Set xdg environment variables.
 for key, val in XDG.items():
-    os.environ[key] = val
+    os.environ[key] = str(val)
 
 # Enable full test coverage for subprocesses.
 os.environ['COVERAGE_PROCESS_START'] = 'setup.cfg'
