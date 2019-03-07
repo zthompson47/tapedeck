@@ -1,5 +1,5 @@
 """Tests for :mod:`reel.proc`."""
-import trio
+from trio import Path
 
 import reel
 
@@ -32,7 +32,7 @@ async def test_spool_simple_command():
 
 async def test_pwd():
     """Test a familiar shell command."""
-    assert str(trio.Path.cwd()) == await reel.Spool('pwd').run()
+    assert str(await Path.cwd()) == await reel.Spool('pwd').run()
 
 
 async def test_limit_output():

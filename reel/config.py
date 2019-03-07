@@ -6,7 +6,7 @@ assigns defaults when appropriate.
 """
 import os
 
-from ._path import Path
+from trio import Path
 
 __all__ = [
     'get_config',
@@ -30,10 +30,10 @@ async def get_package_name():
 async def get_xdg_home(choice=None):
     """Return the root configuration directories for this environment."""
     home_env = {
-        'XDG_CONFIG_HOME': await Path.canon('~/.config'),
-        'XDG_CACHE_HOME': await Path.canon('~/.cache'),
-        'XDG_DATA_HOME': await Path.canon('~/.local/share'),
-        'XDG_RUNTIME_DIR': await Path.canon('~/.local/run'),
+        'XDG_CONFIG_HOME': await Path('~/.config').expanduser(),
+        'XDG_CACHE_HOME': await Path('~/.cache').expanduser(),
+        'XDG_DATA_HOME': await Path('~/.local/share').expanduser(),
+        'XDG_RUNTIME_DIR': await Path('~/.local/run').expanduser(),
     }
 
     # Override the defaults if already set in an environment variable.

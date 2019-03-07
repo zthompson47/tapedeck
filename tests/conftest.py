@@ -10,6 +10,7 @@ from tempfile import mkdtemp
 
 import pytest
 import trio
+from trio import Path
 
 import reel
 from reel import Reel
@@ -30,10 +31,10 @@ for _env_key in os.environ.keys():
 
 # Create home directories for testing.
 XDG = {
-    'XDG_CONFIG_HOME': reel.Path(mkdtemp('xdg_config')),
-    'XDG_CACHE_HOME': reel.Path(mkdtemp('xdg_cache')),
-    'XDG_DATA_HOME': reel.Path(mkdtemp('xdg_data')),
-    'XDG_RUNTIME_DIR': reel.Path(mkdtemp('xdg_runtime')),
+    'XDG_CONFIG_HOME': mkdtemp('xdg_config'),
+    'XDG_CACHE_HOME': mkdtemp('xdg_cache'),
+    'XDG_DATA_HOME': mkdtemp('xdg_data'),
+    'XDG_RUNTIME_DIR': mkdtemp('xdg_runtime'),
 }
 
 # Set xdg environment variables.
@@ -79,7 +80,7 @@ def audio_dest():
             out = ffmpeg.to_udp('127.0.0.1', '9876')
         else:
             # Check for file output.
-            out_path = reel.Path(dest)
+            out_path = Path(dest)
             if (dest == '/dev/null' or
                     trio.run(out_path.is_file) or
                     trio.run(out_path.is_dir)):

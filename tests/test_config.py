@@ -1,8 +1,7 @@
 # pylint: disable=W0611, W0621
 """Test the application configuration system."""
-import pathlib
-
 import trio
+from trio import Path
 
 from reel.config import (
     get_config,
@@ -14,8 +13,6 @@ from reel.config import (
     get_xdg_runtime_dir,
     get_xdg_home,
 )
-
-from reel import Path
 
 from .conftest import set_env, unset_env
 
@@ -43,17 +40,17 @@ async def test_fixture_env_home_uses_default(env_home):
     """Provide xdg home directories if not set in the environemnt."""
     unset_env(env_home)
     config = await get_xdg_home()
-    home = pathlib.Path.home()
-    assert config['XDG_CONFIG_HOME'] == str(home / '.config')
-    assert config['XDG_CACHE_HOME'] == str(home / '.cache')
-    assert config['XDG_DATA_HOME'] == str(home / '.local' / 'share')
-    assert config['XDG_RUNTIME_DIR'] == str(home / '.local' / 'run')
+    home = await Path.home()
+    assert str(config['XDG_CONFIG_HOME']) == str(home / '.config')
+    assert str(config['XDG_CACHE_HOME']) == str(home / '.cache')
+    assert str(config['XDG_DATA_HOME']) == str(home / '.local' / 'share')
+    assert str(config['XDG_RUNTIME_DIR']) == str(home / '.local' / 'run')
     # ... log warning if no xdg_runtime pylint : disable = W0511 ...
 
 
 async def test_get_package_dir():
     """Get the path to this package."""
-    assert await Path.canon('./reel') == str(await get_package_dir())
+    assert await Path('./reel').resolve() == await get_package_dir()
 
 
 async def test_get_package_name():

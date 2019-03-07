@@ -2,8 +2,8 @@
 import logging
 
 import trio
+from trio import Path
 
-import reel
 from reel import Spool
 from reel.config import get_config, get_xdg_config_dir
 
@@ -16,7 +16,7 @@ async def test_shell_commands():
 
     async with Spool('find .', xflags=['-type', 'f']) as found:
         lines = await found.readlines()
-        found_resolved = [await reel.Path.canon(_) for _ in lines]
+        found_resolved = [str(await Path(_).resolve()) for _ in lines]
         assert __file__ in found_resolved
 
     assert float((await Spool('python -V').run())[7:10]) >= 3.5
