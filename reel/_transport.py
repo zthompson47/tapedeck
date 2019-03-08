@@ -11,7 +11,7 @@ class Transport(trio.abc.AsyncResource):
 
     def __init__(self, *args):
         """Create a transport chain from a list of spools."""
-        self._done_evt = None
+        self._is_done = trio.Event()
         self._nursery = None
         self._output = None
         if len(args) == 1 and isinstance(args[0], list):
@@ -21,6 +21,15 @@ class Transport(trio.abc.AsyncResource):
         else:
             self._chain = list(args)
         LOG.debug(self.__repr__())
+
+    @property
+    def is_done(self):
+        """Has this thing finished playing."""
+        return self._is_done.is_set()
+
+    async def wait(self):
+        """Wait until this is done."""
+        await self._is_done.wait()
 
     def __str__(self):
         """Print prettily."""
@@ -74,7 +83,7 @@ class Transport(trio.abc.AsyncResource):
                             _dst.receive_from_channel, receive_ch.clone()
                         )
 
-            # Read stdout from the last spool in the list.
+            # Read stdout from the last spool in the list
             LOG.debug('about to read stdout of chain')
             ch_send, ch_receive = trio.open_memory_channel(0)
             nursery.start_soon(self._chain[-1].send_to_channel, ch_send)
@@ -83,18 +92,13 @@ class Transport(trio.abc.AsyncResource):
                     self._output = b''
                 self._output += chunk
 
-            if self._done_evt:
-                self._done_evt.set()
-
-        return self._output
+            # All done
+            self._is_done.set()
+            # nursery.cancel_scope.cancel()
 
     def start_daemon(self, nursery):
         """Run this transport in the background and return."""
         nursery.start_soon(self._run)
-
-        # Set up an event to report done.
-        self._done_evt = trio.Event()
-        return self._done_evt
 
     async def stop(self):
         """Stop this transport."""
@@ -111,21 +115,23 @@ class Transport(trio.abc.AsyncResource):
         if message and text:
             message = message.encode('utf-8')
 
-        rawbytes = await self._run(message=message)
+        await self._run(message=message)
 
-        if text and rawbytes:
-            decoded = rawbytes.decode('utf-8')
+        if text and self._output:
+            decoded = self._output.decode('utf-8')
 
-            # Remove trailing \n.
+            # Remove trailing \n
             if decoded[-1:] == '\n':
                 decoded = decoded[:-1]
             return decoded
-        return rawbytes
+        return self._output
 
     async def readlines(self):
         """Run this transport and return stdout as a `list`."""
-        result = await self._run()
-        if not result:
+        await self._run()
+        if self._output:
+            result = self._output
+        else:
             result = b''
         output = result.decode('utf-8')
         return output.split('\n')[:-1]

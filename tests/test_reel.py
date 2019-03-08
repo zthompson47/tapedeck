@@ -239,10 +239,10 @@ async def test_reel_daemon_playing(neil_reel, audio_dest):
     got_there = False
     async with neil_reel | audio_dest() as player:
         async with trio.open_nursery() as nursery:
-            done_evt = player.start_daemon(nursery)
+            player.start_daemon(nursery)
             got_here = True
             while True:
-                if done_evt.is_set():
+                if player.is_done:
                     got_there = True
                     break
                 await trio.sleep(0)
