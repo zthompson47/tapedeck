@@ -3,7 +3,11 @@ import logging
 import os
 from typing import List
 
-LOGGER = logging.getLogger(__name__)
+from trio import Path
+
+from reel.config import get_xdg_cache_dir
+
+LOG = logging.getLogger(__name__)
 
 
 class Folder:
@@ -19,7 +23,7 @@ class Folder:
                 self._path = value
             else:
                 self.__setattr__(key, value)
-        LOGGER.debug('__init__:%s', self)
+        LOG.debug('__init__:%s', self)
 
     def __repr__(self):
         """Print prettily."""
@@ -29,6 +33,26 @@ class Folder:
     def path(self):
         """Return this path."""
         return self._path
+
+
+async def cached_search(index: int) -> Path:
+    """Return the path to a cached search entry."""
+    cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
+    async with await cache_file.open('r') as cache:
+        lines = (await cache.read()).split('\n')[0:-1]
+    track = lines[index - 1]
+    return Path(track[track.find(' ') + 1:])
+
+
+async def scan_folder(folder):
+    """Return a list of songs found in a folder."""
+    songs = [_ for _ in await folder.iterdir() if await _.is_file()]
+    songs.sort()
+    result = []
+    for song in songs:
+        if is_audio(str(song)):
+            result.append(song)
+    return result
 
 
 async def find_tunes(music_dir: str,

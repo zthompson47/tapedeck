@@ -108,6 +108,7 @@ async def test_output_file(tmpdir):
         f"tapedeck play {audio_uri} -o {tmpdir.join('out.wav')}"
     )
     await player.run()
+    print(player.stderr)
     assert player.returncode == 0
 
 

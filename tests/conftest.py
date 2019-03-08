@@ -4,26 +4,12 @@ Imported before tests.  Loads fixtures and sets environment
 variables for subprocess testing.
 
 """
-import logging
 import os
 from tempfile import mkdtemp
 
 import pytest
-import trio
 from trio import Path
 
-import tapedeck
-
-
-# Log debug messages for testing.
-LOG_FILE = trio.run(tapedeck.config.logfile, 'tests.log')
-logging.basicConfig(
-    filename=LOG_FILE,
-    level='DEBUG',
-    format='%(process)d:%(levelname)s:%(module)s:%(message)s'
-)
-LOGGER = logging.getLogger(__name__)
-LOGGER.debug('Begin logging for tests ~-~=~-~=~-~=~!!((o))!!~=~-~=~-~=~')
 
 # Remove any existing TAPEDECK_* config vars.
 for key in os.environ.keys():
