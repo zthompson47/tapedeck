@@ -8,7 +8,7 @@ setup(
     author='Zach Thompson',
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/reel',
-    description='Async subprocess pipelines and stream transports',
+    description='A contraption for async subprocess streaming',
     long_description_content_type='text/x-rst',
     long_description=open('README.rst', 'r').read(),
     classifiers=[
