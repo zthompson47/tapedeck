@@ -1,5 +1,4 @@
 """Spool class."""
-from time import time
 import logging
 import os
 import shlex
@@ -23,7 +22,7 @@ class Spool(trio.abc.AsyncResource):
         self._proc = None
         self._status = None
         self._stderr = None
-        self._timeout = None
+        self._stdout = None
         if xflags:
             for flag in xflags:
                 # Accept objects like Path that look like a str
@@ -79,23 +78,39 @@ class Spool(trio.abc.AsyncResource):
             return self._stderr.decode('utf-8')
         return None
 
+    @property
+    def stdout(self):
+        """Return whatever the process sent to stdout."""
+        # if self._stdout:
+        #    return self._stdout.decode('utf-8')
+        # return None
+        return self._stdout
+
     def limit(self, byte_limit=65536):
         """Configure this `spool` to limit output to `byte_limit` bytes."""
         self._limit = byte_limit
         return self
 
-    def timeout(self, seconds=0.47):
-        """Configure this `spool` to stop after `seconds` seconds."""
-        self._timeout = seconds
-        return self
-
-    async def run(self, message=None, text=True):
+    async def run(self, message=b''):
         """Send stdin to process and return stdout."""
-        return await Transport(self).read(message, text=text)
+        async with trio.open_nursery() as nursery:
+            self._proc = trio.Process(
+                self._command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=self._env
+            )
+            nursery.start_soon(self._handle_stdin, message)
+            nursery.start_soon(self._handle_stdout, self._limit)
+            nursery.start_soon(self._handle_stderr)
+        await self._proc.wait()
+        if self._stdout:
+            return self._stdout.decode('utf-8', errors='ignore').strip()
+        return None
 
     async def _handle_stderr(self):
-        """Read stderr in a function so that the nursery has a function."""
-        LOG.debug('< _STDERR %s >', self)
+        """Read stderr."""
         while True:
             try:
                 chunk = await self._proc.stderr.receive_some(16384)
@@ -109,14 +124,47 @@ class Spool(trio.abc.AsyncResource):
                     self._stderr = b''
                 self._stderr += chunk
 
+    async def _handle_stdout(self, limit=None):
+        """Read stdout."""
+        max_rcv = limit or 16834
+
+        while True:
+            try:
+                chunk = await self._proc.stdout.receive_some(max_rcv)
+                LOG.debug(chunk)
+            except trio.ClosedResourceError as err:
+                LOG.exception(err)
+                break
+            else:
+                if not chunk:
+                    break
+                if not self._stdout:
+                    self._stdout = b''
+                self._stdout += chunk
+                max_rcv -= len(chunk)
+                if max_rcv == 0:
+                    await self._proc.stderr.aclose()
+                    await self._proc.stdout.aclose()
+                    break
+
     async def _handle_stdin(self, message):
-        """Handle stdin."""
+        """Receive stdin."""
+        if isinstance(message, str):
+            _msg = message.encode('utf-8')
+        elif message is None:
+            _msg = b''
+        else:
+            _msg = message
         async with self.proc.stdin as stdin:
-            await stdin.send_all(message)
+            await stdin.send_all(_msg)
 
     def handle_stderr(self, nursery):
         """Read stderr, called as a task in a nursery."""
         nursery.start_soon(self._handle_stderr)
+
+    def handle_stdout(self, nursery):
+        """Read stdout, called as a task in a nursery."""
+        nursery.start_soon(self._handle_stdout)
 
     def handle_stdin(self, nursery, message):
         """Feed stdin, called as a task in a nursery."""
@@ -177,7 +225,6 @@ class Spool(trio.abc.AsyncResource):
             buffsize = self._limit
 
         # <=~ Receive data.
-        _start_time = time()
         chunk = await self.receive_some(buffsize)
         while chunk:
 
@@ -188,11 +235,6 @@ class Spool(trio.abc.AsyncResource):
             bytes_received += len(chunk)
             if self._limit and bytes_received > self._limit:
                 break
-
-            # Check for timeout.
-            if self._timeout:
-                if (time() - _start_time) >= self._timeout:
-                    break
 
             # Cap buffer at limit.
             buffsize = 16384
