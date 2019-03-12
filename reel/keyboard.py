@@ -45,8 +45,8 @@ class Keyboard:
         try:
             self._stashed_term = termios.tcgetattr(sys.stdin)
             tty.setcbreak(sys.stdin, termios.TCSANOW)
-        except termios.error as error:
-            LOG.exception(error)
+        except termios.error:
+            LOG.debug('No termios', exc_info=True)
         return self
 
     async def __aexit__(self, *args):

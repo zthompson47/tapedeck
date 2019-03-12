@@ -114,8 +114,8 @@ class Spool(trio.abc.AsyncResource):
         while True:
             try:
                 chunk = await self._proc.stderr.receive_some(16384)
-            except trio.ClosedResourceError as err:
-                LOG.exception(err)
+            except trio.ClosedResourceError:
+                LOG.debug('Stderr closed', exc_info=True)
                 break
             else:
                 if not chunk:
@@ -132,8 +132,8 @@ class Spool(trio.abc.AsyncResource):
             try:
                 chunk = await self._proc.stdout.receive_some(max_rcv)
                 LOG.debug(chunk)
-            except trio.ClosedResourceError as err:
-                LOG.exception(err)
+            except trio.ClosedResourceError:
+                LOG.debug('Stdout closed', exc_info=True)
                 break
             else:
                 if not chunk:
@@ -190,8 +190,8 @@ class Spool(trio.abc.AsyncResource):
             try:
                 self.proc.kill()
                 await self.proc.wait()
-            except AttributeError as err:
-                LOG.exception(err)
+            except AttributeError:
+                LOG.debug('Could not kill proc', exc_info=True)
         else:
             LOG.debug('-- || SPOOL stop NO-PROC')
 
