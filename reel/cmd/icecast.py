@@ -4,6 +4,23 @@ from reel.config import get_xdg_config_dir, get_xdg_data_dir, get_config
 from .._spool import Spool
 
 
+class IcecastServer(Spool):
+    """An icecast client and server."""
+
+    def __init__(self, command='icecast'):
+        """Store the configuration for the server command."""
+        self._config = dict(
+            location='Neptune',
+            admin_email='sushi@trident.sea',
+            password='hack-it-up',
+            hostname='127.0.0.1',
+            port='8777',
+            logdir='/Users/zach',
+            # logdir=str(await get_xdg_data_dir()),
+        )
+        super().__init__(self, command)
+
+
 async def server():
     """Return a command to run an icecast server."""
     config_icecast = dict(
