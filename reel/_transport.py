@@ -11,8 +11,8 @@ class Transport(trio.abc.AsyncResource):
 
     def __init__(self, *args):
         """Create a transport chain from a list of spools."""
+        self._cancel_scope = None
         self._is_done = trio.Event()
-        self._nursery = None
         self._output = None
         if len(args) == 1 and isinstance(args[0], list):
             self._chain = []
@@ -93,8 +93,19 @@ class Transport(trio.abc.AsyncResource):
                 self._output += chunk
 
             # All done
+            LOG.debug('-----------------seg is done')
             self._is_done.set()
-            # nursery.cancel_scope.cancel()
+            LOG.debug('-----------------seg cancel')
+
+        if self._cancel_scope:
+            self._cancel_scope.cancel()
+        # LOG.debug('-----------------seg bye')
+
+    def spawn_in(self, nursery):
+        """Start this transport and return a cancel_scope."""
+        nursery.start_soon(self._run)
+        self._cancel_scope = trio.CancelScope()
+        return self._cancel_scope
 
     def start_daemon(self, nursery):
         """Run this transport in the background and return."""
