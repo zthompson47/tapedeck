@@ -2,11 +2,9 @@
 import argparse
 import logging
 import random
-import sys
-import termios
 
 import trio
-from trio import Lock, Path
+from trio import Path
 
 from reel import Reel
 from reel.cmd import ffmpeg, icecast, sox
@@ -43,8 +41,19 @@ def load_args(tdplay):
     tdplay.set_defaults(func=play)
 
 
-async def folders_from_args(args):
-    """Return a list of folders to play."""
+def validate(args) -> None:
+    """Validate the command line arguments."""
+    if args.output == 'udp':
+        if args.host is None or args.port is None:
+            raise argparse.ArgumentTypeError('-o', 'udp needs host and port')
+
+
+async def _folders_from_args(args):
+    """Return a list of folders to play.
+
+    Used by playlist_from_args.
+
+    """
     folders = []
 
     # Get folder from cached search
@@ -63,10 +72,10 @@ async def folders_from_args(args):
     return folders
 
 
-async def playlist_from_args(args):
-    """Return a list of tracks to play."""
+async def playlist_from_args(args) -> Reel:
+    """Return a list of files to play."""
     playlist = []
-    folders = await folders_from_args(args)
+    folders = await _folders_from_args(args)
 
     # Command line argument
     if args.track and await Path(args.track).is_file():
@@ -80,20 +89,14 @@ async def playlist_from_args(args):
     if args.shuffle:
         random.shuffle(playlist)
 
-    return playlist
+    return Reel(
+        [ffmpeg.read(track) for track in playlist],
+        announce_to=print
+    )
 
 
-def validate(args):
-    """Validate the command line arguments."""
-    if args.output == 'udp':
-        if args.host is None or args.port is None:
-            raise argparse.ArgumentTypeError('-o', 'udp needs host and port')
-
-
-async def play(args):
-    """Build a playlist and play it."""
-    validate(args)
-
+def destination_from_args(args):
+    """Figure out where to send the audio."""
     destinations = {
         'speakers': sox.speakers(),
         'udp': ffmpeg.to_udp(host=args.host, port=args.port),
@@ -105,48 +108,50 @@ async def play(args):
         destination = destinations[args.output]
     except KeyError:
         destination = destinations['default']
+    return destination
 
-    # Create the playlist.
-    playlist = Reel(
-        [ffmpeg.read(track) for track in await playlist_from_args(args)],
-        announce_to=print
-    )
 
-    lock = Lock()
+async def play(args):
+    """Build a playlist and play it."""
+    validate(args)
 
-    async with await icecast.server() as icey:
-        async with trio.open_nursery() as nursery:
-            icey.start_daemon(nursery)
+    playlist = await playlist_from_args(args)
+    destination = destination_from_args(args)
 
-            # Play the playlist!
+    # Server
+    async with trio.open_nursery() as nursery:
+        async with await icecast.server() as ice:
+            ice.spawn_in(nursery)
             async with playlist | destination as transport:
-                transport.start_daemon(nursery)
-                try:
-                    async with Keyboard() as keyboard:
-                        async for key in keyboard:
-                            if key == 'q':
+                with transport.spawn_in(nursery):
+
+                    # Client
+                    async with Keyboard() as user:
+                        async for keypress in user:
+                            if keypress == 'q':
                                 nursery.cancel_scope.cancel()
-                            elif key == 'j':
+                                # await transport.stop()
+                            elif keypress == 'j':
+                                # lock = trio.Lock()
                                 # pylint: disable=not-async-context-manager
-                                async with lock:
-                                    await playlist.skip_to_next_track(
-                                        close=True
-                                    )
-                except termios.error:
-                    await transport.wait()
-                await transport.stop()
-
-            await icey.stop()
-
-    return 0
+                                # async with lock:
+                                await playlist.skip_to_next_track(close=True)
+            await ice.stop()
 
 
 def enter():
-    """Entry point for setuptools console_scripts."""
+    """Parse arguments and run.
+
+    Used by setuptools as the entry point to ``tdplay``.
+
+    """
     tdplay = argparse.ArgumentParser()
     load_args(tdplay)
     args = tdplay.parse_args()
-    sys.exit(trio.run(play, args))
+    try:
+        trio.run(play, args)
+    except trio.ClosedResourceError as error:
+        LOG.exception(error)
 
 
 if __name__ == '__main__':
