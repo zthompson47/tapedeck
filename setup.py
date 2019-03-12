@@ -8,7 +8,7 @@ setup(
     author='Zach Thompson',
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/tapedeck',
-    description='A music player',
+    description='A music player that lets you do other things',
     long_description_content_type='text/x-rst',
     long_description=open('README.rst', 'r').read(),
     classifiers=[
@@ -24,7 +24,6 @@ setup(
         ],
     },
     install_requires=[
-        'blessings>=1.7',
         'reel>=0.0.5',
         'trio>=0.10.0',
     ],
