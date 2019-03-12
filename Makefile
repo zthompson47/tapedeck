@@ -41,6 +41,7 @@ lint:
 	python -m pylint --disable=R0801 $(project) tests $(other_files)
 
 coverage: clean-coverage
+	coverage run --module pytest --doctest-modules $(project)
 	coverage run --module pytest -W ignore
 	coverage combine
 	coverage html -d etc/htmlcov

@@ -136,6 +136,7 @@ def pty_stdin(preload=None):
         ...         assert keyboard.read() == 'b'
         ...         stdin('x')
         ...         assert keyboard.read() == 'x'
+        1
 
     """
     _stashed_stdin = sys.stdin
