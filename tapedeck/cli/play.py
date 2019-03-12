@@ -122,20 +122,23 @@ async def play(args):
     async with trio.open_nursery() as nursery:
         async with await icecast.server() as ice:
             ice.spawn_in(nursery)
-            async with playlist | destination as transport:
-                with transport.spawn_in(nursery):
+            async with playlist | destination as player:
+
+                # Beware: "Players only love you when they're playing..."
+                with player.spawn_in(nursery):
 
                     # Client
                     async with Keyboard() as user:
                         async for keypress in user:
                             if keypress == 'q':
                                 nursery.cancel_scope.cancel()
-                                # await transport.stop()
+                                # await player.stop()
                             elif keypress == 'j':
                                 # lock = trio.Lock()
                                 # pylint: disable=not-async-context-manager
                                 # async with lock:
                                 await playlist.skip_to_next_track(close=True)
+
             await ice.stop()
 
 
@@ -150,8 +153,10 @@ def enter():
     args = tdplay.parse_args()
     try:
         trio.run(play, args)
-    except trio.ClosedResourceError as error:
-        LOG.exception(error)
+    except trio.ClosedResourceError:
+        LOG.debug('Ungrateful dumpling', exc_info=True)
+    except trio.BrokenResourceError:
+        LOG.debug('Ungrateful dumpling', exc_info=True)
 
 
 if __name__ == '__main__':

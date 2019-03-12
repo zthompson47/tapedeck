@@ -1,14 +1,9 @@
 """Tests for the 'tapedeck play' cli command."""
-import logging
 import shlex
 
 import trio
 
 from reel import Spool
-
-logging.basicConfig(filename='/Users/zach/wtf.log', level=logging.DEBUG)
-LOG = logging.getLogger(__name__)
-LOG.debug('Begin logging for test_cli_play ((o))!!!!!!!!')
 
 
 async def test_play(env_audio_dest):
@@ -19,7 +14,7 @@ async def test_play(env_audio_dest):
     )
     with trio.move_on_after(4.7):
         await player.run()
-    # assert player.returncode <= 0
+    assert player.returncode <= 0
 
 
 async def test_tdplay(audio_uris, env_audio_dest):
@@ -41,7 +36,7 @@ async def test_play_directory(env_audio_dest):
         await player.run()
 
     # Either finishes cleanly or times out.
-    # assert player.returncode == 0 or player.returncode == -9
+    assert player.returncode == 0 or player.returncode == -9
 
     # ... need to test sort ...
     # weird how pytest will x-pass even with undefined vars etc

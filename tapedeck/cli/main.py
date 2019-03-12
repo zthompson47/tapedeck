@@ -12,12 +12,14 @@ optional arguments:
 
 """
 import argparse
+import logging
 import os
-import sys
 
 import trio
 
 import tapedeck
+
+LOG = logging.getLogger(__name__)
 
 
 def tapedeck_cli() -> int:
@@ -48,12 +50,15 @@ def tapedeck_cli() -> int:
             if key.startswith('TAPEDECK_'):
                 print(f'{key}={val}')
     elif hasattr(args, 'func') and args.func:
-        trio.run(args.func, args)
+        try:
+            trio.run(args.func, args)
+        except trio.ClosedResourceError:
+            LOG.debug('Ungrateful dumpling', exc_info=True)
 
 
 def enter():
     """Run synchronous for setuptools."""
-    sys.exit(tapedeck_cli())
+    tapedeck_cli()
 
 
 if __name__ == '__main__':
