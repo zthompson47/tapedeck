@@ -4,7 +4,6 @@ Imported before tests.  Loads fixtures and sets environment
 variables for subprocess testing.
 
 """
-import logging
 import os
 from tempfile import mkdtemp
 
@@ -12,16 +11,10 @@ import pytest
 import trio
 from trio import Path
 
-import reel
+# import reel
 from reel import Reel
 from reel.cmd import ffmpeg, sox
 
-# Log debug messages for testing.
-LOG_DIR = trio.run(reel.config.get_xdg_data_dir, 'reel')
-LOG_FILE = LOG_DIR / 'tests.log'
-logging.basicConfig(filename=LOG_FILE, level='DEBUG')
-LOGGER = logging.getLogger(__name__)
-LOGGER.debug('<~~~~~~(~<~(o~>)~>~~~~~> BEGIN REEL TESTS LOGGING')
 
 # Remove existing config vars except for testing.
 for _env_key in os.environ.keys():

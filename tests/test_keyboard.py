@@ -1,14 +1,9 @@
 """Tests for the keyboard module."""
-import logging
-
 from reel.keyboard import (
     Keyboard,
     KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_ESC,
     pty_stdin
 )
-
-logging.basicConfig(filename='/Users/zach/kb.log', level=logging.DEBUG)
-LOG = logging.getLogger(__name__)
 
 
 def test_keyboard_context():
@@ -60,7 +55,6 @@ def test_arrows():
 async def test_keyboard_context_async():
     """The keyboard can be opened as a channel."""
     message = ['O', 'n', 'c', 'e', ' ', 'u', 'p', 'o']
-    LOG.debug(message)
     with pty_stdin(''.join(message)) as stdin:
         async with Keyboard() as keyboard:
             keyboard.break_on_eot('o')
