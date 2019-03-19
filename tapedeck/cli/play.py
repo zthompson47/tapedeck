@@ -1,18 +1,115 @@
 """The ``tapedeck`` cli 'play' command."""
 import argparse
+from contextvars import ContextVar
 import logging
 import random
 
 import trio
-from trio import Path
 
 from reel import Reel
-from reel.cmd import ffmpeg, icecast, sox
-from reel.keyboard import Keyboard
+from reel.cmd import ffmpeg, sox, Icecast, Redis, Aria2
+from reel.keyboard import Keyboard, KEY_RIGHT
 
 from tapedeck.search import cached_search, find_tunes, scan_folder
 
 LOG = logging.getLogger(__name__)
+NURSERY = ContextVar('nursery')
+
+
+async def play(args):
+    """Build a playlist and play it."""
+    validate(args)
+
+    playlist = await playlist_from_args(args)
+    output = output_from_args(args)
+
+    async with trio.open_nursery() as nursery:
+
+        async with Redis() | Icecast() | Aria2() as server:
+            await nursery.start(server.run, nursery)
+
+            async with playlist >> output as player:
+                with player.spawn_in(nursery):
+
+                    async with Keyboard() as user:
+                        async for key in user:
+
+                            if key in ('j', KEY_RIGHT):
+                                await playlist.skip_to_next_track()
+
+                            elif key == 'q':
+                                await player.stop()
+                                break
+
+
+def validate(args) -> None:
+    """Validate the command line arguments."""
+    if args.output == 'udp':
+        if args.host is None or args.port is None:
+            raise argparse.ArgumentTypeError('-o', 'udp needs host and port')
+
+
+async def playlist_from_args(args) -> Reel:
+    """Return a list of files to play."""
+    playlist = []
+    folders = await _folders_from_args(args)
+
+    # Command line argument
+    if args.track and not await trio.Path(args.track).is_dir():
+        playlist.append(trio.Path(args.track))
+
+    # Expand folders into songs
+    for folder in folders:
+        playlist += await scan_folder(folder)
+
+    # Shuffle the playlist
+    if args.shuffle:
+        random.shuffle(playlist)
+
+    return Reel(
+        [ffmpeg.read(track) for track in playlist],
+        announce_to=print
+    )
+
+
+def output_from_args(args):
+    """Figure out where to send the audio."""
+    outputs = {
+        'speakers': sox.speakers(),
+        'udp': ffmpeg.to_udp(host=args.host, port=args.port),
+        'icecast': Icecast.client('asdf'),
+        'default': ffmpeg.to_file(trio.Path(args.output))
+    }
+
+    try:
+        output = outputs[args.output]
+    except KeyError:
+        output = outputs['default']
+    return output
+
+
+async def _folders_from_args(args):
+    """Return a list of folders to play.
+
+    Used by playlist_from_args.
+
+    """
+    folders = []
+
+    # Get folder from cached search
+    if args.memory:
+        folders.append(await cached_search(args.memory))
+
+    # Dig for more tracks
+    if args.recursive:
+        for folder in await find_tunes(trio.Path(args.track)):
+            folders.append(trio.Path(folder.path))
+
+    # Command line argument
+    if args.track and await trio.Path(args.track).is_dir():
+        folders.append(trio.Path(args.track))
+
+    return folders
 
 
 def load_args(tdplay):
@@ -41,107 +138,6 @@ def load_args(tdplay):
     tdplay.set_defaults(func=play)
 
 
-def validate(args) -> None:
-    """Validate the command line arguments."""
-    if args.output == 'udp':
-        if args.host is None or args.port is None:
-            raise argparse.ArgumentTypeError('-o', 'udp needs host and port')
-
-
-async def _folders_from_args(args):
-    """Return a list of folders to play.
-
-    Used by playlist_from_args.
-
-    """
-    folders = []
-
-    # Get folder from cached search
-    if args.memory:
-        folders.append(await cached_search(args.memory))
-
-    # Dig for more tracks
-    if args.recursive:
-        for folder in await find_tunes(Path(args.track)):
-            folders.append(Path(folder.path))
-
-    # Command line argument
-    if args.track and await Path(args.track).is_dir():
-        folders.append(Path(args.track))
-
-    return folders
-
-
-async def playlist_from_args(args) -> Reel:
-    """Return a list of files to play."""
-    playlist = []
-    folders = await _folders_from_args(args)
-
-    # Command line argument
-    if args.track and await Path(args.track).is_file():
-        playlist.append(Path(args.track))
-
-    # Expand folders into songs
-    for folder in folders:
-        playlist += await scan_folder(folder)
-
-    # Shuffle the playlist
-    if args.shuffle:
-        random.shuffle(playlist)
-
-    return Reel(
-        [ffmpeg.read(track) for track in playlist],
-        announce_to=print
-    )
-
-
-def destination_from_args(args):
-    """Figure out where to send the audio."""
-    destinations = {
-        'speakers': sox.speakers(),
-        'udp': ffmpeg.to_udp(host=args.host, port=args.port),
-        'icecast': icecast.client(),
-        'default': ffmpeg.to_file(Path(args.output))
-    }
-
-    try:
-        destination = destinations[args.output]
-    except KeyError:
-        destination = destinations['default']
-    return destination
-
-
-async def play(args):
-    """Build a playlist and play it."""
-    validate(args)
-
-    playlist = await playlist_from_args(args)
-    destination = destination_from_args(args)
-
-    # Server
-    async with trio.open_nursery() as nursery:
-        async with await icecast.server() as ice:
-            ice.spawn_in(nursery)
-            async with playlist | destination as player:
-
-                # Beware: "Players only love you when they're playing..."
-                with player.spawn_in(nursery):
-
-                    # Client
-                    async with Keyboard() as user:
-                        async for keypress in user:
-                            if keypress == 'q':
-                                nursery.cancel_scope.cancel()
-                                # await player.stop()
-                            elif keypress == 'j':
-                                # lock = trio.Lock()
-                                # pylint: disable=not-async-context-manager
-                                # async with lock:
-                                await playlist.skip_to_next_track(close=True)
-
-            await ice.stop()
-
-
 def enter():
     """Parse arguments and run.
 
@@ -154,9 +150,9 @@ def enter():
     try:
         trio.run(play, args)
     except trio.ClosedResourceError:
-        LOG.debug('Ungrateful dumpling', exc_info=True)
+        LOG.debug('Ungrateful dumpling!', exc_info=True)
     except trio.BrokenResourceError:
-        LOG.debug('Ungrateful dumpling', exc_info=True)
+        LOG.debug('Ungrateful dumpling!', exc_info=True)
 
 
 if __name__ == '__main__':

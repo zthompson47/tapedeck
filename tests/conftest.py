@@ -10,7 +10,6 @@ from tempfile import mkdtemp
 import pytest
 from trio import Path
 
-
 # Remove any existing TAPEDECK_* config vars.
 for key in os.environ.keys():
     if key.startswith('TAPEDECK_'):
