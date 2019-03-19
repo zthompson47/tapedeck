@@ -81,7 +81,8 @@ class Keyboard:
         """Set an eot character to break from an iterator."""
         self._break_on_eot = character
 
-    def read(self):  # pylint: disable=no-self-use
+    @staticmethod
+    def read():
         """Read a unicode character from stdin.
 
         https://en.wikipedia.org/wiki/ANSI_escape_code#Escape_sequences
