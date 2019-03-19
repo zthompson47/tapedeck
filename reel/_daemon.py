@@ -19,9 +19,6 @@ class Daemon(Spool):
 
     async def _prepare(self, config):
         """Prepare the config."""
-        assert self._config_base
-        assert self._config
-        assert config
 
     def __or__(self, next_one):
         """Create a server with the first two spools."""
@@ -37,15 +34,15 @@ class Daemon(Spool):
 
     async def launch(self, nursery, task_status=trio.TASK_STATUS_IGNORED):
         """Run the daemon."""
-        LOG.debug('launch daemno')
-        config = await get_config(
-            await get_xdg_config_dir(),
-            self._config_base,
-            **self._config
-        )
+        if self._config_base:
+            config = await get_config(
+                await get_xdg_config_dir(),
+                self._config_base,
+                **self._config
+            )
 
-        # Give the subclasses a chance to prep the conf
-        await self._prepare(config)
+            # Give the subclasses a chance to prep the conf
+            await self._prepare(config)
 
         self._proc = trio.Process(
             self._command,
