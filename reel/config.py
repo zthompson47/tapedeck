@@ -4,9 +4,12 @@ The config module reads settings from environment variables and
 assigns defaults when appropriate.
 
 """
+import logging
 import os
 
 from trio import Path
+
+LOG = logging.getLogger(__name__)
 
 __all__ = [
     'get_config',
@@ -67,10 +70,10 @@ async def get_xdg_config_dir(app=None, feature=None):
 async def get_config(config_path, template_file, **xconf):
     """Create a config file from a template."""
     config_file = config_path / template_file
-    if not await config_file.exists():
-        default_file = (await get_package_dir()) / 'templates' / template_file
-        formatted = (await default_file.read_text()).format(**xconf)
-        await config_file.write_text(formatted)
+    default_file = (await get_package_dir()) / 'templates' / template_file
+    formatted = (await default_file.read_text()).format(**xconf)
+    await config_file.write_text(formatted)
+
     return config_file
 
 
