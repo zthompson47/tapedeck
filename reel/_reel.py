@@ -39,6 +39,10 @@ class Reel(trio.abc.AsyncResource, Streamer):
         """Board the __or__ train, creating `Transport` as first in chain."""
         return Transport(self, the_other_one)
 
+    def __rshift__(self, the_other_one):
+        """Board the __or__ train, creating `Transport` as first in chain."""
+        return Transport(self, the_other_one)
+
     async def aclose(self):
         """Close the spools."""
         for track in self._tracks:

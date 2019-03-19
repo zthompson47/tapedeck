@@ -1,56 +1,46 @@
-"""The Icecast streaming server."""
-from reel.config import get_xdg_config_dir, get_xdg_data_dir, get_config
-
+"""The icecast streaming server."""
+from .._daemon import Daemon
 from .._spool import Spool
 
 
-class IcecastServer(Spool):
+class Icecast(Daemon):
     """An icecast client and server."""
 
-    def __init__(self, command='icecast'):
-        """Store the configuration for the server command."""
-        self._config = dict(
-            location='Neptune',
-            admin_email='sushi@trident.sea',
-            password='hack-it-up',
-            hostname='127.0.0.1',
-            port='8777',
-            logdir='/Users/zach',
-            # logdir=str(await get_xdg_data_dir()),
-        )
-        super().__init__(self, command)
-
-
-async def server():
-    """Return a command to run an icecast server."""
-    config_icecast = dict(
+    _command = 'icecast'
+    _config_base = 'icecast.xml'
+    _config = dict(
         location='Neptune',
         admin_email='sushi@trident.sea',
         password='hack-it-up',
         hostname='127.0.0.1',
         port='8777',
-        logdir=str(await get_xdg_data_dir()),
     )
-    config_dir = await get_xdg_config_dir()
-    config = await get_config(config_dir, 'icecast.xml', **config_icecast)
-    flags = ['-c', str(config)]
-    return Spool('icecast', xflags=flags)
 
+    async def _prepare(self, config):
+        """Get the configuration file ready."""
+        self._command.extend(['-c', str(config)])
 
-def client(host='127.0.0.1', port='8777', mount='asdf', password='hack-it-up'):
-    """Return a command to send a stream to an icecast server."""
-    cmd = 'ffmpeg'
-    flags = [
-        '-re',
-        '-ac', '2',
-        '-ar', '44.1k',
-        '-f', 's16le',
-        '-i', '-',
-        '-vn',
-        '-codec:a', 'libvorbis',
-        '-q:a', '8.0',
-        '-content_type', 'audio/ogg',
-        '-f', 'ogg',
-        f'icecast://source:{password}@{host}:{port}/{mount}'
-    ]
-    return Spool(cmd, xflags=flags)
+    @classmethod
+    def client(cls, mount):
+        """Return a process that streams to the icecast server."""
+        cmd = 'ffmpeg'
+        uri = 'icecast://source:{}@{}:{}/{}'.format(
+            cls._config['password'],
+            cls._config['hostname'],
+            cls._config['port'],
+            mount
+        )
+        flags = [
+            '-re',
+            '-ac', '2',
+            '-ar', '44.1k',
+            '-f', 's16le',
+            '-i', '-',
+            '-vn',
+            '-codec:a', 'libvorbis',
+            '-q:a', '8.0',
+            '-content_type', 'audio/ogg',
+            '-f', 'ogg',
+            uri
+        ]
+        return Spool(cmd, xflags=flags)

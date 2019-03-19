@@ -12,12 +12,15 @@ LOG = logging.getLogger(__name__)
 
 
 class Spool(trio.abc.AsyncResource):
-    """A command to run as an async subprocess in a ``Transport``."""
+    """A shell command."""
 
     def __init__(self, command, xenv=None, xflags=None):
-        """Start a subprocess with a modified argument list and environment."""
-        self._command = shlex.split(command)
-        self._env = dict(os.environ)
+        """Queue a subprocess."""
+        if isinstance(command, list):
+            self._command = command
+        else:
+            self._command = shlex.split(command)
+        self._env = os.environ.copy()
         self._limit = None
         self._proc = None
         self._status = None
@@ -30,7 +33,7 @@ class Spool(trio.abc.AsyncResource):
         if xenv:
             for key, val in xenv.items():
                 self._env[key] = val
-        super().__init__()
+        # super().__init__()
         LOG.debug(self.__repr__())
 
     def __str__(self):
@@ -38,19 +41,23 @@ class Spool(trio.abc.AsyncResource):
         return ' '.join(self._command)
 
     def __repr__(self):
-        """Represent prettily."""
+        """Represent the command."""
         return f"Spool('{str(self)}')"
 
-    def __or__(self, the_other_one):
-        """Create a `Transport` out of the first two spools in the chain."""
-        return Transport(self, the_other_one)
+    def __or__(self, next_one):
+        """Create a server with the first two spools."""
+        return Transport(self, next_one)
+
+    def __rshift__(self, next_one):
+        """Create a transport with the first two spools."""
+        return Transport(self, next_one)
 
     async def __aenter__(self):
-        """Run through a tranport in an async managed context."""
+        """Start an async context."""
         return Transport(self)
 
     async def aclose(self):
-        """Wait for the process to end and close it."""
+        """Clean up."""
         if self.proc:
             await self.proc.aclose()
 

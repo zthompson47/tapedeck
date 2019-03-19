@@ -1,6 +1,10 @@
 """Pre-configured commands."""
 from . import ffmpeg, icecast, sox
 
+from ._aria2 import Aria2
+from .icecast import Icecast
+from ._redis import Redis
+
 SRC_SILENCE = "ffmpeg -re -f s16le -i /dev/zero -f s16le -"
 
 SRC_FILE = "ffmpeg -ac 2 -i {filename} -f s16le -ar 44.1k -acodec pcm_s16le -"

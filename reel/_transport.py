@@ -49,6 +49,16 @@ class Transport(trio.abc.AsyncResource):
         self._append(the_other_one)
         return self
 
+    def __gt__(self, the_other_one):
+        """Store all the chained spools and reels in this transport."""
+        self._append(the_other_one)
+        return self
+
+    def __rshift__(self, the_other_one):
+        """Store all the chained spools and reels in this transport."""
+        self._append(the_other_one)
+        return self
+
     async def aclose(self):
         """Clean up resources."""
         # Not needed for tests:
