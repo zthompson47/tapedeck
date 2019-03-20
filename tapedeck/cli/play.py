@@ -38,7 +38,6 @@ async def play(args):
                                 await playlist.skip_to_next_track()
 
                             elif key == 'q':
-                                await player.stop()
                                 break
 
 
