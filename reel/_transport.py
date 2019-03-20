@@ -44,26 +44,22 @@ class Transport(trio.abc.AsyncResource):
         result += ' ])'
         return result
 
-    def __or__(self, the_other_one):
+    def __or__(self, next_one):
         """Store all the chained spools and reels in this transport."""
-        self._append(the_other_one)
+        self._append(next_one)
         return self
 
-    def __gt__(self, the_other_one):
+    def __rshift__(self, next_one):
         """Store all the chained spools and reels in this transport."""
-        self._append(the_other_one)
-        return self
-
-    def __rshift__(self, the_other_one):
-        """Store all the chained spools and reels in this transport."""
-        self._append(the_other_one)
+        self._append(next_one)
         return self
 
     async def aclose(self):
         """Clean up resources."""
-        # Not needed for tests:
-        # for spool in self._chain:
-        #     await spool.aclose()
+        # print('!!!!!!!!!!!!!!!!!!!!!!!!!1')
+        for streamer in self._chain:
+            # print(f'stopping {streamer}')
+            await streamer.stop()
 
     def _append(self, spool):
         """Add a spool to this transport chain."""
@@ -102,14 +98,10 @@ class Transport(trio.abc.AsyncResource):
                     self._output = b''
                 self._output += chunk
 
-            # All done
-            LOG.debug('-----------------seg is done')
             self._is_done.set()
-            LOG.debug('-----------------seg cancel')
 
         if self._cancel_scope:
             self._cancel_scope.cancel()
-        # LOG.debug('-----------------seg bye')
 
     def spawn_in(self, nursery):
         """Start this transport and return a cancel_scope."""

@@ -38,8 +38,11 @@ class Server(trio.abc.AsyncResource):
 
     async def aclose(self):
         """Clean up."""
+        # print('claenine up')
         for daemon in self._daemons:
+            # print(f'daemon shuting down: {daemon}')
             await daemon.aclose()
+            # print(f'daemon shut DOWN: {daemon}')
 
     async def run(self, nursery, task_status=trio.TASK_STATUS_IGNORED):
         """Start up."""

@@ -237,8 +237,8 @@ async def test_reel_daemon_playing(neil_reel, audio_dest):
     """Detect when a reel is playing."""
     got_here = False
     got_there = False
-    async with neil_reel | audio_dest() as player:
-        async with trio.open_nursery() as nursery:
+    async with trio.open_nursery() as nursery:
+        async with neil_reel | audio_dest() as player:
             player.start_daemon(nursery)
             got_here = True
             while True:

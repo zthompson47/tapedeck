@@ -101,6 +101,9 @@ class Reel(trio.abc.AsyncResource, Streamer):
 
     async def stop(self):
         """Stop it."""
+        for track in self._tracks:
+            # print(f'closing {track}')
+            await track.aclose()
 
     def _start_next_track(self):
         """Set the current/next track so send has something to send."""

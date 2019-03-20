@@ -58,6 +58,8 @@ class Spool(trio.abc.AsyncResource):
 
     async def aclose(self):
         """Clean up."""
+        # if self.proc:
+        #     self.proc.terminate()
         if self.proc:
             await self.proc.aclose()
 
@@ -193,14 +195,7 @@ class Spool(trio.abc.AsyncResource):
 
     async def stop(self):
         """Stop it."""
-        if self.proc:
-            try:
-                self.proc.kill()
-                await self.proc.wait()
-            except AttributeError:
-                LOG.debug('Could not kill proc', exc_info=True)
-        else:
-            LOG.debug('-- || SPOOL stop NO-PROC')
+        await self.aclose()
 
     async def receive_from_channel(self, channel):
         """Send the output of the receive `channel` to this spool's stdin."""

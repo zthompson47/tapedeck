@@ -4,7 +4,7 @@ import logging
 import trio
 from trio import Path
 
-from reel import Spool
+from reel import Daemon, Spool
 from reel.config import get_config, get_xdg_config_dir
 
 LOG = logging.getLogger(__name__)
@@ -50,9 +50,10 @@ async def test_server(config_icecast):
     flags = ['-c', str(config)]
 
     # Start an icecast daemon.
-    async with Spool('icecast', xflags=flags) as icecast:
-        async with trio.open_nursery() as nursery:
-            icecast.start_daemon(nursery)
+    async with trio.open_nursery() as nursery:
+        async with Daemon('icecast', xflags=flags) as icecast:
+            nursery.start_soon(icecast.run, nursery)
+            # icecast.start_daemon(nursery)
 
             await trio.sleep(0.5)  # give icecast time to start
 
@@ -65,7 +66,7 @@ async def test_server(config_icecast):
                         found_it = True
                 # ... WEIRD!! 'assert False' here hangs!!!!!
                 assert found_it
-            await icecast.stop()
+            # await icecast.stop()
 
     # Check the process list for no zombies.
     async with Spool('ps ax') as proclist:

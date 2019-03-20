@@ -24,9 +24,16 @@ class Daemon(Spool):
         """Create a server with the first two spools."""
         return Server([self, next_one])
 
-    def __init__(self):
+    def __init__(self, command=None, xenv=None, xflags=None):
         """Init the :class:`~reel.Spool`."""
-        super().__init__(self._command)
+        if command:
+            self._command = command
+        super().__init__(self._command, xenv=xenv, xflags=xflags)
+
+    async def aclose(self):
+        """Terminate the process."""
+        if self._proc:
+            self._proc.terminate()
 
     async def __aenter__(self):
         """Open a server context for this daemon."""
