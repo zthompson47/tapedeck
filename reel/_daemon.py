@@ -24,6 +24,10 @@ class Daemon(Spool):
         """Create a server with the first two spools."""
         return Server([self, next_one])
 
+    def __gt__(self, nursery):
+        """Set the nursery to use in the context manager."""
+        return Server(self) > nursery
+
     def __init__(self, command=None, xenv=None, xflags=None):
         """Init the :class:`~reel.Spool`."""
         if command:
@@ -48,7 +52,7 @@ class Daemon(Spool):
                 **self._config
             )
 
-            # Give the subclasses a chance to prep the conf
+            # Give the subclasses a chance to fill in configuration vars
             await self._prepare(config)
 
         self._proc = trio.Process(

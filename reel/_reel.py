@@ -35,13 +35,13 @@ class Reel(trio.abc.AsyncResource, Streamer):
         result += ' ])'
         return result
 
-    def __or__(self, the_other_one):
-        """Board the __or__ train, creating `Transport` as first in chain."""
-        return Transport(self, the_other_one)
+    def __or__(self, next_one):
+        """Combine with the next one as a transport."""
+        return Transport(self, next_one)
 
-    def __rshift__(self, the_other_one):
-        """Board the __or__ train, creating `Transport` as first in chain."""
-        return Transport(self, the_other_one)
+    def __rshift__(self, next_one):
+        """Combine with the next one as a transport."""
+        return Transport(self, next_one)
 
     async def aclose(self):
         """Close the spools."""
@@ -98,12 +98,6 @@ class Reel(trio.abc.AsyncResource, Streamer):
         self._nursery = nursery
         self._stdin = stdin
         self._start_next_track()
-
-    async def stop(self):
-        """Stop it."""
-        for track in self._tracks:
-            # print(f'closing {track}')
-            await track.aclose()
 
     def _start_next_track(self):
         """Set the current/next track so send has something to send."""
