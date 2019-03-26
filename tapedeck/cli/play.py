@@ -1,10 +1,10 @@
 """The ``tapedeck`` cli 'play' command."""
 import argparse
-from contextvars import ContextVar
 import logging
 import random
 
 import trio
+# from trio_websocket import serve_websocket, ConnectionClosed
 
 from reel import Reel
 from reel.cmd import ffmpeg, sox, Icecast, Redis, Aria2
@@ -13,32 +13,30 @@ from reel.keyboard import Keyboard, KEY_RIGHT
 from tapedeck.search import cached_search, find_tunes, scan_folder
 
 LOG = logging.getLogger(__name__)
-NURSERY = ContextVar('nursery')
 
 
-async def play(args):
+async def play(args, nursery):
     """Build a playlist and play it."""
     validate(args)
 
     playlist = await playlist_from_args(args)
     output = output_from_args(args)
 
-    async with trio.open_nursery() as nursery:
+    async with Aria2() | Icecast() | Redis() > nursery as server:
+        async with playlist >> output as player:
+            with player.spawn_in(nursery):
+                async with Keyboard() as user:
+                    async for key in user:
 
-        async with Redis() | Icecast() | Aria2() as server:
-            await nursery.start(server.run, nursery)
+                        if key in ['l', KEY_RIGHT]:
+                            await playlist.skip_to_next_track()
 
-            async with playlist >> output as player:
-                with player.spawn_in(nursery):
+                        elif key == '?':
+                            print(server, player)
 
-                    async with Keyboard() as user:
-                        async for key in user:
-
-                            if key in ('j', KEY_RIGHT):
-                                await playlist.skip_to_next_track()
-
-                            elif key == 'q':
-                                break
+                        elif key == 'q':
+                            print('Quitting...')
+                            break
 
 
 def validate(args) -> None:
@@ -137,6 +135,12 @@ def load_args(tdplay):
     tdplay.set_defaults(func=play)
 
 
+async def main(args):
+    """Launch main program tasks."""
+    async with trio.open_nursery() as nursery:
+        await play(args, nursery)
+
+
 def enter():
     """Parse arguments and run.
 
@@ -146,12 +150,7 @@ def enter():
     tdplay = argparse.ArgumentParser()
     load_args(tdplay)
     args = tdplay.parse_args()
-    try:
-        trio.run(play, args)
-    except trio.ClosedResourceError:
-        LOG.debug('Ungrateful dumpling!', exc_info=True)
-    except trio.BrokenResourceError:
-        LOG.debug('Ungrateful dumpling!', exc_info=True)
+    trio.run(main, args)
 
 
 if __name__ == '__main__':

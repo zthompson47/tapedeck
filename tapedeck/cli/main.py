@@ -1,16 +1,4 @@
-"""Command line interface for the ¤_tapedeck_¤ music player.
-
-usage: tapedeck [-h] [-c] [-v] {play,search} ...
-
-positional arguments:
-  {play,search}
-
-optional arguments:
-  -h, --help     show this help message and exit
-  -c, --config   print the configuration and exit
-  -v, --version  print the version and exit
-
-"""
+"""Command line interface for the ¤_tapedeck_¤ music player."""
 import argparse
 import logging
 import os
@@ -51,9 +39,15 @@ def tapedeck_cli() -> int:
                 print(f'{key}={val}')
     elif hasattr(args, 'func') and args.func:
         try:
-            trio.run(args.func, args)
+            trio.run(main, args.func, args)
         except trio.ClosedResourceError:
             LOG.debug('Ungrateful dumpling', exc_info=True)
+
+
+async def main(func, args):
+    """Launch main program tasks."""
+    async with trio.open_nursery() as nursery:
+        await func(args, nursery)
 
 
 def enter():

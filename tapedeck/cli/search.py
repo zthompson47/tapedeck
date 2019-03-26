@@ -34,8 +34,10 @@ def load_args(tdsearch):
     tdsearch.set_defaults(func=search)
 
 
-async def search(args):
+async def search(args, nursery=None):
     """Search for music."""
+    if nursery:  # pylint
+        pass
     if args.memory:
         # Read the cached search file.
         cache_file = await get_xdg_cache_dir('tapedeck') / 'search.txt'
