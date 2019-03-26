@@ -4,9 +4,14 @@ import logging
 import trio
 from trio import Path
 
-from reel import Daemon, Spool
+from reel import Daemon, Server, Spool
 from reel.config import get_config, get_xdg_config_dir
 
+logging.basicConfig(
+    filename='/Users/zach/asdf.log',
+    level='DEBUG',
+    format='%(levelname)s:%(lineno)d:%(module)s:%(funcName)s:%(message)s'
+)
 LOG = logging.getLogger(__name__)
 
 
@@ -43,30 +48,37 @@ async def test_shell_commands():
 async def test_server(config_icecast):
     """Run a server."""
     config_dir = await get_xdg_config_dir()
-    LOG.debug(']]]]]]]]]]]]]]]]]]]]] config dir: %s', config_dir)
-    # ... get_config needs better naming, e.g. get_config_from_template
     config = await get_config(config_dir, 'icecast.xml', **config_icecast)
-    LOG.debug(']]]]]]]]]]]]]]]]]]]]] config: %s', str(config))
     flags = ['-c', str(config)]
 
     # Start an icecast daemon.
+    LOG.debug('------>><<>><< before open_nursery')
     async with trio.open_nursery() as nursery:
-        async with Daemon('icecast', xflags=flags) as icecast:
-            nursery.start_soon(icecast.run, nursery)
+        LOG.debug('------>><<>><< before async with daemon')
+        async with Daemon('icecast', xflags=flags) > nursery as icecast:
+            LOG.debug('------>><<>><< after async with daemon')
+            assert isinstance(icecast, Server)
+            # nursery.start_soon(icecast.run, nursery)
             # icecast.start_daemon(nursery)
 
             await trio.sleep(0.5)  # give icecast time to start
 
             # Make sure it started.
             async with Spool('ps ax') | Spool('grep icecast') as procs:
+                LOG.debug('------>><<>><< after async with spool')
                 found_it = False
                 lines = await procs.readlines()
+                LOG.debug('------>><<>><< BEFORE lines')
                 for line in lines:
+                    LOG.debug('------>><<>><< IN lines')
                     if str(config) in line:
                         found_it = True
                 # ... WEIRD!! 'assert False' here hangs!!!!!
                 assert found_it
             # await icecast.stop()
+            LOG.debug('------>><<>><< OUT of spool')
+        LOG.debug('------>><<>><< OUT of daemon')
+    LOG.debug('------>><<>><< OUT of nursery')
 
     # Check the process list for no zombies.
     async with Spool('ps ax') as proclist:
