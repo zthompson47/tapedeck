@@ -58,8 +58,6 @@ class Spool(trio.abc.AsyncResource):
 
     async def aclose(self):
         """Clean up."""
-        # if self.proc:
-        #     self.proc.terminate()
         if self.proc:
             await self.proc.aclose()
 
@@ -189,6 +187,7 @@ class Spool(trio.abc.AsyncResource):
             stderr=subprocess.PIPE,
             env=self._env
         )
+        LOG.debug('-- >> SPOOL start ljjjj to run proc %s', self._proc)
         if stdin:
             self.handle_stdin(nursery, stdin)
         self.handle_stderr(nursery)
@@ -198,10 +197,15 @@ class Spool(trio.abc.AsyncResource):
         await self.aclose()
 
     async def receive_from_channel(self, channel):
-        """Send the output of the receive `channel` to this spool's stdin."""
-        async for chunk in channel:
-            await self._proc.stdin.send_all(chunk)
-        await self._proc.stdin.aclose()  # ??? unless last in chain
+        """Send output of channel to stdin."""
+        try:
+            async with self._proc.stdin:
+                async for chunk in channel:
+                    await self._proc.stdin.send_all(chunk)
+        except trio.ClosedResourceError as error:
+            LOG.debug(error)
+        except AttributeError:
+            LOG.debug('<><><><><><><><><><><: %s %s', self, self._proc)
 
     async def send_to_channel(self, channel):
         """Stream stdout to `channel` and close both sides."""
@@ -215,7 +219,10 @@ class Spool(trio.abc.AsyncResource):
 
     async def receive_some(self, max_bytes):
         """Return a chunk of data from the output of this stream."""
-        return await self._proc.stdout.receive_some(max_bytes)
+        try:
+            return await self._proc.stdout.receive_some(max_bytes)
+        except trio.ClosedResourceError as error:
+            LOG.debug(error)
 
     async def send_no_close(self, channel):
         """Stream stdout to `channel` without closing either side."""
