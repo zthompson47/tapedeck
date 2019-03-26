@@ -30,6 +30,9 @@ class Icecast(Daemon):
             cls._config['port'],
             mount
         )
+        # Maybe:
+        # -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 \
+        # -reconnect_delay_max 2000
         flags = [
             '-re',
             '-ac', '2',
