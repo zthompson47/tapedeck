@@ -1,7 +1,11 @@
+docs/build/
+
 __pycache__/
-htmlcov/
-.coverage
-.coverage.*
+
 build/
 dist/
 tapedeck.egg-info/
+
+htmlcov/
+.coverage
+.coverage.*
