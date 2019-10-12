@@ -9,3 +9,4 @@ tapedeck.egg-info/
 htmlcov/
 .coverage
 .coverage.*
+.tox
