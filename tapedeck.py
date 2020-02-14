@@ -8,7 +8,7 @@ import trio
 from trio_websocket import open_websocket_url as _ws
 from trio import open_tcp_stream as _tcp
 from trio_monitor.monitor import Monitor
-from trio_repl import Wrap as TrioWrapper
+from trio_repl import TrioRepl
 
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.completion import NestedCompleter
@@ -32,7 +32,7 @@ PS1_MPD = HTML(
     "<orange>_</orange>"
     "<yellow>✇</yellow>"
     "<blue>⦘</blue>"
-    "<orange>~mpd></orange> "
+    "<orange>mpd></orange> "
 )
 PS1_ARIA2 = HTML(
     "<blue>⦗</blue>"
@@ -40,7 +40,7 @@ PS1_ARIA2 = HTML(
     "<orange>_</orange>"
     "<yellow>✇</yellow>"
     "<blue>⦘</blue>"
-    "<orange>~aria2></orange> "
+    "<orange>aria2></orange> "
 )
 
 class CommandNotFound(Exception):
@@ -81,9 +81,6 @@ class Dispatch:
         }
 
     def completer(self):
-        #if self.prefix == "":
-        #    return {_: None for _ in self.CMD.keys()}
-        #else:
         result = {}
         for key in self.CMD.keys():
             if key.startswith(self.prefix):
@@ -100,6 +97,8 @@ class Dispatch:
 
     async def route(self, request):
         """Parse request and execute command"""
+        if not request:
+            raise CommandNotFound
         args = request.split()
         command = None
         if args:
@@ -113,7 +112,7 @@ class Dispatch:
         elif command == "mpd":
             self.prefix = "mpd_"
         elif command == "trio":
-            await TrioWrapper().main()
+            await TrioRepl().run()
 
         elif self.prefix + command == "mpd_add":
             await self.mpd.add(args[1])

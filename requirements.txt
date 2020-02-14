@@ -1,1 +1,4 @@
 trio
+feedparser
+redis
+trio-websocket
