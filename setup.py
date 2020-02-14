@@ -8,7 +8,7 @@ setup(
     author='Zach Thompson',
     author_email='zach@allotropic.com',
     url='http://github.com/zthompson47/tapedeck',
-    description='A music player that lets you do other things',
+    description='A metashell for mpd + aria2 + rss',
     long_description_content_type='text/x-rst',
     long_description=open('README.rst', 'r').read(),
     classifiers=[
@@ -16,15 +16,15 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    entry_points={
-        'console_scripts': [
-            'tapedeck=tapedeck.cli.main:tapedeck_cli',
-            'tdplay=tapedeck.cli.play:enter',
-            'tdsearch=tapedeck.cli.search:enter',
-        ],
-    },
+    #entry_points={
+    #    'console_scripts': [
+    #        'tapedeck=tapedeck.cli.main:tapedeck_cli',
+    #        'tdplay=tapedeck.cli.play:enter',
+    #        'tdsearch=tapedeck.cli.search:enter',
+    #    ],
+    #},
     install_requires=[
-        'reel>=0.0.5',
+        #'reel>=0.0.5',
         'trio>=0.10.0',
     ],
     zip_safe=False,
