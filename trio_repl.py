@@ -21,6 +21,7 @@ PS1 = HTML("<yellow>>>></yellow> ")
 PS2 = HTML("<yellow>...</yellow> ")
 STYLE = style_from_pygments_cls(get_style_by_name("monokai"))
 TAB = " " * 4
+other = {}
 
 _bindings = KeyBindings()
 @_bindings.add("c-i")
@@ -28,14 +29,14 @@ def _bind(event):
     """Tab key."""
     event.current_buffer.insert_text(TAB)
 
-_wrap_eval = """async def __wrap(nursery):
+_wrap_eval = """async def __wrap(nursery, other):
     result = {}
     _locals = locals()
     del _locals["nursery"]
     return (_locals, result)
 """
 
-_wrap_exec = """async def __wrap(nursery):
+_wrap_exec = """async def __wrap(nursery, other):
     {}
     _locals = locals()
     del _locals["nursery"]
@@ -43,7 +44,8 @@ _wrap_exec = """async def __wrap(nursery):
 """
 
 class TrioRepl(object):
-    async def run(self):
+    async def run(self, other):
+        print("other:", other)
         session = PromptSession(
             style=STYLE,
             lexer=PygmentsLexer(PythonLexer),
@@ -92,7 +94,7 @@ class TrioRepl(object):
 
                     __wrap = locals()['__wrap']
                     try:
-                        inner_locals, result = await __wrap(nursery)
+                        inner_locals, result = await __wrap(nursery, other)
                         if result is not None:
                             print(result)
                     except:
