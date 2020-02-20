@@ -1,5 +1,8 @@
 import json
 import functools
+import threading
+from itertools import count
+from pprint import pformat
 
 import feedparser
 from redis import Redis
@@ -8,40 +11,39 @@ import trio
 from trio_websocket import open_websocket_url as _ws
 from trio import open_tcp_stream as _tcp
 from trio_monitor.monitor import Monitor
+import trio_repl
 from trio_repl import TrioRepl
+from trignalc import main as signal
 
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.completion import NestedCompleter
-from prompt_toolkit.shortcuts import CompleteStyle
+from prompt_toolkit.shortcuts import CompleteStyle, ProgressBar
 from prompt_toolkit import PromptSession, HTML
 
 RSS_ETREE = "http://bt.etree.org/rss/bt_etree_org.rdf"
 ARIA2 = "ws://localhost:6800/jsonrpc"
 MPD = ("localhost", 6600)
+PULSE = "/var/run/usr/1000/pulse/cli"
+
 PS1 = HTML(
     "<blue>⦗</blue>"
     "<yellow>✇</yellow>"
     "<orange>_</orange>"
     "<yellow>✇</yellow>"
     "<blue>⦘</blue>"
-    "<orange>~></orange> "
+    "<orange>{prefix}></orange> "
 )
-PS1_MPD = HTML(
-    "<blue>⦗</blue>"
-    "<yellow>✇</yellow>"
-    "<orange>_</orange>"
-    "<yellow>✇</yellow>"
-    "<blue>⦘</blue>"
-    "<orange>mpd></orange> "
-)
-PS1_ARIA2 = HTML(
-    "<blue>⦗</blue>"
-    "<yellow>✇</yellow>"
-    "<orange>_</orange>"
-    "<yellow>✇</yellow>"
-    "<blue>⦘</blue>"
-    "<orange>aria2></orange> "
-)
+
+def pprint(content):
+    print(pformat(content, indent=0, compact=True, sort_dicts=False))
+
+def pprint_etree(rss):
+    result = ""
+    for entry in rss["entries"]:
+        result += entry["title"] + "\n"
+        result += entry["links"][0]["href"] + "\n"
+        result += "--\n"
+    print(result)
 
 class CommandNotFound(Exception):
     pass
@@ -73,11 +75,13 @@ class Dispatch:
             "mpd_status": None,
             "mpd_toggleoutput": None,
             "mpd_update": None,
-            "exit": None,
-            "all": None,
-            "aria2": None,
-            "mpd": None,
-            "trio": None,
+            "_exit": None,
+            "_all": None,
+            "_aria2": None,
+            "_mpd": None,
+            "_trio": None,
+            "_trignalc": None,
+            "_asdf": None,
         }
 
     def completer(self):
@@ -89,11 +93,11 @@ class Dispatch:
 
     def ps1(self):
         if self.prefix == "mpd_":
-            return PS1_MPD
+            return PS1.format(prefix="mpd")
         elif self.prefix  == "aria2_":
-            return PS1_ARIA2
+            return PS1.format(prefix="aria2")
         else:
-            return PS1
+            return PS1.format(prefix="~")
 
     async def route(self, request):
         """Parse request and execute command"""
@@ -103,17 +107,24 @@ class Dispatch:
         command = None
         if args:
             command = args[0]
-        if command == "exit":
-            self.nursery.cancel_scope.cancel()
-        elif command == "all":
-            self.prefix = ""
-        elif command == "aria2":
-            self.prefix = "aria2_"
-        elif command == "mpd":
-            self.prefix = "mpd_"
-        elif command == "trio":
-            await TrioRepl().run()
 
+        # Builtins
+        if command == "_exit":
+            self.nursery.cancel_scope.cancel()
+        elif command == "_all":
+            self.prefix = ""
+        elif command == "_aria2":
+            self.prefix = "aria2_"
+        elif command == "_mpd":
+            self.prefix = "mpd_"
+        elif command == "_trio":
+            await TrioRepl().run(locals())
+        elif command == "_trignalc":
+            await signal()
+        elif command == "_asdf":
+            print("fdsa_")
+
+        # MPD
         elif self.prefix + command == "mpd_add":
             await self.mpd.add(args[1])
         elif self.prefix + command == "mpd_clear":
@@ -141,15 +152,34 @@ class Dispatch:
         elif self.prefix + command == "mpd_update":
             await self.mpd.update()
 
+        # Aria2
         elif self.prefix + command == "aria2_addUri":
-            await self.aria2.add_uri(args[1])
+            pprint(await self.aria2.add_uri(args[1]))
         elif self.prefix + command == "aria2_tellActive":
-            await self.aria2.tell_active()
+            response = await self.aria2.tell_active()
+            result = ""
+            for torrent in response["result"]:
+                if result:
+                    result += "\n"
+                result += torrent["gid"] + " "
+                result += str(
+                    int(torrent["completedLength"]) /
+                    int(torrent["totalLength"])
+                ) + " "
+                result += torrent["bittorrent"]["info"]["name"]
+            print(result)
         elif self.prefix + command == "aria2_tellStatus":
-            await self.aria2.tell_status(args[1])
+            pprint(await self.aria2.tell_status(args[1]))
 
+        # RSS (Etree)
         elif command == "etree_rss":
-            await self.etree.rss()
+            rss = await self.etree.rss()
+            result = ""
+            for entry in rss["entries"]:
+                result += entry["title"] + "\n"
+                result += entry["links"][0]["href"] + "\n"
+                result += "--\n"
+            print(result)
 
         else:
             raise CommandNotFound()
@@ -158,35 +188,57 @@ class Aria2Proxy:
     def __init__(self, nursery, socket):
         self.nursery = nursery
         self.socket = socket
+        self.id_counter = count()
+        self.pending = {}
         self.nursery.start_soon(self.task_listener)
 
     async def task_listener(self):
         while True:
             response = await self.socket.get_message()
-            print("aria2", response)
+            rsp = json.loads(response)
+            if rsp.get("id") is not None:
+                if self.pending.get(rsp["id"]) is not None:
+                    await self.pending[int(rsp["id"])].send(rsp)
+                    del(self.pending[int(rsp["id"])])
+                else:
+                    print("aria2", response)
+            else:
+                print("aria2", response)
 
     async def add_uri(self, uri):
+        req_id = next(self.id_counter)
         await self.socket.send_message(json.dumps({
             "jsonrpc": "2.0",
-            "id": "47",
+            "id": req_id,
             "method": "aria2.addUri",
             "params": [[uri]],
         }))
+        ch_snd, ch_rcv = trio.open_memory_channel(0)
+        self.pending[req_id] = ch_snd
+        return await ch_rcv.receive()
 
     async def tell_status(self, torrent_id):
+        req_id = next(self.id_counter)
         await self.socket.send_message(json.dumps({
             "jsonrpc": "2.0",
-            "id": "42",
+            "id": req_id,
             "method": "aria2.tellStatus",
             "params": [torrent_id],
         }))
+        ch_snd, ch_rcv = trio.open_memory_channel(0)
+        self.pending[req_id] = ch_snd
+        return await ch_rcv.receive()
 
     async def tell_active(self):
+        req_id = next(self.id_counter)
         await self.socket.send_message(json.dumps({
             "jsonrpc": "2.0",
-            "id": "48",
+            "id": req_id,
             "method": "aria2.tellActive",
         }))
+        ch_snd, ch_rcv = trio.open_memory_channel(0)
+        self.pending[req_id] = ch_snd
+        return await ch_rcv.receive()
 
 class MPDProxy:
     def __init__(self, nursery, stream):
@@ -202,9 +254,13 @@ class MPDProxy:
 
     async def task_listener(self):
         while True:
-            response = await self.stream.receive_some(65536)
-            if response != b"OK\n":
-                print("mpd", response.decode("utf-8").rstrip())
+            try:
+                response = await self.stream.receive_some(65536)
+                if response != b"OK\n":
+                    print("mpd", response.decode("utf-8").rstrip())
+            except trio.ClosedResourceError:
+                print("closed resource error")
+                break
 
     async def add(self, filename):
         command = b"add " + filename.encode("utf-8") + b"\n"
@@ -253,7 +309,7 @@ class MPDProxy:
 class EtreeProxy:
     def __init__(self, nursery, redis):
         self.nursery = nursery
-        self.ch_to_redis = redis.ch_to_redis
+        self.to_redis = redis.ch_to_redis
         # TODO test for fetch_rss_task started!!
 
     async def fetch_rss_task(self):
@@ -265,13 +321,14 @@ class EtreeProxy:
                 RSS_ETREE,
                 cancellable=True
             )
-            await self.ch_to_redis.send((ch_to_me, "set", "etree.rss", rss))
+            await self.to_redis.send(
+                (ch_to_me, "set", "etree.rss", rss)
+            )
 
     async def rss(self):
         ch_to_me, ch_from_redis = trio.open_memory_channel(0)
-        await self.ch_to_redis.send((ch_to_me, "get", "etree.rss"))
-        result = await ch_from_redis.receive()
-        print(result)
+        await self.to_redis.send((ch_to_me, "get", "etree.rss"))
+        return await ch_from_redis.receive()
 
 class RedisProxy:
     def __init__(self, nursery):
