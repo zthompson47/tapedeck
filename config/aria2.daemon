@@ -1,0 +1,8 @@
+continue
+daemon=true
+dir=${HOME}/incoming
+file-allocation=falloc
+log-level=warn
+enable-http-pipelining=true
+enable-rpc=true
+rpc-listen-all=true
