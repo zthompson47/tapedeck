@@ -31,7 +31,6 @@ async def main():
         trio.hazmat.add_instrument(mon)
         nursery.start_soon(trio.serve_tcp, mon.listen_on_stream, 8998)
 
-        # Begin prompt
         ptk = PromptSession(
             vi_mode=True,
             complete_style=CompleteStyle.READLINE_LIKE,
@@ -40,11 +39,6 @@ async def main():
         with patch_stdout(nursery=nursery):
             while 47 != 42:
                 try:
-                    # Recalculate auto-complete
-                    #tab = NestedCompleter.from_nested_dict(
-                    #tab = TapedeckCompleter.from_nested_dict(
-                    #    td_cmd.completer()
-                    #)
                     # Prompt
                     request = await ptk.prompt_async(td_cmd.PS1())
                     await td_cmd.route(request)

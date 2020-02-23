@@ -32,9 +32,9 @@ class Aria2Proxy:
                     await self.pending[int(rsp["id"])].send(rsp)
                     del(self.pending[int(rsp["id"])])
                 else:
-                    print("aria2", response)
+                    print("!?!aria2", response)
             else:
-                print("aria2", response)
+                print("?!?aria2", response)
 
     async def run(self, command, params=None):
         req_id = next(self.id_counter)

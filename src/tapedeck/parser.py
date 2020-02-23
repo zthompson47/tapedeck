@@ -3,4 +3,5 @@ def parse(code):
     command = None
     if args:
         command = args[0]
-    return ((command, *args[1:]),)
+    result = ((command, *args[1:]),)
+    return result

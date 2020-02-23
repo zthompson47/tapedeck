@@ -1,8 +1,14 @@
 from prompt_toolkit import PromptSession, HTML
 
-RSS_ETREE = "http://bt.etree.org/rss/bt_etree_org.rdf"
+REDIS = dict(host="localhost", port=6379, db=0)
+
+ETREE_RSS_URI = "http://bt.etree.org/rss/bt_etree_org.rdf"
+ETREE_RSS_REDIS_KEY = "td.etree.rss"
+
 ARIA2 = "ws://localhost:6800/jsonrpc"
+
 MPD = ("localhost", 6600)
+
 PULSE = "/var/run/usr/1000/pulse/cli"
 
 PS1 = HTML(
@@ -11,5 +17,5 @@ PS1 = HTML(
     "<orange>_</orange>"
     "<yellow>✇</yellow>"
     "<blue>⦘</blue>"
-    "<orange>{prefix}></orange> "
+    "<orange>{namespace}></orange> "
 )

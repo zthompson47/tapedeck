@@ -50,8 +50,8 @@ class MPDProxy:
         await self.stream.send_all(command + b"\n")
 
     @cmd("add")
-    async def add(self, filename):
-        await self.runcmd("add", filename)
+    async def add(self, uri):
+        await self.runcmd("add", uri)
 
     @cmd("clear")
     async def clear(self):
@@ -81,7 +81,7 @@ class MPDProxy:
     async def outputs(self):
         await self.runcmd("outputs")
 
-    @cmd("play")
+    @cmd("play") # [SONGPOS]
     async def play(self):
         await self.runcmd("play")
 
@@ -100,3 +100,29 @@ class MPDProxy:
     @cmd("update")
     async def update(self):
         await self.runcmd("update")
+
+    # clearerror
+    # currentsong
+    # idle [SUBSYSTEMS]
+    # stats
+    # crossfade {SECONDS}
+    # mixrampdb {deciBels}
+    # mixrampdelay {SECONDS}
+    # random {STATE}
+    # repeat {STATE}
+    # setvol {VOL}
+    # single {STATE}
+    # replay_gain_mode {MODE}
+    # replay_gain_status
+    # next
+    # pause {PAUSE}
+    # playid [SONGID]h
+    # previous
+    # seek {SONGPOS} {TIME}
+    # seekid {SONGID} {TIME}
+    # seekcur {TIME}
+    # stop
+    # addid {URI} [POSITION]
+    # delete [{POS} | {START:END}]
+    # deleteid {SONGID}
+    # ...

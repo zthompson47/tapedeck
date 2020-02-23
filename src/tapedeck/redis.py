@@ -1,29 +1,40 @@
 import json
 import functools
+
 import trio
 from redis import Redis
 
+from .config import REDIS
+
+
 class RedisProxy:
     def __init__(self, nursery):
+        self.request, self.trio_request = trio.open_memory_channel(0)
         self.nursery = nursery
-        self.ch_to_redis, self.ch_from_trio = trio.open_memory_channel(0)
-        self.ch_to_trio, self.ch_from_redis = trio.open_memory_channel(0)
-        self.nursery.start_soon(self.task_listener)
         self.nursery.start_soon(functools.partial(
-            trio.to_thread.run_sync, self.task_proxy, cancellable=True
+            trio.to_thread.run_sync, self.redis_thread, cancellable=True
         ))
 
-    async def task_listener(self):
+    def redis_thread(self):
+        """Run redis requests synchronously in a thread."""
+        redis = Redis(**REDIS)
         while True:
-            response = await self.ch_from_redis.receive()
-            print(response)
-
-    def task_proxy(self):
-        redis = Redis(host="localhost", port=6379, db=0)
-        while True:
-            req = trio.from_thread.run(self.ch_from_trio.receive)
+            req = trio.from_thread.run(self.trio_request.receive)
             if req[1] == "set":
                 rsp = redis.set(req[2], json.dumps(req[3]))
             elif req[1] == "get":
-                rsp = json.loads(redis.get(req[2]))
-            trio.from_thread.run(req[0].send, rsp)
+                rsp = redis.get(req[2])
+                result = None
+                if rsp:
+                    result = json.loads(rsp)
+            trio.from_thread.run(req[0].send, result)
+
+    async def get(self, key):
+        ch_snd, ch_rcv = trio.open_memory_channel(0)
+        await self.request.send((ch_snd, "get", key,))
+        return await ch_rcv.receive()
+
+    async def set(self, key, value):
+        ch_snd, ch_rcv = trio.open_memory_channel(0)
+        await self.request.send((ch_snd, "set", key, value))
+        return await ch_rcv.receive()
