@@ -5,14 +5,12 @@ from trignalc import main as signal
 
 from prompt_toolkit.patch_stdout import patch_stdout
 
-from .redis import RedisProxy
-
-from .aria2.proxy import CMD as aria2_cmd, Aria2Proxy
+from .aria2.proxy import CMD as aria2_cmd
 from .aria2.format import FMT as aria2_fmt
 
-from .mpd.proxy import CMD as mpd_cmd, MPDProxy
+from .mpd.proxy import CMD as mpd_cmd
 
-from .etree.proxy import CMD as etree_cmd, EtreeProxy
+from .etree.proxy import CMD as etree_cmd
 from .etree.format import FMT as etree_fmt
 
 from .config import PS1
@@ -22,14 +20,13 @@ class CommandNotFound(Exception):
     pass
 
 class Dispatch:
-    def __init__(self, nursery, aria2_websocket, mpd_tcp_stream):
+    def __init__(self, aria2=None, mpd=None, redis=None, etree=None):
         """Start up proxy services"""
         self.namespace = ""
-        self.nursery = nursery
-        self.aria2 = Aria2Proxy(nursery, aria2_websocket)
-        self.mpd = MPDProxy(nursery, mpd_tcp_stream)
-        self.redis = RedisProxy(nursery)
-        self.etree = EtreeProxy(nursery, self.redis)
+        self.aria2 = aria2
+        self.mpd = mpd
+        self.redis = redis
+        self.etree = etree
 
     def PS1(self):
         if self.namespace == "mpd.":
@@ -53,9 +50,7 @@ class Dispatch:
             command = args[0]
 
         # Builtins
-        if command == "quit":
-            self.nursery.cancel_scope.cancel()
-        elif command == "~":
+        if command == "~":
             self.namespace = ""
         elif command == "aria2.~":
             self.namespace = "aria2."
@@ -88,9 +83,8 @@ class Dispatch:
             meth = aria2_cmd[cmd_name]
             response = await meth(self.aria2, *args)
             format = aria2_fmt.get(cmd_name, aria2_fmt["_default"])
-            with patch_stdout(nursery=self.nursery):
-                print("-------->>>>>>>!!!!!!!!!!!!!!", flush=True)
-                print(format(response), flush=True)
+            print("-------->>>>>>>!!!!!!!!!!!!!!", flush=True)
+            print(format(response), flush=True)
 
         # RSS (Etree)
         elif self.namespace == "etree."or command.startswith("etree."):
@@ -102,8 +96,7 @@ class Dispatch:
             meth = etree_cmd[cmd_name]
             response = await meth(self.etree, *args)
             format = etree_fmt.get(cmd_name, etree_fmt["_default"])
-            with patch_stdout(nursery=self.nursery):
-                print(format(response))
+            print(format(response))
 
         else:
             raise CommandNotFound()

@@ -1,9 +1,16 @@
+import logging
 import json
+import asyncio
 from itertools import count
+from functools import partial
 
+import curio
 import trio
 
+from ..util import TrioQueue
+
 CMD = {}
+
 
 def cmd(name):
     """Fill aria2.CMD with command list via this decorator."""
@@ -12,24 +19,29 @@ def cmd(name):
         return func
     return decorator
 
-class Aria2Proxy:
-    def __init__(self, nursery, socket):
-        self.nursery = nursery
-        self.socket = socket
-        self.id_counter = count()
-        self.pending = {}
-        self.nursery.start_soon(self.listener)
 
-    async def listener(self):
+class Aria2ProxyBase:
+    id_counter = count()
+    pending = {}
+
+    def new_queue(self):
+        """Create a command queue."""
+        return curio.UniversalQueue()
+
+    async def listen(self):
+        """Receive incoming websocket messages and match them with
+        associated requests."""
+
         while True:
-            try:
-                response = await self.socket.get_message()
-            except:
-                break
+            response = await self.read()
+            logging.debug(response)
+            if response == b"":
+                continue
             rsp = json.loads(response)
             if rsp.get("id") is not None:
                 if self.pending.get(rsp["id"]) is not None:
-                    await self.pending[int(rsp["id"])].send(rsp)
+                    # Race condition?  Maybe put del first..
+                    await self.pending[int(rsp["id"])].put(rsp)
                     del(self.pending[int(rsp["id"])])
                 else:
                     print("!?!aria2", response)
@@ -37,14 +49,22 @@ class Aria2Proxy:
                 print("?!?aria2", response)
 
     async def run(self, command, params=None):
+        """Send a command request through the websocket and wait for
+        a response."""
+
+        # Assemble request parameters
         req_id = next(self.id_counter)
         req = {"jsonrpc": "2.0", "id": req_id, "method": command}
         if params:
             req["params"] = params
-        await self.socket.send_message(json.dumps(req))
-        ch_snd, ch_rcv = trio.open_memory_channel(0)
-        self.pending[req_id] = ch_snd
-        return await ch_rcv.receive()
+
+        # Create reply channel
+        queue = self.new_queue()
+        self.pending[req_id] = queue
+
+        # Wait on response
+        await self.write(json.dumps(req))
+        return await queue.get()
 
     @cmd("addUri")
     async def add_uri(self, uri):
@@ -191,3 +211,95 @@ class Aria2Proxy:
     @cmd("multicall")
     async def multicall(self, methods):
         return await self.run("system.multicall", [methods])
+
+
+class TrioAria2Proxy(Aria2ProxyBase):
+    def __init__(self, nursery, socket):
+        self.read = socket.get_message
+        self.write = socket.send_message
+        nursery.start_soon(self.listen)
+
+    def new_queue(self):
+        """Create a special trio version of the command queue."""
+        return TrioQueue(curio.UniversalQueue(withfd=True))
+
+
+class AsyncioAria2Proxy(Aria2ProxyBase):
+    def __init__(self, websocket):
+        self.read = websocket.recv
+        self.write = websocket.send
+        asyncio.create_task(self.listen())
+
+
+#from wsproto import ConnectionType, WSConnection
+#from wsproto.events import Request
+
+from wsproto import WSConnection
+from wsproto.connection import ConnectionType
+from wsproto.events import (
+    AcceptConnection,
+    CloseConnection,
+    RejectConnection,
+    Message,
+    Ping,
+    Pong,
+    Request,
+    TextMessage,
+    BytesMessage,
+)
+
+class CurioAria2Proxy(Aria2ProxyBase):
+    def __init__(self, socket):
+        self.sock = socket
+
+    async def start(self):
+        self.ws = WSConnection(ConnectionType.CLIENT)
+        request = Request(host="localhost", target="/jsonrpc")
+        data = self.ws.send(request)
+        await self.sock.sendall(data)
+        data = await self.sock.recv(65536)
+        self.ws.receive_data(data)
+        print("?????????", await self.handle_events())
+        await curio.spawn(self.listen)
+
+    #self.write = sock.sendall
+    async def write(self, data):
+        request = self.ws.send(Message(data=data))
+        await self.sock.sendall(request)
+
+    async def handle_events(self):
+        result = b""
+        for event in self.ws.events():
+            if isinstance(event, AcceptConnection):
+                logging.debug('Connection established')
+            elif isinstance(event, RejectConnection):
+                logging.debug('Connection rejected')
+            elif isinstance(event, CloseConnection):
+                logging.debug('Connection closed: code={} reason={}'.format(
+                    event.code, event.reason
+                ))
+                await self.sock.sendall(self.ws.send(event.response()))
+            elif isinstance(event, Ping):
+                logging.debug(
+                    'Received Ping frame with payload '
+                    '{}'.format(event.payload)
+                )
+                await self.sock.sendall(self.ws.send(event.response()))
+            elif isinstance(event, TextMessage):
+                logging.debug('Received TEXT data: {}'.format(event.data))
+                result += event.data.encode("utf-8")
+                if event.message_finished:
+                    logging.debug('Message finished.')
+            elif isinstance(event, BytesMessage):
+                logging.debug('Received BINARY data: {}'.format(event.data))
+                result += event.data
+                if event.message_finished:
+                    logging.debug('BINARY Message finished.')
+            else:
+                logging.debug('Unknown event: {!r}'.format(event))
+        return result
+
+    async def read(self):
+        data = await self.sock.recv(65536)
+        self.ws.receive_data(data)
+        return await self.handle_events()
