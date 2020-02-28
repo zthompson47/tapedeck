@@ -2,9 +2,9 @@ from prompt_toolkit.completion import Completer
 from prompt_toolkit.completion.word_completer import WordCompleter
 from prompt_toolkit.document import Document
 
-from .aria2.proxy import CMD as aria2_cmd
-from .mpd.proxy import CMD as mpd_cmd
-from .etree.proxy import CMD as etree_cmd
+from .aria2 import CMD as aria2_cmd
+from .mpd import CMD as mpd_cmd
+from .etree import CMD as etree_cmd
 
 class TapedeckCompleter(Completer):
     def __init__(self, td_cmd):

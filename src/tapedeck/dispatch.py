@@ -5,14 +5,11 @@ from trignalc import main as signal
 
 from prompt_toolkit.patch_stdout import patch_stdout
 
-from .aria2.proxy import CMD as aria2_cmd
-from .aria2.format import FMT as aria2_fmt
+from .aria2 import CMD as aria2_cmd
+from .mpd import CMD as mpd_cmd
+from .etree import CMD as etree_cmd
 
-from .mpd.proxy import CMD as mpd_cmd
-
-from .etree.proxy import CMD as etree_cmd
-from .etree.format import FMT as etree_fmt
-
+from .format import FMT_ARIA2 as aria2_fmt, FMT_ETREE as etree_fmt
 from .config import PS1
 from .parser import parse
 

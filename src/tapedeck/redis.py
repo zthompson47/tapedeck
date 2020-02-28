@@ -22,7 +22,9 @@ class AsyncioRedisProxy:
         """Run redis requests synchronously in a thread."""
         redis = Redis(**REDIS)
         while True:
-            req = asyncio.run_coroutine_threadsafe(self.request.get(), self.loop).result()
+            req = asyncio.run_coroutine_threadsafe(
+                self.request.get(), self.loop
+            ).result()
             if req[1] == "set":
                 rsp = redis.set(req[2], json.dumps(req[3]))
             elif req[1] == "get":
@@ -80,9 +82,11 @@ class TrioRedisProxy:
     def __init__(self, nursery):
         self.request, self.trio_request = trio.open_memory_channel(0)
         self.nursery = nursery
-        self.nursery.start_soon(functools.partial(
-            trio.to_thread.run_sync, self.redis_thread, cancellable=True
-        ))
+        self.nursery.start_soon(
+            functools.partial(
+                trio.to_thread.run_sync, self.redis_thread, cancellable=True
+            )
+        )
 
     def redis_thread(self):
         """Run redis requests synchronously in a thread."""

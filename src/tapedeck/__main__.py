@@ -18,10 +18,10 @@ from prompt_toolkit import PromptSession
 from .dispatch import Dispatch, CommandNotFound
 from .config import ARIA2, ARIA2_CURIO, MPD
 from .completion import TapedeckCompleter
-from .aria2.proxy import AsyncioAria2Proxy, CurioAria2Proxy, TrioAria2Proxy
-from .mpd.proxy import AsyncioMPDProxy, CurioMPDProxy, TrioMPDProxy
+from .aria2 import AsyncioAria2Proxy, CurioAria2Proxy, TrioAria2Proxy
+from .mpd import AsyncioMPDProxy, CurioMPDProxy, TrioMPDProxy
 from .redis import AsyncioRedisProxy, CurioRedisProxy, TrioRedisProxy
-from .etree.proxy import AsyncioEtreeProxy, CurioEtreeProxy, TrioEtreeProxy
+from .etree import AsyncioEtreeProxy, CurioEtreeProxy, TrioEtreeProxy
 from .util import TrioQueue
 
 

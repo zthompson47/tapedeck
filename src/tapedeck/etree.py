@@ -5,7 +5,7 @@ import feedparser
 import curio
 import trio
 
-from ..config import ETREE_RSS_URI, ETREE_RSS_REDIS_KEY
+from .config import ETREE_RSS_URI, ETREE_RSS_REDIS_KEY
 
 CMD = {}
 

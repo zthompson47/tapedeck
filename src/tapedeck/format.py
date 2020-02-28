@@ -18,7 +18,20 @@ def pprint_tellActive(content):
         result += torrent["bittorrent"]["info"]["name"]
     return result
 
-FMT = {
+def pprint_etree(rss):
+    result = ""
+    if rss:
+        for entry in rss["entries"]:
+            result += entry["title"] + "\n"
+            result += entry["links"][0]["href"] + "\n"
+            result += "--\n"
+    print(result)
+
+FMT_ETREE = {
+    "_default": pprint_etree,
+}
+
+FMT_ARIA2 = {
     "tellActive": pprint_tellActive,
     "_default": pprint,
 }

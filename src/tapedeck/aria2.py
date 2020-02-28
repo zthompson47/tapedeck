@@ -7,7 +7,7 @@ from functools import partial
 import curio
 import trio
 
-from ..util import TrioQueue
+from .util import TrioQueue
 
 CMD = {}
 
