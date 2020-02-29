@@ -5,12 +5,13 @@ from prompt_toolkit.document import Document
 from .aria2 import CMD as aria2_cmd
 from .mpd import CMD as mpd_cmd
 from .etree import CMD as etree_cmd
+from .pulse import CMD as pulse_cmd
 
 class TapedeckCompleter(Completer):
     def __init__(self, td_cmd):
         self.td_cmd = td_cmd
         self.root_opts = [
-            "aria2.", "etree.", "mpd.",
+            "aria2.", "etree.", "mpd.", "pulse.",
             "trio", "trignalc",
             "quit",
         ]
@@ -28,6 +29,8 @@ class TapedeckCompleter(Completer):
                 words += list(mpd_cmd.keys())
             elif first_term == "etree":
                 words += list(etree_cmd.keys())
+            elif first_term == "pulse":
+                words += list(pulse_cmd.keys())
             completer = WordCompleter(words, ignore_case=True)
 
             # If we have a sub completer, use this for the completions.

@@ -1,4 +1,4 @@
-from prompt_toolkit import PromptSession, HTML
+from prompt_toolkit import HTML
 
 REDIS = dict(host="localhost", port=6379, db=0)
 
@@ -10,7 +10,7 @@ ARIA2_CURIO = ("localhost", 6800)
 
 MPD = ("localhost", 6600)
 
-PULSE = "/var/run/usr/1000/pulse/cli"
+PULSE = "/var/run/user/1000/pulse/cli"
 
 PS1 = HTML(
     "<blue>⦗</blue>"

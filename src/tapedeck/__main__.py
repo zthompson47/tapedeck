@@ -1,14 +1,12 @@
 import argparse
 import logging
-logging.basicConfig(filename='/home/zach/td.log', level=logging.DEBUG)
 from contextlib import AsyncExitStack
 import threading
 import asyncio
 
-import websockets
+import anyio
 import curio
 import trio
-import trio_websocket
 from trio_monitor.monitor import Monitor
 
 from prompt_toolkit.patch_stdout import patch_stdout
@@ -16,20 +14,23 @@ from prompt_toolkit.shortcuts import CompleteStyle
 from prompt_toolkit import PromptSession
 
 from .dispatch import Dispatch, CommandNotFound
-from .config import ARIA2, ARIA2_CURIO, MPD
+from .config import ARIA2, ARIA2_CURIO, MPD, PULSE
 from .completion import TapedeckCompleter
-from .aria2 import AsyncioAria2Proxy, CurioAria2Proxy, TrioAria2Proxy
-from .mpd import AsyncioMPDProxy, CurioMPDProxy, TrioMPDProxy
-from .redis import AsyncioRedisProxy, CurioRedisProxy, TrioRedisProxy
-from .etree import AsyncioEtreeProxy, CurioEtreeProxy, TrioEtreeProxy
+from .aria2 import AnyioAria2Proxy
+from .mpd import AnyioMPDProxy
+from .redis import AnyioRedisProxy
+from .etree import AnyioEtreeProxy
+from .pulse import PulseProxy
 from .util import TrioQueue
+
+logging.basicConfig(filename="/home/zach/td.log", level=logging.DEBUG)
 
 
 async def prompt_thread(td_cmd, request_queue, response_queue):
     ptk = PromptSession(
         vi_mode=True,
         complete_style=CompleteStyle.READLINE_LIKE,
-        completer=TapedeckCompleter(td_cmd)
+        completer=TapedeckCompleter(td_cmd),
     )
     while True:
         try:
@@ -61,95 +62,47 @@ async def run_prompt(td_cmd, request_queue, response_queue):
 
 
 async def asyncio_main(request_queue, response_queue):
-    async with AsyncExitStack() as stack:
-        # Aria2
-        aria2 = await stack.enter_async_context(
-            websockets.connect(ARIA2)
-        )
-        aria2_proxy = AsyncioAria2Proxy(aria2)
+    async with anyio.create_task_group() as tg:
+        async with AsyncExitStack() as stack:
+            try:
+                # Check for trio backend
+                trio.hazmat.current_task()
 
-        # MPD
-        mpd_reader, mpd_writer = await asyncio.open_connection(*MPD)
-        mpd_proxy = AsyncioMPDProxy(mpd_reader, mpd_writer)
+                # Create special queue that works in trio
+                request_queue = TrioQueue(request_queue)
+                response_queue = TrioQueue(response_queue)
 
-        redis_proxy = AsyncioRedisProxy()
-        etree_proxy = AsyncioEtreeProxy(redis_proxy)
+                # Enable debugging
+                mon = Monitor()
+                trio.hazmat.add_instrument(mon)
+                nursery = await stack.enter_async_context(trio.open_nursery())
+                nursery.start_soon(trio.serve_tcp, mon.listen_on_stream, 8998)
+            except RuntimeError:
+                pass
 
-        # Prompt
-        td_cmd = Dispatch(
-            aria2_proxy, mpd_proxy, redis_proxy, etree_proxy
-        )
+            aria2_proxy = await stack.enter_async_context(
+                AnyioAria2Proxy(tg, ARIA2)
+            )
+            mpd_proxy = await stack.enter_async_context(AnyioMPDProxy(tg, *MPD))
+            redis_proxy = await stack.enter_async_context(AnyioRedisProxy(tg))
+            etree_proxy = AnyioEtreeProxy(redis_proxy)
+            pulse_proxy = await stack.enter_async_context(PulseProxy(PULSE))
+            td_cmd = Dispatch(
+                aria2_proxy,
+                mpd_proxy,
+                redis_proxy,
+                etree_proxy,
+                pulse_proxy
+            )
+            await run_prompt(td_cmd, request_queue, response_queue)
 
-        await run_prompt(td_cmd, request_queue, response_queue)
-
-
-async def curio_main(request_queue, response_queue):
-    async with AsyncExitStack() as stack:
-        # MPD
-        mpd = await stack.enter_async_context(
-            await curio.open_connection(*MPD)
-        )
-        mpd_proxy = CurioMPDProxy(mpd)
-        await mpd_proxy.start()
-
-        # Aria2
-        aria2 = await stack.enter_async_context(
-            await curio.open_connection(*ARIA2_CURIO)
-        )
-        aria2_proxy = CurioAria2Proxy(aria2)
-        await aria2_proxy.start()
-
-        # Redis
-        redis_proxy = CurioRedisProxy()
-        await redis_proxy.start()
-
-        etree_proxy = CurioEtreeProxy(redis_proxy)
-
-        # Prompt
-        td_cmd = Dispatch(
-            aria2_proxy, mpd_proxy, redis_proxy, etree_proxy
-        )
-        await run_prompt(td_cmd, request_queue, response_queue)
-
-
-async def trio_main(request_queue, response_queue):
-    async with AsyncExitStack() as stack:
-        # Initialize IO resources
-        aria2_websocket = await stack.enter_async_context(
-            trio_websocket.open_websocket_url(ARIA2)
-        )
-        mpd = await stack.enter_async_context(
-            await trio.open_tcp_stream(*MPD)
-        )
-        nursery = await stack.enter_async_context(trio.open_nursery())
-
-        # Route commands
-        aria2_proxy = TrioAria2Proxy(nursery, aria2_websocket)
-        mpd_proxy = TrioMPDProxy(nursery, mpd)
-        redis_proxy = TrioRedisProxy(nursery)
-        etree_proxy = TrioEtreeProxy(redis_proxy)
-        td_cmd = Dispatch(
-            aria2_proxy, mpd_proxy, redis_proxy, etree_proxy
-        )
-
-        # Enable debugging
-        mon = Monitor()
-        trio.hazmat.add_instrument(mon)
-        nursery.start_soon(trio.serve_tcp, mon.listen_on_stream, 8998)
-
-        # Communicate with the prompt
-        await run_prompt(td_cmd, request_queue, response_queue)
-
-        # Shutdown
-        nursery.cancel_scope.cancel()
-
-
-assert __name__ == "__main__"
 
 # Command line arguments
 arrg = argparse.ArgumentParser()
 arrg.add_argument(
-    "-a", "--async-loop", help="asyncio, curio, trio", default="trio"
+    "-a", "--async-loop",
+    help="asyncio, curio, trio",
+    default="trio"
 )
 arrgs = arrg.parse_args()
 
@@ -157,20 +110,13 @@ arrgs = arrg.parse_args()
 td_cmd = Dispatch(None, None, None, None)  # Hack for autocomplete
 request_queue = curio.UniversalQueue(withfd=True)
 response_queue = curio.UniversalQueue(withfd=True)
-ptk_thread = threading.Thread(
-    target=asyncio.run,
-    args=[prompt_thread(td_cmd, request_queue, response_queue)]
-)
+ptk_coro = prompt_thread(td_cmd, request_queue, response_queue)
+ptk_thread = threading.Thread(target=asyncio.run, args=[ptk_coro])
 ptk_thread.start()
 
-# Run main IO loop
-if arrgs.async_loop == "asyncio":
-    asyncio.run(asyncio_main(request_queue, response_queue))
-elif arrgs.async_loop == "curio":
-    curio.run(
-        curio_main, request_queue, response_queue, with_monitor=True
-    )
-elif arrgs.async_loop == "trio":
-    request_q = TrioQueue(request_queue)
-    response_q = TrioQueue(response_queue)
-    trio.run(trio_main, request_q, response_q)
+anyio.run(
+    asyncio_main,
+    request_queue,
+    response_queue,
+    backend=arrgs.async_loop
+)

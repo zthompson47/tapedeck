@@ -4,6 +4,8 @@ import asyncio
 from itertools import count
 from functools import partial
 
+import anyio
+import asyncwebsockets
 import curio
 import trio
 
@@ -211,6 +213,73 @@ class Aria2ProxyBase:
     @cmd("multicall")
     async def multicall(self, methods):
         return await self.run("system.multicall", [methods])
+
+
+
+
+
+
+class AnyioAria2Proxy(Aria2ProxyBase):
+    def __init__(self, task_group, uri):
+        self.tg = task_group
+        self.uri = uri
+
+    async def __aenter__(self):
+        self.ws = await asyncwebsockets.create_websocket(self.uri)
+        await self.tg.spawn(self.listen)
+        return self
+
+    async def __aexit__(self, *args):
+        pass
+
+    async def listen(self):
+        """Receive incoming websocket messages and match them with
+        associated requests."""
+
+        async for event in self.ws:
+            #event = await self.ws.next_event()
+            response = getattr(event, "data", b"")
+            logging.debug(response)
+            if response == b"":
+                continue
+            rsp = json.loads(response)
+            if rsp.get("id") is not None:
+                if self.pending.get(rsp["id"]) is not None:
+                    # Race condition?  Maybe put del first..
+                    await self.pending[int(rsp["id"])].put(rsp)
+                    del(self.pending[int(rsp["id"])])
+                else:
+                    print("!?!aria2", response)
+            else:
+                print("?!?aria2", response)
+
+    async def run(self, command, params=None):
+        """Send a command request through the websocket and wait for
+        a response."""
+
+        # Assemble request parameters
+        req_id = next(self.id_counter)
+        req = {"jsonrpc": "2.0", "id": req_id, "method": command}
+        if params:
+            req["params"] = params
+
+        # Create reply channel
+        queue = anyio.create_queue(0)
+        self.pending[req_id] = queue
+
+        # Wait on response
+        await self.ws.send(json.dumps(req))
+        return await queue.get()
+
+
+
+
+
+
+
+
+
+
 
 
 class TrioAria2Proxy(Aria2ProxyBase):

@@ -1,8 +1,9 @@
 import json
-import functools
+from functools import partial
 import asyncio
 import threading
 
+import anyio
 import curio
 import trio
 from redis import Redis
@@ -45,6 +46,49 @@ class AsyncioRedisProxy:
         return await answer.get()
 
 
+class AnyioRedisProxy:
+    def __init__(self, task_group):
+        self.request = anyio.create_queue(0)
+        self.tg = task_group
+
+    async def __aenter__(self):
+        await self.tg.spawn(partial(
+            anyio.run_in_thread, self.redis_thread, cancellable=True
+        ))
+        return self
+
+    async def __aexit__(self, *args):
+        pass
+
+    def redis_thread(self):
+        """Run redis requests synchronously in a thread."""
+        async def arun(func):
+            """Use async fn in local context so anyio can
+            find the asyncio event loop."""
+            return await func()
+        redis = Redis(**REDIS)
+        while True:
+            req = anyio.run_async_from_thread(arun, self.request.get)
+            if req[1] == "set":
+                rsp = redis.set(req[2], json.dumps(req[3]))
+            elif req[1] == "get":
+                rsp = redis.get(req[2])
+                result = None
+                if rsp:
+                    result = json.loads(rsp)
+            anyio.run_async_from_thread(arun, partial(req[0].put, result))
+
+    async def get(self, key):
+        answer = anyio.create_queue(0)
+        await self.request.put((answer, "get", key,))
+        return await answer.get()
+
+    async def set(self, key, value):
+        answer = anyio.create_queue(0)
+        await self.request.put((answer, "set", key, value))
+        return await answer.get()
+
+
 class CurioRedisProxy:
     def __init__(self):
         self.request = curio.Queue()
@@ -83,7 +127,7 @@ class TrioRedisProxy:
         self.request, self.trio_request = trio.open_memory_channel(0)
         self.nursery = nursery
         self.nursery.start_soon(
-            functools.partial(
+            partial(
                 trio.to_thread.run_sync, self.redis_thread, cancellable=True
             )
         )

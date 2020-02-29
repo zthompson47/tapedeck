@@ -8,6 +8,7 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from .aria2 import CMD as aria2_cmd
 from .mpd import CMD as mpd_cmd
 from .etree import CMD as etree_cmd
+from .pulse import CMD as pulse_cmd
 
 from .format import FMT_ARIA2 as aria2_fmt, FMT_ETREE as etree_fmt
 from .config import PS1
@@ -17,13 +18,14 @@ class CommandNotFound(Exception):
     pass
 
 class Dispatch:
-    def __init__(self, aria2=None, mpd=None, redis=None, etree=None):
+    def __init__(self, aria2=None, mpd=None, redis=None, etree=None, pulse=None):
         """Start up proxy services"""
         self.namespace = ""
         self.aria2 = aria2
         self.mpd = mpd
         self.redis = redis
         self.etree = etree
+        self.pulse = pulse
 
     def PS1(self):
         if self.namespace == "mpd.":
@@ -32,6 +34,8 @@ class Dispatch:
             return PS1.format(namespace="aria2")
         elif self.namespace  == "etree.":
             return PS1.format(namespace="etree")
+        elif self.namespace  == "pulse.":
+            return PS1.format(namespace="pulse")
         else:
             return PS1.format(namespace="~")
 
@@ -55,6 +59,8 @@ class Dispatch:
             self.namespace = "mpd."
         elif command == "etree.~":
             self.namespace = "etree."
+        elif command == "pulse.~":
+            self.namespace = "pulse."
         elif command == "trio":
             await TrioRepl().run(locals())
         elif command == "trignalc":
@@ -94,6 +100,17 @@ class Dispatch:
             response = await meth(self.etree, *args)
             format = etree_fmt.get(cmd_name, etree_fmt["_default"])
             print(format(response))
+
+        # Pulseaudio
+        elif self.namespace == "pulse."or command.startswith("pulse."):
+            if command.startswith("pulse."):
+                cmd_name = program[0][0][6:]
+            else:
+                cmd_name = program[0][0]
+            args = program[0][1:]
+            meth = pulse_cmd[cmd_name]
+            response = await meth(self.pulse, *args)
+            print(response.decode("utf-8"))
 
         else:
             raise CommandNotFound()

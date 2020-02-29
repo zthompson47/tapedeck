@@ -1,5 +1,6 @@
 from functools import partial
 import logging
+import anyio
 
 import asyncio
 import curio
@@ -205,6 +206,42 @@ class TrioMPDProxy(MPDProxyBase):
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self.keepalive_task)
             nursery.start_soon(self.listener_task)
+
+
+class AnyioMPDProxy(MPDProxyBase):
+    def __init__(self, task_group, *uri):
+        self.tg = task_group
+        self.uri = uri
+
+    async def __aenter__(self):
+        self.sock = await anyio.connect_tcp(*self.uri)
+        await self.tg.spawn(self.keepalive_task)
+        await self.tg.spawn(self.listener_task)
+        return self
+
+    async def __aexit__(self, *args):
+        await self.sock.close()
+
+    async def keepalive_task(self):
+        while True:
+            await self.sock.send_all(b"ping\n")
+            await anyio.sleep(3.333)
+
+    async def listener_task(self):
+        while True:
+            response = await self.sock.receive_some(65536)
+            if response != b"OK\n":
+                print("mpd", response.decode("utf-8").rstrip())
+
+    async def runcmd(self, command, *params):
+        # Encode to UTF-8 bytes
+        if params:
+            params = [param.encode("utf-8") for param in params]
+            params_str = b" " + b" ".join(params)
+            command = command.encode("utf-8") + params_str
+        else:
+            command = command.encode("utf-8")
+        await self.sock.send_all(command + b"\n")
 
 
 class CurioMPDProxy(MPDProxyBase):
