@@ -43,14 +43,9 @@ class EtreeProxyBase:
 
 
 class AnyioEtreeProxy(EtreeProxyBase):
-    ...
-    ... # ok....
-    ...
     async def get_rss(self, feed):
-        return await anyio.run_in_thread(feed)
-    ...
-    ...  # JELLOOOOOOO
-    ...
+        return await anyio.run_in_thread(feed, cancellable=True)
+
 
 class AsyncioEtreeProxy(EtreeProxyBase):
     async def get_rss(self, feed):
@@ -60,7 +55,7 @@ class AsyncioEtreeProxy(EtreeProxyBase):
 
 class CurioEtreeProxy(EtreeProxyBase):
     async def get_rss(self, feed):
-        return await curio.run_in_thread(feed)
+        return await curio.run_in_thread(feed, cancellable=True)
 
 
 class TrioEtreeProxy(EtreeProxyBase):

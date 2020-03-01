@@ -1,8 +1,9 @@
 from functools import partial
 import logging
-import anyio
-
 import asyncio
+
+import anyio
+from anyio.exceptions import ClosedResourceError
 import curio
 import trio
 
@@ -224,14 +225,24 @@ class AnyioMPDProxy(MPDProxyBase):
 
     async def keepalive_task(self):
         while True:
-            await self.sock.send_all(b"ping\n")
-            await anyio.sleep(3.333)
+            try:
+                await self.sock.send_all(b"ping\n")
+            except OSError:
+                logging.debug("mpd keepalive bad conn")
+                break
+            else:
+                await anyio.sleep(3.333)
 
     async def listener_task(self):
         while True:
-            response = await self.sock.receive_some(65536)
-            if response != b"OK\n":
-                print("mpd", response.decode("utf-8").rstrip())
+            try:
+                response = await self.sock.receive_some(65536)
+            except ClosedResourceError:
+                logging.debug("mpd listener closed conn")
+                break
+            else:
+                if response != b"OK\n":
+                    print("mpd", response.decode("utf-8").rstrip())
 
     async def runcmd(self, command, *params):
         # Encode to UTF-8 bytes

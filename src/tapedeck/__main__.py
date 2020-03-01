@@ -1,3 +1,4 @@
+import os
 import argparse
 import logging
 from contextlib import AsyncExitStack
@@ -8,6 +9,7 @@ import anyio
 import curio
 import trio
 from trio_monitor.monitor import Monitor
+import sniffio
 
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.shortcuts import CompleteStyle
@@ -23,7 +25,7 @@ from .etree import AnyioEtreeProxy
 from .pulse import PulseProxy
 from .util import TrioQueue
 
-logging.basicConfig(filename="/home/zach/td.log", level=logging.DEBUG)
+logging.basicConfig(filename="td.log", level=logging.DEBUG)
 
 
 async def prompt_thread(td_cmd, request_queue, response_queue):
@@ -50,7 +52,9 @@ async def prompt_thread(td_cmd, request_queue, response_queue):
 async def run_prompt(td_cmd, request_queue, response_queue):
     while True:
         request = await request_queue.get()
+        logging.debug(f"got request: {request}")
         if request is None:
+            logging.debug(f"?????????got request: {request} - break!!")
             break
         else:
             try:
@@ -61,13 +65,11 @@ async def run_prompt(td_cmd, request_queue, response_queue):
                 await response_queue.put(response)
 
 
-async def asyncio_main(request_queue, response_queue):
+async def main(request_queue, response_queue):
     async with anyio.create_task_group() as tg:
         async with AsyncExitStack() as stack:
-            try:
-                # Check for trio backend
-                trio.hazmat.current_task()
-
+            backend = sniffio.current_async_library()
+            if backend == "trio":
                 # Create special queue that works in trio
                 request_queue = TrioQueue(request_queue)
                 response_queue = TrioQueue(response_queue)
@@ -77,8 +79,6 @@ async def asyncio_main(request_queue, response_queue):
                 trio.hazmat.add_instrument(mon)
                 nursery = await stack.enter_async_context(trio.open_nursery())
                 nursery.start_soon(trio.serve_tcp, mon.listen_on_stream, 8998)
-            except RuntimeError:
-                pass
 
             aria2_proxy = await stack.enter_async_context(
                 AnyioAria2Proxy(tg, ARIA2)
@@ -88,13 +88,15 @@ async def asyncio_main(request_queue, response_queue):
             etree_proxy = AnyioEtreeProxy(redis_proxy)
             pulse_proxy = await stack.enter_async_context(PulseProxy(PULSE))
             td_cmd = Dispatch(
-                aria2_proxy,
-                mpd_proxy,
-                redis_proxy,
-                etree_proxy,
-                pulse_proxy
+                aria2=aria2_proxy,
+                mpd=mpd_proxy,
+                redis=redis_proxy,
+                etree=etree_proxy,
+                pulse=pulse_proxy
             )
             await run_prompt(td_cmd, request_queue, response_queue)
+            await redis_proxy.close()  # Close so curio doesn't hang on exit
+            await tg.cancel_scope.cancel()
 
 
 # Command line arguments
@@ -114,9 +116,5 @@ ptk_coro = prompt_thread(td_cmd, request_queue, response_queue)
 ptk_thread = threading.Thread(target=asyncio.run, args=[ptk_coro])
 ptk_thread.start()
 
-anyio.run(
-    asyncio_main,
-    request_queue,
-    response_queue,
-    backend=arrgs.async_loop
-)
+os.environ["CURIOMONITOR"] = "True"
+anyio.run(main, request_queue, response_queue, backend=arrgs.async_loop)
