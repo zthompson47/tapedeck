@@ -58,6 +58,8 @@ class AnyioRedisProxy:
         return self
 
     async def __aexit__(self, *args):
+        import logging
+        logging.debug("-----------------------!!!!!!!!!!!!!!!!!!!!!!!!!!1")
         pass
 
     def redis_thread(self):
@@ -76,6 +78,8 @@ class AnyioRedisProxy:
                 result = None
                 if rsp:
                     result = json.loads(rsp)
+            elif req[1] is None:
+                break
             anyio.run_async_from_thread(arun, partial(req[0].put, result))
 
     async def get(self, key):
@@ -87,6 +91,9 @@ class AnyioRedisProxy:
         answer = anyio.create_queue(0)
         await self.request.put((answer, "set", key, value))
         return await answer.get()
+
+    async def close(self):
+        await self.request.put((None, None,))
 
 
 class CurioRedisProxy:
