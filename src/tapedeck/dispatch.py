@@ -1,7 +1,7 @@
 from itertools import count
 
-from trio_repl import TrioRepl
-from trignalc import main as signal
+#from trio_repl import TrioRepl
+#from trignalc import main as signal
 
 from prompt_toolkit.patch_stdout import patch_stdout
 
@@ -61,10 +61,10 @@ class Dispatch:
             self.namespace = "etree."
         elif command == "pulse.~":
             self.namespace = "pulse."
-        elif command == "trio":
-            await TrioRepl().run(locals())
-        elif command == "trignalc":
-            await signal()
+        #elif command == "trio":
+        #    await TrioRepl().run(locals())
+        #elif command == "trignalc":
+        #    await signal()
 
         # MPD
         elif self.namespace == "mpd."or command.startswith("mpd."):
@@ -86,7 +86,6 @@ class Dispatch:
             meth = aria2_cmd[cmd_name]
             response = await meth(self.aria2, *args)
             format = aria2_fmt.get(cmd_name, aria2_fmt["_default"])
-            print("-------->>>>>>>!!!!!!!!!!!!!!", flush=True)
             print(format(response), flush=True)
 
         # RSS (Etree)
