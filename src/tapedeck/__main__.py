@@ -1,17 +1,9 @@
-import os
 import argparse
-import logging
-import threading
 import asyncio
 from contextlib import AsyncExitStack
-from collections import namedtuple
 from functools import partial
 
-import anyio
-import curio
 import trio
-import sniffio
-
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.shortcuts import CompleteStyle
 from prompt_toolkit import PromptSession
@@ -21,17 +13,17 @@ from .config import ARIA2, ARIA2_CURIO, MPD, PULSE
 from .completion import TapedeckCompleter
 from .aria2 import Aria2Proxy
 from .mpd import TrioMPDProxy
-from .redis import AnyioRedisProxy
-from .etree import AnyioEtreeProxy
+from .redis import TrioRedisProxy
+from .etree import TrioEtreeProxy
 from .pulse import TrioPulseProxy
 from .util import TrioQueue
 
-logging.basicConfig(filename="td.log", level=logging.DEBUG)
-
+# import logging
+# logging.basicConfig(filename="td.log", level=logging.DEBUG)
 
 async def prompt_thread(td_cmd, to_main, from_main, trio_token):
     async def _put(data):
-        asyncio.get_event_loop().run_in_executor(
+        fut = asyncio.get_event_loop().run_in_executor(
             None,
             partial(
                 trio.from_thread.run,
@@ -39,6 +31,8 @@ async def prompt_thread(td_cmd, to_main, from_main, trio_token):
                 trio_token=trio_token
             )
         )
+        await asyncio.wait([fut])
+        return fut.result()
 
     async def _get():
         fut = asyncio.get_event_loop().run_in_executor(
@@ -84,7 +78,6 @@ async def run_in_prompt(td_cmd, to_thread, from_thread):
 
     while True:
         request = await _get()
-        logging.debug(f"got request: {request}")
         if request is None:
             break
         else:
@@ -97,43 +90,42 @@ async def run_in_prompt(td_cmd, to_thread, from_thread):
 
 
 async def main(args):
-    async with anyio.create_task_group() as tg:
-        async with AsyncExitStack() as stack:
-            nursery = await stack.enter_async_context(trio.open_nursery())
-            if args.monitor:
-                from trio_monitor.monitor import Monitor
-                mon = Monitor()
-                trio.hazmat.add_instrument(mon)
-                nursery.start_soon(trio.serve_tcp, mon.listen_on_stream, 8998)
+    async with AsyncExitStack() as stack:
+        nursery = await stack.enter_async_context(trio.open_nursery())
+        if args.monitor:
+            from trio_monitor.monitor import Monitor
+            mon = Monitor()
+            trio.hazmat.add_instrument(mon)
+            nursery.start_soon(trio.serve_tcp, mon.listen_on_stream, 8998)
 
-            aria2_proxy = await stack.enter_async_context(
-                Aria2Proxy(tg, ARIA2)
-            )
-            mpd_proxy = await stack.enter_async_context(TrioMPDProxy(nursery, *MPD))
-            redis_proxy = await stack.enter_async_context(AnyioRedisProxy(tg))
-            etree_proxy = AnyioEtreeProxy(redis_proxy)
-            pulse_proxy = await stack.enter_async_context(TrioPulseProxy(PULSE))
-            td_cmd = Dispatch(
-                aria2=aria2_proxy,
-                mpd=mpd_proxy,
-                redis=redis_proxy,
-                etree=etree_proxy,
-                pulse=pulse_proxy
-            )
+        aria2_proxy = await stack.enter_async_context(
+            Aria2Proxy(nursery, ARIA2)
+        )
+        mpd_proxy = await stack.enter_async_context(TrioMPDProxy(nursery, *MPD))
+        redis_proxy = TrioRedisProxy(nursery)
+        etree_proxy = TrioEtreeProxy(redis_proxy)
+        pulse_proxy = await stack.enter_async_context(TrioPulseProxy(PULSE))
+        td_cmd = Dispatch(
+            aria2=aria2_proxy,
+            mpd=mpd_proxy,
+            redis=redis_proxy,
+            etree=etree_proxy,
+            pulse=pulse_proxy
+        )
 
-            to_thread, from_main = trio.open_memory_channel(0)
-            to_main, from_thread = trio.open_memory_channel(0)
+        to_thread, from_main = trio.open_memory_channel(0)
+        to_main, from_thread = trio.open_memory_channel(0)
 
-            trio_token = trio.hazmat.current_trio_token()
-            nursery.start_soon(partial(
-                trio.to_thread.run_sync,
-                asyncio.run,
-                prompt_thread(td_cmd, to_main, from_main, trio_token),
-                cancellable=True
-            ))
-            await run_in_prompt(td_cmd, to_thread, from_thread)
-#            await redis_proxy.close()  # Close so curio doesn't hang on exit
-            await tg.cancel_scope.cancel()
+        trio_token = trio.hazmat.current_trio_token()
+        nursery.start_soon(partial(
+            trio.to_thread.run_sync,
+            asyncio.run,
+            prompt_thread(td_cmd, to_main, from_main, trio_token),
+            cancellable=True
+        ))
+
+        await run_in_prompt(td_cmd, to_thread, from_thread)
+        nursery.cancel_scope.cancel()
 
 
 def enter():

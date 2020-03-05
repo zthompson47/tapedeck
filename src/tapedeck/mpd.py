@@ -1,5 +1,4 @@
 from functools import partial
-import logging
 
 import trio
 
@@ -49,7 +48,6 @@ class MPDConnection:
         return "\n".join(_message)
 
     def send(self, request):
-        logging.debug(f"==MPDConn.send==>> {request}")
         if request.command == "idle":
             self.in_idle = True
         elif request.command == "noidle":
@@ -57,11 +55,9 @@ class MPDConnection:
         return request.send()
 
     def receive_event(self, event):
-        logging.debug(f"==MPDConn.receive_event==>> {event}")
         self.in_idle = False
 
     def receive_data(self, data):
-        logging.debug(f"==MPDConn.receive_data==>> {data}")
         response = self._decode(data)
         if self.initialized:
             return response
@@ -101,7 +97,6 @@ class TrioMPDProxy:
         await self.sock.send_all(encoded)
 
         confirmation = await self.sock.receive_some(65536)
-        logging.debug(f"GOT OK in noidle event!!!!!! {confirmation}")
         self.mpd.receive_event(confirmation)
 
     async def idle_task(self, task_status=trio.TASK_STATUS_IGNORED):
@@ -110,23 +105,17 @@ class TrioMPDProxy:
         task_status.started(cancel_scope)
         with cancel_scope:
             while True:
-                logging.debug(f"waiting for idle event!!!!!!")
                 event = await self.sock.receive_some(65536)
-                logging.debug(f"GOT for idle event!!!!!! {event}")
                 self.mpd.receive_event(event)
-                print("???--=>", event)
+                print("==MPD==>", event)
                 await self._send_idle()
-                logging.debug(f"SENT idle event!!!!!!")
 
     async def __aexit__(self, *args):
         await self.sock.aclose()
 
     async def run_cmd(self, command, *params):
-        logging.debug(f"-->> run_cmd enter about to cancel")
         self.idle_scope.cancel()
-        logging.debug(f"-->> run_cmd after idle cancel, bef noidle")
         await self._send_noidle()
-        logging.debug(f"-->> run_cmd after noidle")
 
         # Build request
         request = MPDRequest(command, *params)

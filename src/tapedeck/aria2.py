@@ -1,10 +1,9 @@
-import logging
 import json
 from itertools import count
 from functools import partial
 
-import anyio
-import asyncwebsockets
+import trio
+import trio_websocket
 
 CMD = {}
 
@@ -18,40 +17,38 @@ def cmd(name):
 
 
 class Aria2Proxy:
-    def __init__(self, task_group, uri):
+    def __init__(self, nursery, uri):
         self.id_counter = count()
         self.pending = {}
-        self.tg = task_group
+        self.nursery = nursery
         self.uri = uri
 
     async def __aenter__(self):
-        self.ws = await asyncwebsockets.create_websocket(self.uri)
-        await self.tg.spawn(self.listener)
+        self.conn = await trio_websocket.connect_websocket(
+            self.nursery, *self.uri, use_ssl=False
+        )
+        self.nursery.start_soon(self.listener)
         return self
 
-    async def __aexit__(self, *args):
-        pass
+    async def __aexit__(self, *_):
+        await self.conn.aclose()
 
     async def listener(self):
         """Receive incoming websocket messages and match them with
         associated requests."""
 
-        async for event in self.ws:
-            #event = await self.ws.next_event()
-            response = getattr(event, "data", b"")
-            logging.debug(response)
-            if response == b"":
-                continue
+        while True:
+            response = await self.conn.get_message()
             rsp = json.loads(response)
             if rsp.get("id") is not None:
                 if self.pending.get(rsp["id"]) is not None:
                     # Race condition?  Maybe put del first..
-                    await self.pending[int(rsp["id"])].put(rsp)
+                    await self.pending[int(rsp["id"])].send(rsp)
                     del(self.pending[int(rsp["id"])])
                 else:
-                    print("!?!aria2", response)
+                    print("==ARIA2==>", response)
             else:
-                print("?!?aria2", response)
+                print("==ARIA2==>", response)
 
     async def _cmd(self, command, params=None):
         """Send a request to the websocket and return the response."""
@@ -63,12 +60,12 @@ class Aria2Proxy:
             req["params"] = params
 
         # Create reply channel
-        queue = anyio.create_queue(0)
-        self.pending[req_id] = queue
+        to_main, from_conn = trio.open_memory_channel(0)
+        self.pending[req_id] = to_main
 
         # Wait on response
-        await self.ws.send(json.dumps(req))
-        return await queue.get()
+        await self.conn.send_message(json.dumps(req))
+        return await from_conn.receive()
 
     @cmd("addUri")
     async def add_uri(self, uri):

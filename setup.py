@@ -24,8 +24,11 @@ setup(
         ],
     },
     install_requires=[
-        "anyio", "sniffio", "curio", "trio", "prompt-toolkit"
-        "asyncwebsockets", "feedparser", "redis"
+        "trio",
+        "trio-websocket",
+        "prompt-toolkit",
+        "feedparser",
+        "redis",
     ],
     zip_safe=False,
     packages=find_packages(where="src"),

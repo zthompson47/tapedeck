@@ -1,9 +1,6 @@
 import functools
-import asyncio
 
 import feedparser
-import anyio
-import curio
 import trio
 
 from .config import ETREE_RSS_URI, ETREE_RSS_REDIS_KEY
@@ -40,22 +37,6 @@ class EtreeProxyBase:
         rss = await self.get_rss(feed)
         if rss.status != 304:
             await self.redis.set(ETREE_RSS_REDIS_KEY, rss)
-
-
-class AnyioEtreeProxy(EtreeProxyBase):
-    async def get_rss(self, feed):
-        return await anyio.run_in_thread(feed, cancellable=True)
-
-
-class AsyncioEtreeProxy(EtreeProxyBase):
-    async def get_rss(self, feed):
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(feed)
-
-
-class CurioEtreeProxy(EtreeProxyBase):
-    async def get_rss(self, feed):
-        return await curio.run_in_thread(feed, cancellable=True)
 
 
 class TrioEtreeProxy(EtreeProxyBase):
