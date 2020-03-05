@@ -1,10 +1,6 @@
 from functools import partial
 import logging
-import asyncio
 
-import anyio
-from anyio.exceptions import ClosedResourceError
-import curio
 import trio
 
 CMD = {}
@@ -20,261 +16,275 @@ def cmd(name):
     return decorator
 
 
-async def arun(func, *args, **kwargs):
-    """Run a sync function as async."""
-    return func(*args, **kwargs)
+class MPDRequest:
+    def __init__(self, command, *params):
+        self.command = command
+        self.params = params
 
-
-class MPDProxyBase:
-    async def keepalive_task(self):
-        while True:
-            await self.write(b"ping\n")
-            await self.sleep(3.333)
-
-    async def listener_task(self):
-        while True:
-            response = await self.read()
-            if response != b"OK\n":
-                print("mpd", response.decode("utf-8").rstrip())
-
-    async def runcmd(self, command, *params):
-        # Encode to UTF-8 bytes
-        if params:
-            params = [param.encode("utf-8") for param in params]
-            params_str = b" " + b" ".join(params)
-            command = command.encode("utf-8") + params_str
+    def send(self):
+        if self.params:
+            params = [
+                param.encode("utf-8") for param in self.params
+            ]
+            params_str = b" \"" + b"\" \"".join(params) + b"\""
+            command = self.command.encode("utf-8") + params_str
         else:
-            command = command.encode("utf-8")
-        await self.write(command + b"\n")
-
-    @cmd("add")
-    async def add(self, uri):
-        await self.runcmd("add", uri)
-
-    @cmd("clear")
-    async def clear(self):
-        await self.runcmd("clear")
-
-    @cmd("consume")
-    async def consume(self, state):
-        await self.runcmd("consume", state)
-
-    @cmd("disableoutput")
-    async def disable_output(self, output):
-        await self.runcmd("disableoutput", output)
-
-    @cmd("enableoutput")
-    async def enable_output(self, output):
-        await self.runcmd("enableoutput", output)
-
-    @cmd("toggleoutput")
-    async def toggle_output(self, output):
-        await self.runcmd("toggleoutput", output)
-
-    @cmd("listall")
-    async def list_all(self):
-        await self.runcmd("listall")
-
-    @cmd("outputs")
-    async def outputs(self):
-        await self.runcmd("outputs")
-
-    @cmd("play")  # [SONGPOS]
-    async def play(self):
-        await self.runcmd("play")
-
-    @cmd("playlist")
-    async def playlist(self):
-        await self.runcmd("playlist")
-
-    @cmd("shuffle")
-    async def shuffle(self):
-        await self.runcmd("shuffle")
-
-    @cmd("status")
-    async def status(self):
-        await self.runcmd("status")
-
-    @cmd("update")
-    async def update(self):
-        await self.runcmd("update")
-
-    @cmd("clearerror")
-    async def clear_error(self):
-        await self.runcmd("clearerror")
-
-    @cmd("currentsong")
-    async def current_song(self):
-        await self.runcmd("currentsong")
-
-    @cmd("idle")  # [SUBSYSTEMS]
-    async def idle(self):
-        await self.runcmd("idle")
-
-    @cmd("stats")
-    async def stats(self):
-        await self.runcmd("stats")
-
-    @cmd("crossfade")  # {SECONDS}
-    async def crossfade(self):
-        await self.runcmd("crossfade")
-
-    @cmd("mixrampdb")  # {deciBels}
-    async def mix_ramp_db(self):
-        await self.runcmd("mixrampdb")
-
-    @cmd("mixrampdelay")  # {SECONDS}
-    async def mix_ramp_delay(self):
-        await self.runcmd("mixrampdelay")
-
-    @cmd("random")  # {STATE}
-    async def random(self):
-        await self.runcmd("random")
-
-    @cmd("repeat")  # {STATE}
-    async def repeat(self):
-        await self.runcmd("repeat")
-
-    @cmd("setvol")  # {VOL}
-    async def set_vol(self):
-        await self.runcmd("setvol")
-
-    @cmd("single")  # {STATE}
-    async def single(self):
-        await self.runcmd("single")
-
-    @cmd("replay_gain_mode")  # {MODE}
-    async def replay_gain_mode(self):
-        await self.runcmd("replay_gain_mode")
-
-    @cmd("replay_gain_status")
-    async def replay_gain_status(self):
-        await self.runcmd("replay_gain_status")
-
-    @cmd("previous")
-    async def previous(self):
-        await self.runcmd("previous")
-
-    @cmd("next")
-    async def next(self):
-        await self.runcmd("next")
-
-    @cmd("pause")
-    async def pause(self):
-        await self.runcmd("pause")
-
-    @cmd("stop")
-    async def stop(self):
-        await self.runcmd("stop")
-
-    @cmd("playid")  # [SONGID]
-    async def play_id(self):
-        await self.runcmd("playid")
-
-    @cmd("seek")  # {SONGPOS} {TIME}
-    async def seek(self):
-        await self.runcmd("seek")
-
-    @cmd("seekid")  # {SONGPOS} {TIME}
-    async def seek_id(self):
-        await self.runcmd("seekid")
-
-    @cmd("seekcur")  # {TIME}
-    async def seek_cur(self):
-        await self.runcmd("seekcur")
-
-    @cmd("addid")  # {URI} [POSITION]
-    async def add_id(self):
-        await self.runcmd("addid")
-
-    @cmd("delete")  # [{POS} | {START:END}]
-    async def delete(self):
-        await self.runcmd("delete")
-
-    @cmd("deleteid")  # {SONGID}
-    async def delete_id(self):
-        await self.runcmd("deleteid")
+            command = self.command.encode("utf-8")
+        return command + b"\n"
 
 
-class TrioMPDProxy(MPDProxyBase):
-    def __init__(self, nursery, stream):
-        self.read = partial(stream.receive_some, 65536)
-        self.write = stream.send_all
-        self.sleep = trio.sleep
-        nursery.start_soon(self.run_tasks)
+class MPDConnection:
+    def __init__(self):
+        self.queue = []
+        self.version = None
+        self.initialized = False
+        self.in_idle = False
 
-    async def run_tasks(self):
-        async with trio.open_nursery() as nursery:
-            nursery.start_soon(self.keepalive_task)
-            nursery.start_soon(self.listener_task)
+    def _decode(self, data):
+        text = data.decode("utf-8").rstrip()
+        _message = []
+        for line in text.split("\n"):
+            if line and line != "OK":
+                _message.append(line)
+        return "\n".join(_message)
+
+    def send(self, request):
+        logging.debug(f"==MPDConn.send==>> {request}")
+        if request.command == "idle":
+            self.in_idle = True
+        elif request.command == "noidle":
+            self.in_idle = False
+        return request.send()
+
+    def receive_event(self, event):
+        logging.debug(f"==MPDConn.receive_event==>> {event}")
+        self.in_idle = False
+
+    def receive_data(self, data):
+        logging.debug(f"==MPDConn.receive_data==>> {data}")
+        response = self._decode(data)
+        if self.initialized:
+            return response
+        else:
+            self.version = response
+            self.initialized = True
+            print("--->>>", self.version)
 
 
-class AnyioMPDProxy(MPDProxyBase):
-    def __init__(self, task_group, *uri):
-        self.tg = task_group
+class TrioMPDProxy:
+    def __init__(self, nursery, *uri):
+        self.mpd = MPDConnection()
+        self.nursery = nursery
         self.uri = uri
 
     async def __aenter__(self):
-        self.sock = await anyio.connect_tcp(*self.uri)
-        await self.tg.spawn(self.keepalive_task)
-        await self.tg.spawn(self.listener_task)
+        self.sock = await trio.open_tcp_stream(*self.uri)
+
+        # Receive MPD greeting
+        init = await self.sock.receive_some(65536)
+        self.mpd.receive_data(init)
+        assert self.mpd.initialized
+
+        # Idle for events and keep connection alive
+        self.idle_scope = await self.nursery.start(self.idle_task)
+
         return self
 
+    async def _send_idle(self):
+        idle = MPDRequest("idle")
+        encoded = self.mpd.send(idle)
+        await self.sock.send_all(encoded)
+
+    async def _send_noidle(self):
+        noidle = MPDRequest("noidle")
+        encoded = self.mpd.send(noidle)
+        await self.sock.send_all(encoded)
+
+        confirmation = await self.sock.receive_some(65536)
+        logging.debug(f"GOT OK in noidle event!!!!!! {confirmation}")
+        self.mpd.receive_event(confirmation)
+
+    async def idle_task(self, task_status=trio.TASK_STATUS_IGNORED):
+        await self._send_idle()
+        cancel_scope = trio.CancelScope()
+        task_status.started(cancel_scope)
+        with cancel_scope:
+            while True:
+                logging.debug(f"waiting for idle event!!!!!!")
+                event = await self.sock.receive_some(65536)
+                logging.debug(f"GOT for idle event!!!!!! {event}")
+                self.mpd.receive_event(event)
+                print("???--=>", event)
+                await self._send_idle()
+                logging.debug(f"SENT idle event!!!!!!")
+
     async def __aexit__(self, *args):
-        await self.sock.close()
+        await self.sock.aclose()
 
-    async def keepalive_task(self):
-        while True:
-            try:
-                await self.sock.send_all(b"ping\n")
-            except OSError:
-                logging.debug("mpd keepalive bad conn")
-                break
-            else:
-                await anyio.sleep(3.333)
+    async def run_cmd(self, command, *params):
+        logging.debug(f"-->> run_cmd enter about to cancel")
+        self.idle_scope.cancel()
+        logging.debug(f"-->> run_cmd after idle cancel, bef noidle")
+        await self._send_noidle()
+        logging.debug(f"-->> run_cmd after noidle")
 
-    async def listener_task(self):
-        while True:
-            try:
-                response = await self.sock.receive_some(65536)
-            except ClosedResourceError:
-                logging.debug("mpd listener closed conn")
-                break
-            else:
-                if response != b"OK\n":
-                    print("mpd", response.decode("utf-8").rstrip())
+        # Build request
+        request = MPDRequest(command, *params)
+        encoded = self.mpd.send(request)
 
-    async def runcmd(self, command, *params):
-        # Encode to UTF-8 bytes
-        if params:
-            params = [param.encode("utf-8") for param in params]
-            params_str = b" " + b" ".join(params)
-            command = command.encode("utf-8") + params_str
-        else:
-            command = command.encode("utf-8")
-        await self.sock.send_all(command + b"\n")
+        # Perform IO
+        await self.sock.send_all(encoded)
+        response = await self.sock.receive_some(65536)
 
+        self.idle_scope = await self.nursery.start(self.idle_task)
 
-class CurioMPDProxy(MPDProxyBase):
-    def __init__(self, sock):
-        self.read = partial(sock.recv, 65536)
-        self.write = sock.sendall
-        self.sleep = curio.sleep
+        # Report results
+        print(self.mpd.receive_data(response))
 
-    async def start(self):
-        async def _start():
-            async with curio.TaskGroup() as tg:
-                await tg.spawn(self.keepalive_task)
-                await tg.spawn(self.listener_task)
-        await curio.spawn(_start)
+    @cmd("add")
+    async def add(self, uri):
+        await self.run_cmd("add", uri)
 
+    @cmd("clear")
+    async def clear(self):
+        await self.run_cmd("clear")
 
-class AsyncioMPDProxy(MPDProxyBase):
-    def __init__(self, reader, writer):
-        self.read = partial(reader.read, 65536)
-        self.write = partial(arun, writer.write)
-        self.sleep = asyncio.sleep
-        asyncio.create_task(self.run_tasks())
+    @cmd("consume")
+    async def consume(self, state):
+        await self.run_cmd("consume", state)
 
-    async def run_tasks(self):
-        await asyncio.gather(self.keepalive_task(), self.listener_task())
+    @cmd("disableoutput")
+    async def disable_output(self, output):
+        await self.run_cmd("disableoutput", output)
+
+    @cmd("enableoutput")
+    async def enable_output(self, output):
+        await self.run_cmd("enableoutput", output)
+
+    @cmd("toggleoutput")
+    async def toggle_output(self, output):
+        await self.run_cmd("toggleoutput", output)
+
+    @cmd("listall")
+    async def list_all(self):
+        await self.run_cmd("listall")
+
+    @cmd("outputs")
+    async def outputs(self):
+        await self.run_cmd("outputs")
+
+    @cmd("play")  # [SONGPOS]
+    async def play(self):
+        await self.run_cmd("play")
+
+    @cmd("playlist")
+    async def playlist(self):
+        await self.run_cmd("playlist")
+
+    @cmd("shuffle")
+    async def shuffle(self):
+        await self.run_cmd("shuffle")
+
+    @cmd("status")
+    async def status(self):
+        await self.run_cmd("status")
+
+    @cmd("update")
+    async def update(self):
+        await self.run_cmd("update")
+
+    @cmd("clearerror")
+    async def clear_error(self):
+        await self.run_cmd("clearerror")
+
+    @cmd("currentsong")
+    async def current_song(self):
+        await self.run_cmd("currentsong")
+
+    @cmd("idle")  # [SUBSYSTEMS]
+    async def idle(self):
+        await self.run_cmd("idle")
+
+    @cmd("stats")
+    async def stats(self):
+        await self.run_cmd("stats")
+
+    @cmd("crossfade")  # {SECONDS}
+    async def crossfade(self):
+        await self.run_cmd("crossfade")
+
+    @cmd("mixrampdb")  # {deciBels}
+    async def mix_ramp_db(self):
+        await self.run_cmd("mixrampdb")
+
+    @cmd("mixrampdelay")  # {SECONDS}
+    async def mix_ramp_delay(self):
+        await self.run_cmd("mixrampdelay")
+
+    @cmd("random")  # {STATE}
+    async def random(self):
+        await self.run_cmd("random")
+
+    @cmd("repeat")  # {STATE}
+    async def repeat(self):
+        await self.run_cmd("repeat")
+
+    @cmd("setvol")  # {VOL}
+    async def set_vol(self):
+        await self.run_cmd("setvol")
+
+    @cmd("single")  # {STATE}
+    async def single(self):
+        await self.run_cmd("single")
+
+    @cmd("replay_gain_mode")  # {MODE}
+    async def replay_gain_mode(self):
+        await self.run_cmd("replay_gain_mode")
+
+    @cmd("replay_gain_status")
+    async def replay_gain_status(self):
+        await self.run_cmd("replay_gain_status")
+
+    @cmd("previous")
+    async def previous(self):
+        await self.run_cmd("previous")
+
+    @cmd("next")
+    async def next(self):
+        await self.run_cmd("next")
+
+    @cmd("pause")
+    async def pause(self):
+        await self.run_cmd("pause")
+
+    @cmd("stop")
+    async def stop(self):
+        await self.run_cmd("stop")
+
+    @cmd("playid")  # [SONGID]
+    async def play_id(self):
+        await self.run_cmd("playid")
+
+    @cmd("seek")  # {SONGPOS} {TIME}
+    async def seek(self):
+        await self.run_cmd("seek")
+
+    @cmd("seekid")  # {SONGPOS} {TIME}
+    async def seek_id(self):
+        await self.run_cmd("seekid")
+
+    @cmd("seekcur")  # {TIME}
+    async def seek_cur(self):
+        await self.run_cmd("seekcur")
+
+    @cmd("addid")  # {URI} [POSITION]
+    async def add_id(self):
+        await self.run_cmd("addid")
+
+    @cmd("delete")  # [{POS} | {START:END}]
+    async def delete(self):
+        await self.run_cmd("delete")
+
+    @cmd("deleteid")  # {SONGID}
+    async def delete_id(self):
+        await self.run_cmd("deleteid")

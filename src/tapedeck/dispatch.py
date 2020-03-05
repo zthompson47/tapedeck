@@ -1,15 +1,11 @@
 from itertools import count
 
-#from trio_repl import TrioRepl
-#from trignalc import main as signal
-
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from .aria2 import CMD as aria2_cmd
 from .mpd import CMD as mpd_cmd
 from .etree import CMD as etree_cmd
 from .pulse import CMD as pulse_cmd
-
 from .format import FMT_ARIA2 as aria2_fmt, FMT_ETREE as etree_fmt
 from .config import PS1
 from .parser import parse
@@ -61,10 +57,12 @@ class Dispatch:
             self.namespace = "etree."
         elif command == "pulse.~":
             self.namespace = "pulse."
-        #elif command == "trio":
-        #    await TrioRepl().run(locals())
-        #elif command == "trignalc":
-        #    await signal()
+        elif command == "trio":
+            from trio_repl import TrioRepl
+            await TrioRepl().run(locals())
+        elif command == "trignalc":
+            from trignalc import main as signal
+            await signal()
 
         # MPD
         elif self.namespace == "mpd."or command.startswith("mpd."):
