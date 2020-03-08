@@ -16,6 +16,7 @@ from .mpd import TrioMPDProxy
 from .redis import TrioRedisProxy
 from .etree import TrioEtreeProxy
 from .pulse import TrioPulseProxy
+from .udev import UdevProxy
 from .util import TrioQueue
 
 # import logging
@@ -105,6 +106,7 @@ async def main(args):
         redis_proxy = TrioRedisProxy(nursery)
         etree_proxy = TrioEtreeProxy(redis_proxy)
         pulse_proxy = await stack.enter_async_context(TrioPulseProxy(PULSE))
+        udev_proxy = await stack.enter_async_context(UdevProxy(nursery))
         td_cmd = Dispatch(
             aria2=aria2_proxy,
             mpd=mpd_proxy,

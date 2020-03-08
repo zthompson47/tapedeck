@@ -55,12 +55,21 @@ class TrioPulseProxy:
         logging.debug(f"==>> {exc_type}\n{exc}\n{tb}")
         await self.sock.aclose()
 
-    async def run_cmd(self, command, *params):
+    async def run_cmd(self, command, *params, expect_response=True):
         request = CliRequest(command, *params)
         await self.sock.send_all(request.send())
-        response = CliResponse(await self.sock.receive_some(65536))
-        return response.decode()
+        if expect_response:
+            response = CliResponse(await self.sock.receive_some(65536))
+            return response.decode()
+        else:
+            return b""
 
     @cmd("list-sinks")
     async def list_sinks(self):
         return await self.run_cmd("list-sinks")
+
+    @cmd("set-default-sink")
+    async def set_default_sink(self, sink_id):
+        return await self.run_cmd(
+            "set-default-sink", sink_id, expect_response=False
+        )

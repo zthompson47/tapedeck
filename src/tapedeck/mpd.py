@@ -62,9 +62,8 @@ class MPDConnection:
         if self.initialized:
             return response
         else:
-            self.version = response
+            self.version = response[7:]
             self.initialized = True
-            print("--->>>", self.version)
 
 
 class TrioMPDProxy:

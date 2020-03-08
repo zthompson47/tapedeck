@@ -29,6 +29,7 @@ setup(
         "prompt-toolkit",
         "feedparser",
         "redis",
+        "pyudev",
     ],
     zip_safe=False,
     packages=find_packages(where="src"),
