@@ -14,7 +14,6 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3.8",
         "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
     ],
     entry_points={
         "console_scripts": [
@@ -30,6 +29,7 @@ setup(
         "feedparser",
         "redis",
         "pyudev",
+        "jeepney",
     ],
     zip_safe=False,
     packages=find_packages(where="src"),
