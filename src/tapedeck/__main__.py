@@ -9,7 +9,7 @@ from prompt_toolkit.shortcuts import CompleteStyle
 from prompt_toolkit import PromptSession
 
 from .dispatch import Dispatch, CommandNotFound
-from .config import ARIA2, ARIA2_CURIO, MPD, PULSE
+from .config import ARIA2, MPD, PULSE
 from .completion import TapedeckCompleter
 from .aria2 import Aria2Proxy
 from .mpd import TrioMPDProxy
@@ -17,36 +17,14 @@ from .redis import TrioRedisProxy
 from .etree import TrioEtreeProxy
 from .pulse import TrioPulseProxy
 from .udev import UdevProxy
-from .util import TrioQueue
+from .util import TrioToAsyncioChannel
 
 # import logging
 # logging.basicConfig(filename="td.log", level=logging.DEBUG)
+# D = logging.debug
 
-async def prompt_thread(td_cmd, to_main, from_main, trio_token):
-    async def _put(data):
-        fut = asyncio.get_event_loop().run_in_executor(
-            None,
-            partial(
-                trio.from_thread.run,
-                to_main.send, data,
-                trio_token=trio_token
-            )
-        )
-        await asyncio.wait([fut])
-        return fut.result()
 
-    async def _get():
-        fut = asyncio.get_event_loop().run_in_executor(
-            None,
-            partial(
-                trio.from_thread.run,
-                from_main.receive,
-                trio_token=trio_token
-            )
-        )
-        await asyncio.wait([fut])
-        return fut.result()
-
+async def prompt_thread(td_cmd, channel):
     ptk = PromptSession(
         vi_mode=True,
         complete_style=CompleteStyle.READLINE_LIKE,
@@ -55,10 +33,9 @@ async def prompt_thread(td_cmd, to_main, from_main, trio_token):
     while True:
         try:
             with patch_stdout():
-                # Prompt loop
                 request = await ptk.prompt_async(td_cmd.PS1())
-                await _put(request)
-                response = await _get()
+                await channel.send(request)
+                response = await channel.receive()
                 if response:
                     print(response)
         except CommandNotFound:
@@ -66,67 +43,63 @@ async def prompt_thread(td_cmd, to_main, from_main, trio_token):
         except KeyboardInterrupt:
             continue
         except EOFError:
-            await _put(None)
+            await channel.send(None)
             break
 
 
-async def run_in_prompt(td_cmd, to_thread, from_thread):
-    async def _put(data):
-        await to_thread.send(data)
-
-    async def _get():
-        return await from_thread.receive()
-
+async def run_in_prompt(td_cmd, channel):
     while True:
-        request = await _get()
+        request = await channel.receive()
         if request is None:
             break
         else:
             try:
                 response = await td_cmd.route(request)
             except CommandNotFound:
-                await _put("Press <TAB> for help")
+                await channel.send("Press <TAB> for help")
             else:
-                await _put(response)
+                await channel.send(response)
 
 
 async def main(args):
     async with AsyncExitStack() as stack:
-        nursery = await stack.enter_async_context(trio.open_nursery())
+        _start = stack.enter_async_context
+        nursery = await _start(trio.open_nursery())
         if args.monitor:
             from trio_monitor.monitor import Monitor
+
             mon = Monitor()
             trio.hazmat.add_instrument(mon)
-            nursery.start_soon(trio.serve_tcp, mon.listen_on_stream, 8998)
+            nursery.start_soon(
+                trio.serve_tcp, mon.listen_on_stream, 8998
+            )
 
-        aria2_proxy = await stack.enter_async_context(
-            Aria2Proxy(nursery, ARIA2)
-        )
-        mpd_proxy = await stack.enter_async_context(TrioMPDProxy(nursery, *MPD))
+        # Gather the proxies
+        aria2_proxy = await _start(Aria2Proxy(nursery, ARIA2))
+        mpd_proxy = await _start(TrioMPDProxy(nursery, *MPD))
         redis_proxy = TrioRedisProxy(nursery)
         etree_proxy = TrioEtreeProxy(redis_proxy)
-        pulse_proxy = await stack.enter_async_context(TrioPulseProxy(PULSE))
-        udev_proxy = await stack.enter_async_context(UdevProxy(nursery))
+        pulse_proxy = await _start(TrioPulseProxy(PULSE))
+        udev_proxy = await _start(UdevProxy(nursery))
         td_cmd = Dispatch(
             aria2=aria2_proxy,
             mpd=mpd_proxy,
             redis=redis_proxy,
             etree=etree_proxy,
-            pulse=pulse_proxy
+            pulse=pulse_proxy,
         )
 
-        to_thread, from_main = trio.open_memory_channel(0)
-        to_main, from_thread = trio.open_memory_channel(0)
-
-        trio_token = trio.hazmat.current_trio_token()
-        nursery.start_soon(partial(
-            trio.to_thread.run_sync,
-            asyncio.run,
-            prompt_thread(td_cmd, to_main, from_main, trio_token),
-            cancellable=True
-        ))
-
-        await run_in_prompt(td_cmd, to_thread, from_thread)
+        # Start the prompt
+        channel = TrioToAsyncioChannel()
+        nursery.start_soon(
+            partial(
+                trio.to_thread.run_sync,
+                asyncio.run,
+                prompt_thread(td_cmd, channel),
+                cancellable=True,
+            )
+        )
+        await run_in_prompt(td_cmd, channel)
         nursery.cancel_scope.cancel()
 
 
@@ -139,6 +112,7 @@ def enter():
     )
     args = arg.parse_args()
     trio.run(main, args)
+
 
 if __name__ == "__main__":
     enter()

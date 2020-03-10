@@ -1,4 +1,8 @@
+import asyncio
+from functools import partial
+
 import trio
+from sniffio import current_async_library
 
 
 class TrioQueue:
@@ -15,3 +19,38 @@ class TrioQueue:
     async def put(self, item):
         # Should _put be awaitable here?
         self.queue._put(item)
+
+
+class TrioToAsyncioChannel:
+    def __init__(self):
+        self.trio_token = trio.hazmat.current_trio_token()
+        self.to_asyncio, self.from_trio = trio.open_memory_channel(0)
+        self.to_trio, self.from_asyncio = trio.open_memory_channel(0)
+
+    async def send(self, data):
+        if current_async_library() == "trio":
+            await self.to_asyncio.send(data)
+        elif current_async_library() == "asyncio":
+            future = asyncio.get_event_loop().run_in_executor(
+                None, partial(
+                    trio.from_thread.run,
+                    self.to_trio.send, data,
+                    trio_token=self.trio_token
+                )
+            )
+            await asyncio.wait([future])
+            future.result()  # might raise exception
+
+    async def receive(self):
+        if current_async_library() == "trio":
+            return await self.from_asyncio.receive()
+        elif current_async_library() == "asyncio":
+            future = asyncio.get_event_loop().run_in_executor(
+                None, partial(
+                    trio.from_thread.run,
+                    self.from_trio.receive,
+                    trio_token=self.trio_token
+                )
+            )
+            await asyncio.wait([future])
+            return future.result()

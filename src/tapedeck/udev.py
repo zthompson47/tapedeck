@@ -25,16 +25,16 @@ class UdevProxy:
         monitor = Monitor.from_netlink(self.context)
         monitor.filter_by("sound")
         for device in iter(monitor.poll, None):
-            print(device.action, device.sys_path)
+            print("==UDEV==>", device.action, device.sys_path)
 
     def storage_listener(self):
         monitor = Monitor.from_netlink(self.context)
         monitor.filter_by("block")
         for device in iter(monitor.poll, None):
-            if 'ID_FS_TYPE' in device:
-                print('{0} partition {1}'.format(
+            if "ID_FS_TYPE" in device:
+                print("==UDEV==>", "{0} partition {1}".format(
                     device.action,
-                    device.get('ID_FS_LABEL')
+                    device.get("ID_FS_LABEL")
                 ))
 
     async def __aexit__(self, *_):

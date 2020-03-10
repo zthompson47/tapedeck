@@ -24,8 +24,8 @@ def pprint_etree(rss):
         for entry in rss["entries"]:
             result += entry["title"] + "\n"
             result += entry["links"][0]["href"] + "\n"
-            result += "--\n"
-    print(result)
+            result += "--"
+    return result
 
 FMT_ETREE = {
     "_default": pprint_etree,
