@@ -6,57 +6,53 @@ from .aria2 import CMD as aria2_cmd
 from .mpd import CMD as mpd_cmd
 from .etree import CMD as etree_cmd
 from .pulse import CMD as pulse_cmd
-from .format import FMT_ARIA2 as aria2_fmt, FMT_ETREE as etree_fmt
+from .format import (
+    FMT_ARIA2 as aria2_fmt,
+    FMT_ETREE as etree_fmt,
+    FMT_MPD as mpd_fmt,
+    FMT_PULSE as pulse_fmt,
+)
 from .config import PS1
-from .parser import parse
+from .language import parse
 
 class CommandNotFound(Exception):
     pass
 
 class Dispatch:
-    def __init__(self, aria2=None, mpd=None, redis=None, etree=None, pulse=None):
-        """Start up proxy services"""
-        self.namespace = ""
-        self.aria2 = aria2
-        self.mpd = mpd
-        self.redis = redis
-        self.etree = etree
-        self.pulse = pulse
+    def __init__(self):
+        self.namespace = None
+        self.proxies = {}
+
+    def add_proxy(self, name, proxy):
+        self.proxies[name] = proxy
 
     def PS1(self):
-        if self.namespace == "mpd.":
-            return PS1.format(namespace="mpd")
-        elif self.namespace  == "aria2.":
-            return PS1.format(namespace="aria2")
-        elif self.namespace  == "etree.":
-            return PS1.format(namespace="etree")
-        elif self.namespace  == "pulse.":
-            return PS1.format(namespace="pulse")
-        else:
+        if self.namespace is None:
             return PS1.format(namespace="~")
+        else:
+            return PS1.format(namespace=f"~{self.namespace}")
 
     async def route(self, request):
         """Parse request and execute command."""
         if not request:
             raise CommandNotFound()
         program = parse(request)
+        command = program[0][0]
+        result = None
 
-        args = request.split()
-        command = None
-        if args:
-            command = args[0]
-
-        # Builtins
+        # Namespace
         if command == "~":
             self.namespace = ""
         elif command == "aria2.~":
-            self.namespace = "aria2."
+            self.namespace = "aria2"
         elif command == "mpd.~":
-            self.namespace = "mpd."
+            self.namespace = "mpd"
         elif command == "etree.~":
-            self.namespace = "etree."
+            self.namespace = "etree"
         elif command == "pulse.~":
-            self.namespace = "pulse."
+            self.namespace = "pulse"
+
+        # Utilities
         elif command == "trio":
             from trio_repl import TrioRepl
             await TrioRepl().run(locals())
@@ -65,49 +61,54 @@ class Dispatch:
             await signal()
 
         # MPD
-        elif self.namespace == "mpd."or command.startswith("mpd."):
+        elif self.namespace == "mpd" or command.startswith("mpd."):
             if command.startswith("mpd."):
-                cmd_name = program[0][0][4:]
+                cmd_name = program[0][0][len("mpd."):]
             else:
                 cmd_name = program[0][0]
             args = program[0][1:]
             meth = mpd_cmd[cmd_name]
-            await meth(self.mpd, *args)
+            response = await meth(self.proxies["mpd"], *args)
+            format = mpd_fmt.get(cmd_name, mpd_fmt["_default"])
+            result = format(response)
 
         # Aria2
-        elif self.namespace == "aria2."or command.startswith("aria2."):
+        elif self.namespace == "aria2" or command.startswith("aria2."):
             if command.startswith("aria2."):
-                cmd_name = program[0][0][6:]
+                cmd_name = program[0][0][len("aria2."):]
             else:
                 cmd_name = program[0][0]
             args = program[0][1:]
             meth = aria2_cmd[cmd_name]
-            response = await meth(self.aria2, *args)
+            response = await meth(self.proxies["aria2"], *args)
             format = aria2_fmt.get(cmd_name, aria2_fmt["_default"])
-            print(format(response), flush=True)
+            result = format(response)
 
         # RSS (Etree)
-        elif self.namespace == "etree."or command.startswith("etree."):
+        elif self.namespace == "etree" or command.startswith("etree."):
             if command.startswith("etree."):
-                cmd_name = program[0][0][6:]
+                cmd_name = program[0][0][len("etree."):]
             else:
                 cmd_name = program[0][0]
             args = program[0][1:]
             meth = etree_cmd[cmd_name]
-            response = await meth(self.etree, *args)
+            response = await meth(self.proxies["etree"], *args)
             format = etree_fmt.get(cmd_name, etree_fmt["_default"])
-            print(format(response))
+            result = format(response)
 
         # Pulseaudio
-        elif self.namespace == "pulse."or command.startswith("pulse."):
+        elif self.namespace == "pulse" or command.startswith("pulse."):
             if command.startswith("pulse."):
-                cmd_name = program[0][0][6:]
+                cmd_name = program[0][0][len("pulse."):]
             else:
                 cmd_name = program[0][0]
             args = program[0][1:]
             meth = pulse_cmd[cmd_name]
-            response = await meth(self.pulse, *args)
-            print(response.decode("utf-8"))
+            response = await meth(self.proxies["pulse"], *args)
+            format = pulse_fmt.get(cmd_name, pulse_fmt["_default"])
+            result = format(response)
 
         else:
             raise CommandNotFound()
+
+        return result

@@ -27,6 +27,12 @@ def pprint_etree(rss):
             result += "--"
     return result
 
+def passthru(x):
+    return x
+
+def decode(x):
+    return x.decode("utf-8")
+
 FMT_ETREE = {
     "_default": pprint_etree,
 }
@@ -34,4 +40,12 @@ FMT_ETREE = {
 FMT_ARIA2 = {
     "tellActive": pprint_tellActive,
     "_default": pprint,
+}
+
+FMT_MPD = {
+    "_default": passthru,
+}
+
+FMT_PULSE = {
+    "_default": decode,
 }

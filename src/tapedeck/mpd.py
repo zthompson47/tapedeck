@@ -124,155 +124,156 @@ class TrioMPDProxy:
         await self.sock.send_all(encoded)
         response = await self.sock.receive_some(65536)
 
+        # Back to idle
         self.idle_scope = await self.nursery.start(self.idle_task)
 
         # Report results
-        print(self.mpd.receive_data(response))
+        return self.mpd.receive_data(response)
 
     @cmd("add")
     async def add(self, uri):
-        await self.run_cmd("add", uri)
+        return await self.run_cmd("add", uri)
 
     @cmd("clear")
     async def clear(self):
-        await self.run_cmd("clear")
+        return await self.run_cmd("clear")
 
     @cmd("consume")
     async def consume(self, state):
-        await self.run_cmd("consume", state)
+        return await self.run_cmd("consume", state)
 
     @cmd("disableoutput")
     async def disable_output(self, output):
-        await self.run_cmd("disableoutput", output)
+        return await self.run_cmd("disableoutput", output)
 
     @cmd("enableoutput")
     async def enable_output(self, output):
-        await self.run_cmd("enableoutput", output)
+        return await self.run_cmd("enableoutput", output)
 
     @cmd("toggleoutput")
     async def toggle_output(self, output):
-        await self.run_cmd("toggleoutput", output)
+        return await self.run_cmd("toggleoutput", output)
 
     @cmd("listall")
     async def list_all(self):
-        await self.run_cmd("listall")
+        return await self.run_cmd("listall")
 
     @cmd("outputs")
     async def outputs(self):
-        await self.run_cmd("outputs")
+        return await self.run_cmd("outputs")
 
     @cmd("play")  # [SONGPOS]
     async def play(self):
-        await self.run_cmd("play")
+        return await self.run_cmd("play")
 
     @cmd("playlist")
     async def playlist(self):
-        await self.run_cmd("playlist")
+        return await self.run_cmd("playlist")
 
     @cmd("shuffle")
     async def shuffle(self):
-        await self.run_cmd("shuffle")
+        return await self.run_cmd("shuffle")
 
     @cmd("status")
     async def status(self):
-        await self.run_cmd("status")
+        return await self.run_cmd("status")
 
     @cmd("update")
     async def update(self):
-        await self.run_cmd("update")
+        return await self.run_cmd("update")
 
     @cmd("clearerror")
     async def clear_error(self):
-        await self.run_cmd("clearerror")
+        return await self.run_cmd("clearerror")
 
     @cmd("currentsong")
     async def current_song(self):
-        await self.run_cmd("currentsong")
+        return await self.run_cmd("currentsong")
 
     @cmd("idle")  # [SUBSYSTEMS]
     async def idle(self):
-        await self.run_cmd("idle")
+        return await self.run_cmd("idle")
 
     @cmd("stats")
     async def stats(self):
-        await self.run_cmd("stats")
+        return await self.run_cmd("stats")
 
     @cmd("crossfade")  # {SECONDS}
     async def crossfade(self):
-        await self.run_cmd("crossfade")
+        return await self.run_cmd("crossfade")
 
     @cmd("mixrampdb")  # {deciBels}
     async def mix_ramp_db(self):
-        await self.run_cmd("mixrampdb")
+        return await self.run_cmd("mixrampdb")
 
     @cmd("mixrampdelay")  # {SECONDS}
     async def mix_ramp_delay(self):
-        await self.run_cmd("mixrampdelay")
+        return await self.run_cmd("mixrampdelay")
 
     @cmd("random")  # {STATE}
     async def random(self):
-        await self.run_cmd("random")
+        return await self.run_cmd("random")
 
     @cmd("repeat")  # {STATE}
     async def repeat(self):
-        await self.run_cmd("repeat")
+        return await self.run_cmd("repeat")
 
     @cmd("setvol")  # {VOL}
     async def set_vol(self):
-        await self.run_cmd("setvol")
+        return await self.run_cmd("setvol")
 
     @cmd("single")  # {STATE}
     async def single(self):
-        await self.run_cmd("single")
+        return await self.run_cmd("single")
 
     @cmd("replay_gain_mode")  # {MODE}
     async def replay_gain_mode(self):
-        await self.run_cmd("replay_gain_mode")
+        return await self.run_cmd("replay_gain_mode")
 
     @cmd("replay_gain_status")
     async def replay_gain_status(self):
-        await self.run_cmd("replay_gain_status")
+        return await self.run_cmd("replay_gain_status")
 
     @cmd("previous")
     async def previous(self):
-        await self.run_cmd("previous")
+        return await self.run_cmd("previous")
 
     @cmd("next")
     async def next(self):
-        await self.run_cmd("next")
+        return await self.run_cmd("next")
 
     @cmd("pause")
     async def pause(self):
-        await self.run_cmd("pause")
+        return await self.run_cmd("pause")
 
     @cmd("stop")
     async def stop(self):
-        await self.run_cmd("stop")
+        return await self.run_cmd("stop")
 
     @cmd("playid")  # [SONGID]
     async def play_id(self):
-        await self.run_cmd("playid")
+        return await self.run_cmd("playid")
 
     @cmd("seek")  # {SONGPOS} {TIME}
     async def seek(self):
-        await self.run_cmd("seek")
+        return await self.run_cmd("seek")
 
     @cmd("seekid")  # {SONGPOS} {TIME}
     async def seek_id(self):
-        await self.run_cmd("seekid")
+        return await self.run_cmd("seekid")
 
     @cmd("seekcur")  # {TIME}
     async def seek_cur(self):
-        await self.run_cmd("seekcur")
+        return await self.run_cmd("seekcur")
 
     @cmd("addid")  # {URI} [POSITION]
     async def add_id(self):
-        await self.run_cmd("addid")
+        return await self.run_cmd("addid")
 
     @cmd("delete")  # [{POS} | {START:END}]
     async def delete(self):
-        await self.run_cmd("delete")
+        return await self.run_cmd("delete")
 
     @cmd("deleteid")  # {SONGID}
     async def delete_id(self):
-        await self.run_cmd("deleteid")
+        return await self.run_cmd("deleteid")

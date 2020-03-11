@@ -45,10 +45,10 @@ class TapedeckCompleter(Completer):
                     yield c
         elif self.td_cmd.namespace:
             words = ["~"]
-            if self.td_cmd.namespace == "aria2.":
+            if self.td_cmd.namespace == "aria2":
                 first_term = "aria2"
                 words += list(aria2_cmd.keys())
-            elif self.td_cmd.namespace == "mpd.":
+            elif self.td_cmd.namespace == "mpd":
                 first_term = "mpd"
                 words += list(mpd_cmd.keys())
             completer = WordCompleter(words, ignore_case=True)

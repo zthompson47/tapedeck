@@ -81,13 +81,12 @@ async def main(args):
         etree_proxy = TrioEtreeProxy(redis_proxy)
         pulse_proxy = await _start(TrioPulseProxy(PULSE))
         udev_proxy = await _start(UdevProxy(nursery))
-        td_cmd = Dispatch(
-            aria2=aria2_proxy,
-            mpd=mpd_proxy,
-            redis=redis_proxy,
-            etree=etree_proxy,
-            pulse=pulse_proxy,
-        )
+
+        td_cmd = Dispatch()
+        td_cmd.add_proxy("aria2", aria2_proxy)
+        td_cmd.add_proxy("mpd", mpd_proxy)
+        td_cmd.add_proxy("etree", etree_proxy)
+        td_cmd.add_proxy("pulse", pulse_proxy)
 
         # Start the prompt
         channel = TrioToAsyncioChannel()

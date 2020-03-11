@@ -38,8 +38,9 @@ class TrioToAsyncioChannel:
                     trio_token=self.trio_token
                 )
             )
-            await asyncio.wait([future])
-            future.result()  # might raise exception
+            await future
+            #await asyncio.wait([future])
+            #future.result()  # might raise exception
 
     async def receive(self):
         if current_async_library() == "trio":
@@ -52,5 +53,6 @@ class TrioToAsyncioChannel:
                     trio_token=self.trio_token
                 )
             )
-            await asyncio.wait([future])
-            return future.result()
+            #await asyncio.wait([future])
+            #return future.result()
+            return await future
