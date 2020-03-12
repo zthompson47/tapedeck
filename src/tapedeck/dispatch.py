@@ -1,10 +1,3 @@
-from itertools import count
-
-from prompt_toolkit.patch_stdout import patch_stdout
-
-from .aria2 import CMD as aria2_cmd
-from .mpd import CMD as mpd_cmd
-from .etree import CMD as etree_cmd
 from .pulse import CMD as pulse_cmd
 from .format import (
     FMT_ARIA2 as aria2_fmt,
@@ -14,12 +7,18 @@ from .format import (
 )
 from .config import PS1
 from .language import parse
+from .util import CommandRegistry
+
 
 class CommandNotFound(Exception):
     pass
 
+
 class Dispatch:
     def __init__(self):
+        self.etree_cmd = CommandRegistry.namespace["etree"]
+        self.mpd_cmd = CommandRegistry.namespace["mpd"]
+        self.aria2_cmd = CommandRegistry.namespace["aria2"]
         self.namespace = None
         self.proxies = {}
 
@@ -67,7 +66,7 @@ class Dispatch:
             else:
                 cmd_name = program[0][0]
             args = program[0][1:]
-            meth = mpd_cmd[cmd_name]
+            meth = self.mpd_cmd[cmd_name]
             response = await meth(self.proxies["mpd"], *args)
             format = mpd_fmt.get(cmd_name, mpd_fmt["_default"])
             result = format(response)
@@ -79,7 +78,7 @@ class Dispatch:
             else:
                 cmd_name = program[0][0]
             args = program[0][1:]
-            meth = aria2_cmd[cmd_name]
+            meth = self.aria2_cmd[cmd_name]
             response = await meth(self.proxies["aria2"], *args)
             format = aria2_fmt.get(cmd_name, aria2_fmt["_default"])
             result = format(response)
@@ -91,7 +90,7 @@ class Dispatch:
             else:
                 cmd_name = program[0][0]
             args = program[0][1:]
-            meth = etree_cmd[cmd_name]
+            meth = self.etree_cmd[cmd_name]
             response = await meth(self.proxies["etree"], *args)
             format = etree_fmt.get(cmd_name, etree_fmt["_default"])
             result = format(response)

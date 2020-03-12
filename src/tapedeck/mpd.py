@@ -2,17 +2,7 @@ from functools import partial
 
 import trio
 
-CMD = {}
-
-
-def cmd(name):
-    """Fill CMD with list of commands."""
-
-    def decorator(func):
-        CMD[name] = func
-        return func
-
-    return decorator
+from .util import CommandRegistry
 
 
 class MPDRequest:
@@ -129,6 +119,8 @@ class TrioMPDProxy:
 
         # Report results
         return self.mpd.receive_data(response)
+
+    cmd = CommandRegistry("mpd").cmd
 
     @cmd("add")
     async def add(self, uri):

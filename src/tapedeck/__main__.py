@@ -14,7 +14,7 @@ from .completion import TapedeckCompleter
 from .aria2 import Aria2Proxy
 from .mpd import TrioMPDProxy
 from .redis import TrioRedisProxy
-from .etree import TrioEtreeProxy
+from .etree import EtreeProxy
 from .pulse import TrioPulseProxy
 from .udev import UdevProxy
 from .util import TrioToAsyncioChannel
@@ -78,7 +78,7 @@ async def main(args):
         aria2_proxy = await _start(Aria2Proxy(nursery, ARIA2))
         mpd_proxy = await _start(TrioMPDProxy(nursery, *MPD))
         redis_proxy = TrioRedisProxy(nursery)
-        etree_proxy = TrioEtreeProxy(redis_proxy)
+        etree_proxy = EtreeProxy(redis_proxy)
         pulse_proxy = await _start(TrioPulseProxy(PULSE))
         udev_proxy = await _start(UdevProxy(nursery))
 

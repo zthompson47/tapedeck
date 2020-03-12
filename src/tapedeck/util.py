@@ -39,8 +39,6 @@ class TrioToAsyncioChannel:
                 )
             )
             await future
-            #await asyncio.wait([future])
-            #future.result()  # might raise exception
 
     async def receive(self):
         if current_async_library() == "trio":
@@ -53,6 +51,17 @@ class TrioToAsyncioChannel:
                     trio_token=self.trio_token
                 )
             )
-            #await asyncio.wait([future])
-            #return future.result()
             return await future
+
+
+class CommandRegistry:
+    namespace = {}
+    def __init__(self, name):
+        self.name = name
+        self.namespace[name] = {}
+
+    def cmd(self, command_name):
+        def decorator(func):
+            self.namespace[self.name][command_name] = func
+            return func
+        return decorator

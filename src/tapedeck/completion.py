@@ -2,13 +2,15 @@ from prompt_toolkit.completion import Completer
 from prompt_toolkit.completion.word_completer import WordCompleter
 from prompt_toolkit.document import Document
 
-from .aria2 import CMD as aria2_cmd
-from .mpd import CMD as mpd_cmd
-from .etree import CMD as etree_cmd
 from .pulse import CMD as pulse_cmd
+from .util import CommandRegistry
+
 
 class TapedeckCompleter(Completer):
     def __init__(self, td_cmd):
+        self.etree_cmd = CommandRegistry.namespace["etree"]
+        self.mpd_cmd = CommandRegistry.namespace["mpd"]
+        self.aria2_cmd = CommandRegistry.namespace["aria2"]
         self.td_cmd = td_cmd
         self.root_opts = [
             "aria2.", "etree.", "mpd.", "pulse.",
@@ -24,11 +26,11 @@ class TapedeckCompleter(Completer):
             words = ["~"]
             first_term = text.split(".")[0]
             if first_term == "aria2":
-                words += list(aria2_cmd.keys())
+                words += list(self.aria2_cmd.keys())
             elif first_term == "mpd":
-                words += list(mpd_cmd.keys())
+                words += list(self.mpd_cmd.keys())
             elif first_term == "etree":
-                words += list(etree_cmd.keys())
+                words += list(self.etree_cmd.keys())
             elif first_term == "pulse":
                 words += list(pulse_cmd.keys())
             completer = WordCompleter(words, ignore_case=True)
