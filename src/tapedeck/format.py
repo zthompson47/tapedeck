@@ -47,5 +47,5 @@ FMT_MPD = {
 }
 
 FMT_PULSE = {
-    "_default": decode,
+    "_default": passthru,
 }

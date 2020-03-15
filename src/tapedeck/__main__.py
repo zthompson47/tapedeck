@@ -15,7 +15,8 @@ from .aria2 import Aria2Proxy
 from .mpd import TrioMPDProxy
 from .redis import TrioRedisProxy
 from .etree import EtreeProxy
-from .pulse import TrioPulseProxy
+#from .pulse import TrioPulseProxy
+from .pulse import open_pulse_proxy
 from .udev import UdevProxy
 from .util import TrioToAsyncioChannel
 
@@ -79,8 +80,9 @@ async def main(args):
         mpd_proxy = await _start(TrioMPDProxy(nursery, *MPD))
         redis_proxy = TrioRedisProxy(nursery)
         etree_proxy = EtreeProxy(redis_proxy)
-        pulse_proxy = await _start(TrioPulseProxy(PULSE))
+        #pulse_proxy = await _start(TrioPulseProxy(PULSE))
         udev_proxy = await _start(UdevProxy(nursery))
+        pulse_proxy = await open_pulse_proxy(nursery, stack)
 
         td_cmd = Dispatch()
         td_cmd.add_proxy("aria2", aria2_proxy)

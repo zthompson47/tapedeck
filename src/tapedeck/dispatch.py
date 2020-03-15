@@ -1,4 +1,4 @@
-from .pulse import CMD as pulse_cmd
+#from .pulse import CMD as pulse_cmd
 from .format import (
     FMT_ARIA2 as aria2_fmt,
     FMT_ETREE as etree_fmt,
@@ -19,6 +19,7 @@ class Dispatch:
         self.etree_cmd = CommandRegistry.namespace["etree"]
         self.mpd_cmd = CommandRegistry.namespace["mpd"]
         self.aria2_cmd = CommandRegistry.namespace["aria2"]
+        self.pulse_cmd = CommandRegistry.namespace["pulse"]
         self.namespace = None
         self.proxies = {}
 
@@ -102,7 +103,7 @@ class Dispatch:
             else:
                 cmd_name = program[0][0]
             args = program[0][1:]
-            meth = pulse_cmd[cmd_name]
+            meth = self.pulse_cmd[cmd_name]
             response = await meth(self.proxies["pulse"], *args)
             format = pulse_fmt.get(cmd_name, pulse_fmt["_default"])
             result = format(response)

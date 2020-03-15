@@ -14,16 +14,20 @@ from jeepney.wrappers import new_method_call, ProxyBase
 from jeepney.bus_messages import message_bus, MatchRule
 from jeepney.routing import Router
 
-# logging.basicConfig(filename="dbus.log", level=logging.DEBUG)
+#logging.basicConfig(filename="dbus.log", level=logging.DEBUG)
 well_known_bus_name = "io.readthedocs.jeepney.aio_subscribe_example"
 
 
 @dataclass
 class _sigmatch:
+    """A key for matching dbus signal messages.  A value of None for
+       any attribute is a wildcard search."""
     path: str
     interface: str
     member: str
+
     def __eq__(self, other):
+        """Check for exact and wildcard matches."""
         if self.path != other.path:
             if None not in (self.path, other.path):
                 return False
@@ -36,7 +40,8 @@ class _sigmatch:
         return True
 
 
-class Proxy(ProxyBase):
+class TrioDBusProxy(ProxyBase):
+    """A dbus proxy using trio."""
     def __init__(self, msggen, nursery, bus="SESSION", buffsize=math.inf):
         super().__init__(msggen)
         self._serial_id = count(start=1)
@@ -44,26 +49,34 @@ class Proxy(ProxyBase):
         self._bus = bus
         self._parser = Parser()
         self._awaiting_reply = {}
+        self._buffsize = buffsize  # for __repr__
         self._signals, self.signals = trio.open_memory_channel(buffsize)
         self._subscribed_signals = []
+        self._sock = None
 
     def __repr__(self):
-        return f"Proxy({self._msggen}, {self._protocol})"
+        return f"TrioDBusProxy({self._msggen}, {self._nursery}, bus={self._bus}, buffsize={self._buffsize})"
 
     async def __aenter__(self):
         await self._connect_and_authenticate()
         await self._send_hello()
-        self._nursery.start_soon(self._router_task)
+        self._nursery.start_soon(self._routing_task)
+        return self
 
     async def __aexit__(self, *_):
-        await self.sock.aclose()
+        await self._sock.aclose()
 
     async def _connect_and_authenticate(self):
         """Connect and authenticate."""
-        self.sock = await trio.open_unix_socket(get_bus(self._bus))
-        await self.sock.send_all(b"\0" + make_auth_external())
+        if self._bus.startswith("unix:path"):
+            path = self._bus.split("=")[1]
+            self._sock = await trio.open_unix_socket(path)
+        else:
+            self._sock = await trio.open_unix_socket(get_bus(self._bus))
+
+        await self._sock.send_all(b"\0" + make_auth_external())
         auth_parser = SASLParser()
-        response = await self.sock.receive_some()
+        response = await self._sock.receive_some()
         auth_parser.feed(response)
         if not auth_parser.authenticated:
             if auth_parser.error:
@@ -71,13 +84,15 @@ class Proxy(ProxyBase):
             else:
                 raise AuthenticationError("Unknown error")
         self._parser.feed(auth_parser.buffer)
-        await self.sock.send_all(BEGIN)
+        await self._sock.send_all(BEGIN)
 
     async def _send_hello(self):
+        """Initiate session and get bus id."""
         hello = new_method_call(message_bus, "Hello")
         hello.header.serial = next(self._serial_id)
-        await self.sock.send_all(hello.serialise())
-        hello_reply = await self.sock.receive_some()
+        await self._sock.send_all(hello.serialise())
+
+        hello_reply = await self._sock.receive_some()
         for msg in self._parser.feed(hello_reply):
             serial = msg.header.fields.get(
                 HeaderFields.reply_serial, -1
@@ -85,18 +100,21 @@ class Proxy(ProxyBase):
             if serial == hello.header.serial:
                 self.unique_name = msg.body[0]
         
-    async def _router_task(self):
+    async def _routing_task(self):
+        """Handle method_returns and signals."""
         while True:
-            response = await self.sock.receive_some()
+            response = await self._sock.receive_some()
             for msg in self._parser.feed(response):
                 serial = msg.header.fields.get(
                     HeaderFields.reply_serial, -1
                 )
                 if serial in self._awaiting_reply:
+                    # Method return
                     awaiting_channel = self._awaiting_reply[serial]
                     del(self._awaiting_reply[serial])
                     await awaiting_channel.send(msg.body)
                 else:
+                    # Signal
                     hdr = msg.header
                     if hdr.message_type is MessageType.signal:
                         key = _sigmatch(
@@ -119,29 +137,34 @@ class Proxy(ProxyBase):
                             pass
 
     async def _send_message(self, msg):
+        """Handle outgoing messages."""
         msg.header.serial = next(self._serial_id)
         set_done, wait_done = trio.open_memory_channel(0)
         self._awaiting_reply[msg.header.serial] = set_done
         serialized = msg.serialise()
-        await self.sock.send_all(serialized)
+        await self._sock.send_all(serialized)
         async with wait_done:
             return await wait_done.receive()
 
     def _method_call(self, make_msg):
+        """Implement ProxyBase getattr methods."""
         async def inner(*args, **kwargs):
             msg = make_msg(*args, **kwargs)
             assert msg.header.message_type is MessageType.method_call
-            return await self._send_message(msg)
+            val = await self._send_message(msg)
+            return val
         return inner
 
     def subscribe_signal(self, path, interface, member):
+        """Subscribe to signals matching the args.  A value of None for
+           any arg is a wildcard search."""
         self._subscribed_signals.append(_sigmatch(path, interface, member))
 
 
 async def main():
     async with trio.open_nursery() as nursery:
-        service = Proxy(message_bus, nursery, buffsize=0)
-        watcher = Proxy(message_bus, nursery, buffsize=0)
+        service = TrioDBusProxy(message_bus, nursery)
+        watcher = TrioDBusProxy(message_bus, nursery)
         async with service, watcher:
             match_rule = MatchRule(
                 type="signal",

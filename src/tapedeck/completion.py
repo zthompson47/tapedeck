@@ -2,7 +2,7 @@ from prompt_toolkit.completion import Completer
 from prompt_toolkit.completion.word_completer import WordCompleter
 from prompt_toolkit.document import Document
 
-from .pulse import CMD as pulse_cmd
+#from .pulse import CMD as pulse_cmd
 from .util import CommandRegistry
 
 
@@ -11,6 +11,7 @@ class TapedeckCompleter(Completer):
         self.etree_cmd = CommandRegistry.namespace["etree"]
         self.mpd_cmd = CommandRegistry.namespace["mpd"]
         self.aria2_cmd = CommandRegistry.namespace["aria2"]
+        self.pulse_cmd = CommandRegistry.namespace["pulse"]
         self.td_cmd = td_cmd
         self.root_opts = [
             "aria2.", "etree.", "mpd.", "pulse.",
@@ -32,7 +33,7 @@ class TapedeckCompleter(Completer):
             elif first_term == "etree":
                 words += list(self.etree_cmd.keys())
             elif first_term == "pulse":
-                words += list(pulse_cmd.keys())
+                words += list(self.pulse_cmd.keys())
             completer = WordCompleter(words, ignore_case=True)
 
             # If we have a sub completer, use this for the completions.
