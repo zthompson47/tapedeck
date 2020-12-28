@@ -15,17 +15,17 @@ async-process = "1.0.1"
 libc = "0.2.81"
 bytes = "0.6.0"
 smol = "1.2.5"
-#log = "0.4.11"
-slog = "2.7.0"
-slog-async = "2.5.0"
-slog-term = "2.6.0"
+log = "0.4.11"
+#slog = "2.7.0"
+#slog-async = "2.5.0"
+#slog-term = "2.6.0"
 #simplelog = "0.8.0"
-async_concur = { path = "../async_concur" }
+#async_concur = { path = "../async_concur" }
 tracing = { version = "0.1.22", features = ["log"] }
 tracing-subscriber = "0.2.15"
 tracing-log = "0.1.1"
-ctrlc = "3.1.7"
+#ctrlc = "3.1.7"
 
-[dependencies.log]
-version = "0.4.11"
+#[dependencies.log]
+#version = "0.4.11"
 #features = ["kv_unstable"]

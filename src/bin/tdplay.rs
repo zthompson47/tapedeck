@@ -6,7 +6,7 @@ use smol::{
     prelude::*,
     process::{Command, Stdio},
 };
-use std::{self, panic, path::PathBuf, str, thread, time};
+use std::{self, panic, path::PathBuf, str};
 use structopt::StructOpt;
 
 use tracing::{debug, info, Level};
@@ -14,25 +14,13 @@ use tracing_log::LogTracer;
 use tracing_subscriber::FmtSubscriber;
 
 fn main() {
-    println!("000EEEEEEEEEEEEENTER");
-    let result = ctrlc::set_handler(move || {
-        println!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZzz");
-    });
-    match result {
-        Ok(ok) => println!("AAAA{:?}AAAA", ok),
-        Err(err) => println!("CCCC{:?}cccc", err),
-    };
-    println!("111EEEEEEEEEEEEENTER");
-
     let args = Cli::from_args();
     init_logging();
-    debug!("------------>>>>>>>>>>>>>>>>>>>>>>>>>");
     with_raw_mode(|| {
         let (msg_out, msg_in) = smol::channel::unbounded();
         smol::spawn(quit(msg_out)).detach();
         smol::block_on(play(args.fname, msg_in));
     });
-    thread::sleep(time::Duration::from_millis(3000));
 }
 
 /// Capture command line arguments.
@@ -91,11 +79,11 @@ fn with_raw_mode(f: impl FnOnce() + panic::UnwindSafe) {
         // Do nothing: overrides console error message from panic!()
     }));
 
-    terminal::enable_raw_mode().expect("enabling raw mode");
+    terminal::enable_raw_mode().expect("raw mode enabled");
     let result = panic::catch_unwind(|| {
         f();
     });
-    terminal::disable_raw_mode().expect("disabling raw mode");
+    terminal::disable_raw_mode().expect("raw mode disabled");
 
     panic::set_hook(saved_hook);
     if let Err(err) = result {
@@ -140,19 +128,18 @@ async fn quit(msg_out: Sender<&str>) {
     let mut buf = [0; 1];
 
     loop {
-        trace!("..quitter: waiting for input");
-        let c = stdin.read(&mut buf).await.expect("can't read stdin");
-        trace!("..quitter: GOT input! {}", c);
-        assert!(c == 1);
+        stdin.read(&mut buf).await.expect("can't read stdin");
         match buf[0] {
-            113 => {
-                // `q`
-                trace!("Got QUIT signal");
-                //to_quit.send(42);
+            3 | 113 => {
+                // `^C` or `q`
+                debug!("Got QUIT signal");
                 msg_out.try_send("42").ok();
                 break;
             }
-            _ => continue,
+            _ => {
+                debug!("keyboard input >{}<", buf[0]);
+                continue;
+            }
         }
     }
 }
