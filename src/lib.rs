@@ -1,4 +1,5 @@
 pub mod logging;
+pub mod shell;
 
 #[allow(unused_imports)]
 use {async_std::task, smol::Task, std::time::Duration};
