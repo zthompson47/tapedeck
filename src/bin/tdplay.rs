@@ -71,8 +71,11 @@ impl RawWriter {
 impl std::io::Write for RawWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let buf = str::from_utf8(buf).unwrap();
+
         // `buf` is only terminated by '\n', so add '\r' (search c_oflag OPOST)
+        #[allow(clippy::explicit_write)]
         write!(std::io::stderr(), "{}\r", buf).unwrap();
+
         Ok(buf.len())
     }
 
@@ -96,8 +99,8 @@ fn with_raw_mode(f: impl FnOnce() + panic::UnwindSafe) {
     terminal::disable_raw_mode().expect("disabling raw mode");
 
     panic::set_hook(saved_hook);
-    if result.is_err() {
-        panic::resume_unwind(result.unwrap_err());
+    if let Err(err) = result {
+        panic::resume_unwind(err);
     }
 }
 
