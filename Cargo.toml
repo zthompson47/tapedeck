@@ -23,6 +23,8 @@ slog-term = "2.6.0"
 async_concur = { path = "../async_concur" }
 tracing = { version = "0.1.22", features = ["log"] }
 tracing-subscriber = "0.2.15"
+tracing-log = "0.1.1"
+ctrlc = "3.1.7"
 
 [dependencies.log]
 version = "0.4.11"

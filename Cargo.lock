@@ -1236,6 +1236,7 @@ dependencies = [
  "async_concur",
  "bytes",
  "crossterm",
+ "ctrlc",
  "futures",
  "libc",
  "log",
@@ -1245,6 +1246,7 @@ dependencies = [
  "smol",
  "structopt",
  "tracing",
+ "tracing-log",
  "tracing-subscriber",
 ]
 
