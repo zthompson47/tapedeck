@@ -1,22 +1,16 @@
 pub mod logging;
 
 #[allow(unused_imports)]
-use {
-    std::time::Duration,
-    async_std::task,
-    smol::Task,
-};
+use {async_std::task, smol::Task, std::time::Duration};
 
 pub struct WaitGroup {
     #[allow(dead_code)]
     tasks: Vec<smol::Task<()>>,
 }
- 
+
 impl Default for WaitGroup {
     fn default() -> Self {
-        Self {
-            tasks: Vec::new(),
-        }
+        Self { tasks: Vec::new() }
     }
 }
 
@@ -32,9 +26,7 @@ impl WaitGroup {
 
 impl Clone for WaitGroup {
     fn clone(&self) -> WaitGroup {
-        WaitGroup {
-            tasks: Vec::new(),
-        }
+        WaitGroup { tasks: Vec::new() }
     }
 }
 

@@ -1,10 +1,7 @@
+use log::{debug, error, info, log, trace, warn, Level, LevelFilter, Metadata, Record};
 use std::io::Write;
-use std::sync::Mutex;
 use std::sync::mpsc;
-use log::{
-    log, info, debug, warn, error, trace,
-    Level, LevelFilter, Metadata, Record,
-};
+use std::sync::Mutex;
 
 #[derive(Debug)]
 pub struct LogRecord {
@@ -46,10 +43,7 @@ impl Logger {
         std::thread::spawn(move || {
             while let Ok(msg) = rcv.recv() {
                 //if msg.meta_target == "tdplay" {
-                    write!(
-                        std::io::stdout(),
-                        "{:?}\r\n", msg
-                    ).expect("stdout write error");
+                write!(std::io::stdout(), "{:?}\r\n", msg).expect("stdout write error");
                 //}
             }
         });
@@ -64,19 +58,23 @@ impl Logger {
 }
 
 impl log::Log for Logger {
-    fn enabled(&self, _metadata: &Metadata) -> bool { true }
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
 
     fn log(&self, record: &Record) {
-        self.snd.lock().unwrap().send(
-            LogRecord {
+        self.snd
+            .lock()
+            .unwrap()
+            .send(LogRecord {
                 meta_level: record.level().to_string(),
                 meta_target: record.target().to_string(),
                 module_path: record.module_path().unwrap().to_string(),
                 file: record.file().unwrap().to_string(),
                 args: record.args().to_string(),
                 line: record.line().unwrap(),
-            }
-        ).expect("channel send error");
+            })
+            .expect("channel send error");
     }
 
     fn flush(&self) {}

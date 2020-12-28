@@ -1,11 +1,12 @@
 use crossterm::terminal;
 use log::trace;
 use smol::{
-    self, prelude::*,
+    self,
     channel::{Receiver, Sender},
+    prelude::*,
     process::{Command, Stdio},
 };
-use std::{panic, str};
+use std::{self, panic, path::PathBuf, str, thread, time};
 use structopt::StructOpt;
 
 use tracing::{debug, info, Level};
@@ -31,19 +32,18 @@ fn main() {
         smol::spawn(quit(msg_out)).detach();
         smol::block_on(play(args.fname, msg_in));
     });
-    std::thread::sleep(std::time::Duration::from_millis(3000));
+    thread::sleep(time::Duration::from_millis(3000));
 }
 
 /// Capture command line arguments.
 #[derive(StructOpt)]
 struct Cli {
     #[structopt(parse(from_os_str))]
-    fname: std::path::PathBuf,
+    fname: PathBuf,
 }
 
 /// Initialize logging system.
 fn init_logging() {
-
     // Support log crate
     LogTracer::init().unwrap();
 
@@ -52,8 +52,7 @@ fn init_logging() {
         .with_max_level(Level::TRACE)
         .with_writer(RawWriter::new)
         .finish();
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("problem setting global logger");
+    tracing::subscriber::set_global_default(subscriber).expect("problem setting global logger");
 
     info!("Logging initialized...");
     trace!("[trace] Logging initialized...");
@@ -105,7 +104,7 @@ fn with_raw_mode(f: impl FnOnce() + panic::UnwindSafe) {
 }
 
 /// Play an audio stream.
-async fn play(fname: std::path::PathBuf, msg_in: Receiver<&str>) {
+async fn play(fname: PathBuf, msg_in: Receiver<&str>) {
     trace!("ENTER player");
     let mut cmd = Command::new("mplayer")
         .arg("-playlist")
@@ -121,18 +120,15 @@ async fn play(fname: std::path::PathBuf, msg_in: Receiver<&str>) {
     let result = msg_in.recv().await;
     trace!("<><><><><><>BEFORE<><><><><><><>");
     match result {
-        Ok(_) => trace!(
-            "..player>>{}<<: GOT QUIT SIG -->{:?}<--",
-            cmd.id(),
-            result,
-        ),
+        Ok(_) => trace!("..player>>{}<<: GOT QUIT SIG -->{:?}<--", cmd.id(), result,),
         Err(err) => trace!("------->>ERR:{:?}", err),
     }
     trace!("<><><><><><>AFTER<><><><><><><>");
     //trace!("..player: GOT QUIT SIG -->{}<--");
 
     //cmd.kill().expect("can't kill process");
-    unsafe { // cmd.kill() is SIGKILL - leaves orphaned mplayer process
+    unsafe {
+        // cmd.kill() is SIGKILL - leaves orphaned mplayer process
         libc::kill(cmd.id() as i32, libc::SIGTERM);
     };
     cmd.status().await.unwrap();
@@ -145,17 +141,17 @@ async fn quit(msg_out: Sender<&str>) {
 
     loop {
         trace!("..quitter: waiting for input");
-        let c = stdin.read(&mut buf).await
-            .expect("can't read stdin");
+        let c = stdin.read(&mut buf).await.expect("can't read stdin");
         trace!("..quitter: GOT input! {}", c);
         assert!(c == 1);
         match buf[0] {
-            113 => { // `q`
+            113 => {
+                // `q`
                 trace!("Got QUIT signal");
                 //to_quit.send(42);
                 msg_out.try_send("42").ok();
                 break;
-            },
+            }
             _ => continue,
         }
     }

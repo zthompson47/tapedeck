@@ -1,8 +1,5 @@
+use libc::{cfmakeraw, tcgetattr, tcsetattr, STDIN_FILENO, TCSAFLUSH, TCSANOW};
 use std::{mem, thread, time};
-use libc::{
-    cfmakeraw, tcgetattr, tcsetattr,
-    STDIN_FILENO, TCSANOW, TCSAFLUSH,
-};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -44,10 +41,8 @@ fn main() {
             termios.c_cflag = 191u32;
             termios.c_line = 0u8;
             termios.c_cc = [
-                3, 28, 127, 21, 4, 0, 1, 0,
-                17, 19, 26, 0, 18, 15, 23, 22,
+                3, 28, 127, 21, 4, 0, 1, 0, 17, 19, 26, 0, 18, 15, 23, 22, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0
             ];
             termios.c_ispeed = 15u32;
             termios.c_ospeed = 15u32;
