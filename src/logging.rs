@@ -1,7 +1,49 @@
-use log::{debug, error, info, log, trace, warn, Level, LevelFilter, Metadata, Record};
 use std::io::Write;
 use std::sync::mpsc;
 use std::sync::Mutex;
+use tracing::{subscriber, Level};
+use tracing_log::LogTracer;
+use tracing_subscriber::FmtSubscriber;
+
+/// Initialize logging system.
+pub fn init_logging() {
+    // Support log crate
+    LogTracer::init().unwrap();
+
+    // Send logs to stderr
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::DEBUG)
+        .with_writer(RawWriter::new)
+        .finish();
+    subscriber::set_global_default(subscriber).expect("problem setting global logger");
+}
+
+#[derive(Debug, Default)]
+struct RawWriter;
+
+impl RawWriter {
+    fn new() -> Self {
+        RawWriter::default()
+    }
+}
+
+impl std::io::Write for RawWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let buf = std::str::from_utf8(buf).unwrap();
+
+        // `buf` is only terminated by '\n', so add '\r' (search c_oflag OPOST)
+        #[allow(clippy::explicit_write)]
+        write!(std::io::stderr(), "{}\r", buf).unwrap();
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+// -------------- OLD STUFF - for log crate ------------------
 
 #[derive(Debug)]
 pub struct LogRecord {
@@ -15,7 +57,7 @@ pub struct LogRecord {
 
 #[derive(Debug)]
 pub struct Logger {
-    level: LevelFilter,
+    level: log::LevelFilter,
     snd: Mutex<mpsc::Sender<LogRecord>>,
 }
 
@@ -25,44 +67,35 @@ impl Logger {
         let logger = Logger {
             level: match std::env::var("RUST_LOG") {
                 Ok(level) => match level.as_str() {
-                    "error" => LevelFilter::Error,
-                    "warn" => LevelFilter::Warn,
-                    "info" => LevelFilter::Info,
-                    "debug" => LevelFilter::Debug,
-                    "trace" => LevelFilter::Trace,
-                    _ => LevelFilter::Info,
+                    "error" => log::LevelFilter::Error,
+                    "warn" => log::LevelFilter::Warn,
+                    "info" => log::LevelFilter::Info,
+                    "debug" => log::LevelFilter::Debug,
+                    "trace" => log::LevelFilter::Trace,
+                    _ => log::LevelFilter::Info,
                 },
-                _ => LevelFilter::Info,
+                _ => log::LevelFilter::Info,
             },
             snd: Mutex::new(snd),
         };
         log::set_boxed_logger(Box::new(logger)).expect("already set logger");
-        log::set_max_level(LevelFilter::Trace);
+        log::set_max_level(log::LevelFilter::Trace);
 
         // Log to stdout
         std::thread::spawn(move || {
             while let Ok(msg) = rcv.recv() {
-                //if msg.meta_target == "tdplay" {
                 write!(std::io::stdout(), "{:?}\r\n", msg).expect("stdout write error");
-                //}
             }
         });
-
-        log!(target: "buttmonkey", Level::Error, "-------------!!!!!!!!! {} error starting", 4);
-        error!("-------------!!!!!!!!! {} error starting", 4);
-        warn!("-------------!!!!!!!!! {} warn starting", 4);
-        info!("-------------!!!!!!!!! {} info starting", 4);
-        debug!("-------------!!!!!!!!! {} debug starting", 4);
-        trace!("-------------!!!!!!!!! {} trace starting", 4);
     }
 }
 
 impl log::Log for Logger {
-    fn enabled(&self, _metadata: &Metadata) -> bool {
+    fn enabled(&self, _metadata: &log::Metadata) -> bool {
         true
     }
 
-    fn log(&self, record: &Record) {
+    fn log(&self, record: &log::Record) {
         self.snd
             .lock()
             .unwrap()
