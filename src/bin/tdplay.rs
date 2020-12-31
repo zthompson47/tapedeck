@@ -1,15 +1,12 @@
 use crossterm::terminal;
 use log::debug;
 use smol::{
-    self,
     channel::{Receiver, Sender},
     prelude::*,
-    process::{Child, Command, Stdio},
     Unblock
 };
 use std::{self, panic, path::PathBuf, str};
 use structopt::StructOpt;
-
 use tapedeck::{cmd, logging};
 
 fn main() {
@@ -53,70 +50,67 @@ fn with_raw_mode(f: impl FnOnce() + panic::UnwindSafe) {
 async fn play(fname: PathBuf, msg_in: Receiver<&str>) -> Result<(), std::io::Error> {
     let fname = fname.to_str().unwrap();
     let mut command = cmd::ffmpeg::read(fname).await;
-    debug!("COMMAND >{:?}<", command);
+
     let mut source = command.spawn()?;
     let mut reader = source.stdout.take().unwrap();
 
     let mut sink = cmd::sox::play().spawn()?;
     let mut writer = sink.stdin.take().unwrap();
 
-    let (snd, rcv) = smol::channel::unbounded();
+    let (snd, rcv) = smol::channel::unbounded(); // bounded(100);
 
-    debug!("========>>  SPAWN PLAYLIST");
-    let playlist = smol::spawn(async move {
-        debug!(">>IN<< playlist");
+    let _playlist = smol::spawn(async move {
         let mut buf = [0; 1024];
         loop {
-            let count = reader.read(&mut buf);
-            //print!("{}", buf[0]);
-            //
-            snd.send(buf).await;
-            //snd.try_send(buf);
+            match reader.read(&mut buf) .await {
+                Ok(_n) => {
+                    // TODO check num bytes read and send count with buf
+                    //print!("{}", n)
+                },
+                Err(err) => debug!("WWTF!!!OH NO!!!!!!AAAAAARGGGGGGGG!!!!!!")
+            }
+            match snd.send(buf).await {
+                Ok(_) => {},
+                Err(err) => {
+                    debug!("!!!{}!!!", err.to_string());
+                    break;
+                }
+            }
         }
-    });
+    }).detach();
 
-    debug!("========>>  SPAWN PLAYER");
-    let player = smol::spawn(async move {
+    let _player = smol::spawn(async move {
         loop {
             let buf: [u8; 1024] = rcv.recv().await.unwrap();
-            //debug!("-------->>>>>>>>>>>>>PLATYER!!!!!!!!!!!!!");
-            writer.write(&buf).await;
+            match writer.write(&buf).await {
+                Ok(_n) => {
+                    // TODO compare num bytes written to bytes from buf
+                    /*print!("{:?}", buf)*/
+                },
+                Err(err) => {
+                    debug!("!!!{}!!!", err.to_string());
+                    break;
+                }
+            }
         }
-    });
+    }).detach();
 
-    debug!("========>>  WAIT FOR QUIT");
-    msg_in.recv().await;
-    debug!("========>>  WAIT FOR STATUS");
-    source.status().await;
-    debug!("========>>  DONE");
-
+    // Wait for QUIT signal
+    msg_in.recv().await.unwrap();
 
     /*
-    trace!("ENTER player");
-    let mut cmd = Command::new("mplayer")
-        .arg("-playlist")
-        .arg(fname)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("mplayer won't start");
-    trace!("..player: started mplayer");
-
-    // Wait for quit signal
-    let result = msg_in.recv().await;
-    match result {
-        Ok(_) => trace!("..player>>{}<<: GOT QUIT SIG -->{:?}<--", cmd.id(), result,),
-        Err(err) => trace!("------->>ERR:{:?}", err),
-    }
-
-    //cmd.kill().expect("can't kill process");
-    // cmd.kill() is SIGKILL - leaves orphaned mplayer process: so,
+    // kill() is SIGKILL - leaves orphaned mplayer process..
     unsafe {
-        libc::kill(cmd.id() as i32, libc::SIGTERM);
+        libc::kill(source.id() as i32, libc::SIGTERM);
+        libc::kill(sink.id() as i32, libc::SIGTERM);
     };
-    cmd.status().await.unwrap();
     */
+    source.kill().unwrap();
+    sink.kill().unwrap();
+
+    // Wait for processes to end
+    source.status().await.unwrap();
+    sink.status().await.unwrap();
 
     Ok(())
 }

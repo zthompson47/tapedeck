@@ -27,6 +27,7 @@ use nom::{
 };
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 static PLS: &str = "\
 [playlist]
 numberofentries=4
