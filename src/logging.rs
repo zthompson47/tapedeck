@@ -12,7 +12,19 @@ pub fn init_logging() {
 
     // Send logs to stderr
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::DEBUG)
+        .with_max_level(
+            match std::env::var("RUST_LOG") {
+                Ok(level) => match level.as_str() {
+                    "info" => Level::INFO,
+                    "warn" => Level::WARN,
+                    "error" => Level::ERROR,
+                    "debug" => Level::DEBUG,
+                    "trace" => Level::TRACE,
+                    _ => Level::TRACE,
+                },
+                _ => Level::TRACE,
+            }
+        )
         .with_writer(RawWriter::new)
         .finish();
     subscriber::set_global_default(subscriber).expect("problem setting global logger");
@@ -67,9 +79,9 @@ impl Logger {
         let logger = Logger {
             level: match std::env::var("RUST_LOG") {
                 Ok(level) => match level.as_str() {
-                    "error" => log::LevelFilter::Error,
-                    "warn" => log::LevelFilter::Warn,
                     "info" => log::LevelFilter::Info,
+                    "warn" => log::LevelFilter::Warn,
+                    "error" => log::LevelFilter::Error,
                     "debug" => log::LevelFilter::Debug,
                     "trace" => log::LevelFilter::Trace,
                     _ => log::LevelFilter::Info,
