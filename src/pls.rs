@@ -130,7 +130,7 @@ fn fold_line(mut playlist: Playlist, input: &str) -> Playlist {
                 }
             }
         },
-        Err(err) => println!("ERRRRRR:{:?}", err),
+        Err(err) => log::warn!("ERRRRRR:{:?}", err),
     }
 
     playlist

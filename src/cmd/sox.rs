@@ -1,6 +1,5 @@
 use smol::process::{Command, Stdio};
 
-#[allow(dead_code)]
 pub fn play() -> Command {
     let mut cmd = Command::new("play");
     cmd.args(&["-t", "raw"])
