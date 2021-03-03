@@ -3,7 +3,7 @@ use log::debug;
 use smol::{
     channel::{Receiver, Sender},
     prelude::*,
-    Unblock
+    Unblock,
 };
 use std::{self, /*panic,*/ path::PathBuf, str};
 use structopt::StructOpt;
@@ -26,14 +26,11 @@ fn main() {
 }
 
 /// Play an audio stream.
-async fn play(fname: PathBuf, quit_in: Receiver<&str>)
-    -> Result<(), std::io::Error>
-{
+async fn play(fname: PathBuf, quit_in: Receiver<&str>) -> Result<(), std::io::Error> {
     let fname = fname.to_str().unwrap();
 
     let mut source = cmd::ffmpeg::read(fname).await.spawn()?;
     let mut reader = source.stdout.take().unwrap();
-
     let mut sink = cmd::sox::play().spawn()?;
     let mut writer = sink.stdin.take().unwrap();
 
@@ -47,11 +44,11 @@ async fn play(fname: PathBuf, quit_in: Receiver<&str>)
                     // TODO check num bytes read
                     // and send count with buf
                     //print!("{}", n)
-                },
-                Err(err) => debug!("!!!{}!!!", err.to_string())
+                }
+                Err(err) => debug!("!!!{}!!!", err.to_string()),
             }
             match snd.send(buf).await {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(err) => {
                     debug!("!!!{}!!!", err.to_string());
                     break;
@@ -67,7 +64,7 @@ async fn play(fname: PathBuf, quit_in: Receiver<&str>)
                 Ok(_n) => {
                     // TODO compare num bytes written to bytes from buf
                     /*print!("{:?}", buf)*/
-                },
+                }
                 Err(err) => {
                     debug!("!!!{}!!!", err.to_string());
                     break;

@@ -19,7 +19,9 @@ pub async fn read(uri: &str) -> Command {
     cmd
 }
 
-pub async fn stream_from_playlist(uri: &str) -> Result<String, String> {
+pub async fn stream_from_playlist(uri: &str)
+    -> Result<String, String>
+{
     use crate::pls;
 
     // Fetch remote playlist file
@@ -35,7 +37,9 @@ pub async fn stream_from_playlist(uri: &str) -> Result<String, String> {
 }
 
 #[allow(dead_code)]
-pub fn to_icecast(host: &str, port: i32, mount: &str, pw: &str) -> Command {
+pub fn to_icecast(host: &str, port: i32, mount: &str, pw: &str)
+    -> Command
+{
     let mut cmd = Command::new("ffmpeg");
     cmd.arg("-re")
         .args(&["-ac", "2"])

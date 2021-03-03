@@ -10,9 +10,7 @@ pub fn with_raw_mode(f: impl FnOnce() + panic::UnwindSafe) {
     }));
 
     terminal::enable_raw_mode().expect("raw mode enabled");
-    let result = panic::catch_unwind(|| {
-        f();
-    });
+    let result = panic::catch_unwind(f);
     terminal::disable_raw_mode().expect("raw mode disabled");
 
     panic::set_hook(saved_hook);
