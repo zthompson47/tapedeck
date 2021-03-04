@@ -1,3 +1,5 @@
+use std::{self, /*panic,*/ path::PathBuf, str};
+
 //use crossterm::terminal;
 use log::debug;
 use smol::{
@@ -5,9 +7,10 @@ use smol::{
     prelude::*,
     Unblock,
 };
-use std::{self, /*panic,*/ path::PathBuf, str};
 use structopt::StructOpt;
-use tapedeck::{cmd, logging, term};
+
+use allotropic::init_logging;
+use tapedeck::{cmd, term};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -16,8 +19,8 @@ struct Cli {
 }
 
 fn main() {
+    let _guard = init_logging("td");
     let args = Cli::from_args();
-    logging::init_logging();
     term::with_raw_mode(|| {
         let (quit_out, quit_in) = smol::channel::unbounded();
         smol::spawn(quit(quit_out)).detach();

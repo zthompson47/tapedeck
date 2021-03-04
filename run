@@ -1,0 +1,4 @@
+#!/bin/sh
+cmd=$1
+shift
+cargo run --bin $cmd -- $@

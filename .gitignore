@@ -1,3 +1,6 @@
 /target
-/log.txt
+/.cache
+/.config
+/.local
+/.run
 *.bak
