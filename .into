@@ -3,3 +3,9 @@ export RUST_LOG=DEBUG
 export TAPEDECK_DEV_DIR=`realpath .run`
 export DATABASE_URL=sqlite:`realpath .run`/tapedeck.db
 export PS1="%F{#68ff00}☀%f$PS1"
+echo '#!/bin/sh
+cmd=$1
+shift
+cargo run --bin $cmd -- $@' > run
+chmod 755 run
+cargo sqlx db setup
