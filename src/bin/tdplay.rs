@@ -19,7 +19,7 @@ struct Cli {
 }
 
 fn main() {
-    let _guard = init_logging("td");
+    let _guard = init_logging("tapedeck");
     let args = Cli::from_args();
     term::with_raw_mode(|| {
         let (quit_out, quit_in) = smol::channel::unbounded();

@@ -1,7 +1,6 @@
-use core::cmp::Ordering;
-
+use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::env::args;
+use std::env::{self, args};
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -15,14 +14,37 @@ use tapedeck::audio::dir::{AudioDir, AudioFile};
 
 static MIGRATOR: Migrator = sqlx::migrate!();
 
+fn get_database_url(name: &str) -> Result<String, ()> {
+    let result = match env::var("DATABASE_URL") {
+        Ok(url) => Ok(url),
+        Err(_) => match env::var("HOME") {
+            Ok(dir) => {
+                let mut path = PathBuf::from(dir)
+                    .join(".local")
+                    .join("share")
+                    .join(name)
+                    .join(name);
+                path.set_extension("db");
+                Ok(path.to_str().unwrap().to_string())
+            }
+            Err(_) => Ok("tmp".to_string()),
+        },
+    };
+
+    result
+}
+
 #[tokio::main]
 async fn main() {
+    let _guard = allotropic::init_logging("tapedeck");
+
     let mut music_dirs: HashMap<PathBuf, Vec<AudioFile>> = HashMap::new();
     let mut extensions: HashMap<OsString, usize> = HashMap::new();
     let mut extra: HashMap<OsString, Vec<PathBuf>> = HashMap::new();
 
-    let db = "sqlite:tapedeck.db";
-    let pool = SqlitePool::connect(db)
+    tracing::debug!("{:?}", get_database_url("tapedeck"));
+
+    let pool = SqlitePool::connect(&get_database_url("tapedeck").unwrap())
         .await
         .unwrap();
     MIGRATOR.run(&pool).await.unwrap();
@@ -95,8 +117,6 @@ async fn main() {
         }
     }
     println!("{:#?}", extensions);
-
-
 }
 
 fn print_audio_dir(dir: &AudioDir) {

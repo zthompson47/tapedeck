@@ -1,4 +1,4 @@
-export DATABASE_URL=sqlite:.run/tapedeck.db
+export DATABASE_URL=sqlite:`realpath .run`/tapedeck.db
 export PS1="%F{#68ff00}☀%f$PS1"
 export RUST_LOG=DEBUG
-export TAPEDECK_DEV=`pwd`/.run
+export TAPEDECK_DEV_DIR=`realpath .run`
