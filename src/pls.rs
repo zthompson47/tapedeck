@@ -135,7 +135,7 @@ fn fold_line(mut playlist: Playlist, input: &str) -> Playlist {
                 }
             }
         },
-        Err(err) => log::warn!("ERRRRRR:{:?}", err),
+        Err(err) => tracing::warn!("ERRRRRR:{:?}", err),
     }
 
     playlist

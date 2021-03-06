@@ -1,7 +1,7 @@
+use std::process::Stdio;
+
 use isahc::prelude::*;
-#[allow(unused_imports)]
-use log::debug;
-use smol::process::{Command, Stdio};
+use tokio::process::Command;
 
 pub async fn read(uri: &str) -> Command {
     let stream_url = stream_from_playlist(uri).await.unwrap();

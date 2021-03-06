@@ -1,4 +1,6 @@
-use smol::process::{Command, Stdio};
+use std::process::Stdio;
+
+use tokio::process::Command;
 
 pub fn play() -> Command {
     let mut cmd = Command::new("play");

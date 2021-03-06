@@ -14,26 +14,6 @@ use tapedeck::audio::dir::{AudioDir, AudioFile};
 
 static MIGRATOR: Migrator = sqlx::migrate!();
 
-fn get_database_url(name: &str) -> Result<String, ()> {
-    let result = match env::var("DATABASE_URL") {
-        Ok(url) => Ok(url),
-        Err(_) => match env::var("HOME") {
-            Ok(dir) => {
-                let mut path = PathBuf::from(dir)
-                    .join(".local")
-                    .join("share")
-                    .join(name)
-                    .join(name);
-                path.set_extension("db");
-                Ok(path.to_str().unwrap().to_string())
-            }
-            Err(_) => Ok("tmp".to_string()),
-        },
-    };
-
-    result
-}
-
 #[tokio::main]
 async fn main() {
     let _guard = tapedeck::logging::init_logging("tapedeck");
@@ -139,4 +119,24 @@ fn print_audio_dir(dir: &AudioDir) {
             i += 1
         }
     }
+}
+
+fn get_database_url(name: &str) -> Result<String, ()> {
+    let result = match env::var("DATABASE_URL") {
+        Ok(url) => Ok(url),
+        Err(_) => match env::var("HOME") {
+            Ok(dir) => {
+                let mut path = PathBuf::from(dir)
+                    .join(".local")
+                    .join("share")
+                    .join(name)
+                    .join(name);
+                path.set_extension("db");
+                Ok(path.to_str().unwrap().to_string())
+            }
+            Err(_) => Ok("tmp".to_string()),
+        },
+    };
+
+    result
 }

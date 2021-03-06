@@ -1,13 +1,10 @@
-use std::{self, /*panic,*/ path::PathBuf, str};
+use std::{self, path::PathBuf, str};
 
-//use crossterm::terminal;
-use log::debug;
-use smol::{
-    channel::{Receiver, Sender},
-    prelude::*,
-    Unblock,
-};
 use structopt::StructOpt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::runtime::Runtime;
+use tokio::sync::mpsc;
+use tracing::debug;
 
 use tapedeck::{cmd, logging::init_logging, term};
 
@@ -21,14 +18,18 @@ fn main() {
     let _guard = init_logging("tapedeck");
     let args = Cli::from_args();
     term::with_raw_mode(|| {
-        let (quit_out, quit_in) = smol::channel::unbounded();
-        smol::spawn(quit(quit_out)).detach();
-        smol::block_on(play(args.fname, quit_in)).unwrap();
+        let (tx_quit, rx_quit) = mpsc::unbounded_channel();
+        let rt = Runtime::new().unwrap();
+        rt.spawn(quit(tx_quit));
+        rt.block_on(play(args.fname, rx_quit)).unwrap();
     });
 }
 
 /// Play an audio stream.
-async fn play(fname: PathBuf, quit_in: Receiver<&str>) -> Result<(), std::io::Error> {
+async fn play(
+    fname: PathBuf,
+    mut rx_quit: mpsc::UnboundedReceiver<&str>,
+) -> Result<(), std::io::Error> {
     let fname = fname.to_str().unwrap();
 
     let mut source = cmd::ffmpeg::read(fname).await.spawn()?;
@@ -36,19 +37,12 @@ async fn play(fname: PathBuf, quit_in: Receiver<&str>) -> Result<(), std::io::Er
     let mut sink = cmd::sox::play().spawn()?;
     let mut writer = sink.stdin.take().unwrap();
 
-    let (snd, rcv) = smol::channel::bounded(1);
+    let (snd, mut rcv) = mpsc::channel(1);
 
-    let playlist = smol::spawn(async move {
-        let mut buf = [0; 1024];
+    let playlist = tokio::spawn(async move {
+        let mut buf: [u8; 1024] = [0; 1024];
         loop {
-            match reader.read(&mut buf).await {
-                Ok(_n) => {
-                    // TODO check num bytes read
-                    // and send count with buf
-                    //print!("{}", n)
-                }
-                Err(err) => debug!("!!!{}!!!", err.to_string()),
-            }
+            reader.read(&mut buf).await.unwrap();
             match snd.send(buf).await {
                 Ok(()) => {}
                 Err(err) => {
@@ -59,7 +53,7 @@ async fn play(fname: PathBuf, quit_in: Receiver<&str>) -> Result<(), std::io::Er
         }
     });
 
-    let player = smol::spawn(async move {
+    let player = tokio::spawn(async move {
         loop {
             let buf: [u8; 1024] = rcv.recv().await.unwrap();
             match writer.write(&buf).await {
@@ -76,25 +70,25 @@ async fn play(fname: PathBuf, quit_in: Receiver<&str>) -> Result<(), std::io::Er
     });
 
     // Receive quit signal
-    quit_in.recv().await.unwrap();
-    source.kill().unwrap();
-    sink.kill().unwrap();
+    rx_quit.recv().await.unwrap();
+    source.kill().await.unwrap();
+    sink.kill().await.unwrap();
 
     // Wait for processes
-    source.status().await.unwrap();
-    sink.status().await.unwrap();
+    source.wait().await.unwrap();
+    sink.wait().await.unwrap();
 
     // Wait for tasks
-    playlist.await;
-    player.await;
+    playlist.await.unwrap();
+    player.await.unwrap();
 
     Ok(())
 }
 
 /// Process a quit signal from the keyboard.
-async fn quit(quit_out: Sender<&str>) {
-    let mut stdin = Unblock::new(std::io::stdin());
-    let mut buf = [0; 1];
+async fn quit(quit_out: mpsc::UnboundedSender<&str>) {
+    let mut stdin = tokio::io::stdin();
+    let mut buf: [u8; 1] = [0; 1];
 
     loop {
         stdin.read(&mut buf).await.expect("can't read stdin");
@@ -102,7 +96,7 @@ async fn quit(quit_out: Sender<&str>) {
             3 | 113 => {
                 // `^C` or `q`
                 debug!("Got QUIT signal");
-                quit_out.try_send("42").ok();
+                quit_out.send("42").ok();
                 break;
             }
             _ => {
