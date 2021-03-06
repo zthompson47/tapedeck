@@ -1,6 +1,6 @@
 use std::process::Stdio;
 
-use isahc::prelude::*;
+// use isahc::prelude::*;
 use tokio::process::Command;
 
 pub async fn read(uri: &str) -> Command {
@@ -19,16 +19,11 @@ pub async fn read(uri: &str) -> Command {
     cmd
 }
 
-pub async fn stream_from_playlist(uri: &str)
-    -> Result<String, String>
-{
+pub async fn stream_from_playlist(uri: &str) -> reqwest::Result<String> {
     use crate::pls;
 
     // Fetch remote playlist file
-    let mut response = isahc::get_async(uri)
-        .await
-        .map_err(|e|{ e.to_string() })?;
-    let text = response.text_async().await.unwrap();
+    let text = reqwest::get(uri).await?.text().await?;
 
     // Parse out primary stream url
     let playlist = pls::parse(text.as_str()).unwrap();
@@ -37,9 +32,7 @@ pub async fn stream_from_playlist(uri: &str)
 }
 
 #[allow(dead_code)]
-pub fn to_icecast(host: &str, port: i32, mount: &str, pw: &str)
-    -> Command
-{
+pub fn to_icecast(host: &str, port: i32, mount: &str, pw: &str) -> Command {
     let mut cmd = Command::new("ffmpeg");
     cmd.arg("-re")
         .args(&["-ac", "2"])
@@ -51,7 +44,10 @@ pub fn to_icecast(host: &str, port: i32, mount: &str, pw: &str)
         .args(&["-q:a", "8.0"])
         .args(&["-content_type", "audio/ogg"])
         .args(&["-f", "ogg"])
-        .arg(format!("icecast://source:{}@{}:{}/{}", pw, host, port, mount));
+        .arg(format!(
+            "icecast://source:{}@{}:{}/{}",
+            pw, host, port, mount
+        ));
     cmd
 }
 
