@@ -36,7 +36,7 @@ fn get_database_url(name: &str) -> Result<String, ()> {
 
 #[tokio::main]
 async fn main() {
-    let _guard = allotropic::init_logging("tapedeck");
+    let _guard = tapedeck::logging::init_logging("tapedeck");
 
     let mut music_dirs: HashMap<PathBuf, Vec<AudioFile>> = HashMap::new();
     let mut extensions: HashMap<OsString, usize> = HashMap::new();

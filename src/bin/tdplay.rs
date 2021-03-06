@@ -9,8 +9,7 @@ use smol::{
 };
 use structopt::StructOpt;
 
-use allotropic::init_logging;
-use tapedeck::{cmd, term};
+use tapedeck::{cmd, logging::init_logging, term};
 
 #[derive(StructOpt)]
 struct Cli {

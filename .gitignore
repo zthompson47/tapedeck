@@ -1,6 +1,2 @@
 /target
-/.cache
-/.config
-/.local
 /.run
-*.bak
