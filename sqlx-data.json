@@ -1,0 +1,53 @@
+{
+  "db": "SQLite",
+  "3e7c682a51b47534aa8eda22dc7ec0283b3de0dca699a999c40850e7c65b743e": {
+    "query": "\n            INSERT INTO audio_dir(path)\n            VALUES(?1)\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  },
+  "5f08b4906ccee2cfb6ee03e7c65a91c31259c1bad7ff9326d214a640339190ab": {
+    "query": "\n                    INSERT INTO audio_dir_extra_file(audio_dir_id, extra_file_id)\n                    VALUES ($1, $2);\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "6ff72dc14149bc01f27f8cc568cdb619424edc9a6c7506b68201d173975877ef": {
+    "query": "\n                INSERT INTO audio_file(path, mime_type)\n                VALUES(?1, ?2);\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "f475fe42a4c12b6ce7c937a2a91b6b48c67c0e0d949d17d76be88df2cb9dd2ef": {
+    "query": "\n                INSERT INTO audio_dir_audio_file(audio_dir_id, audio_file_id)\n                VALUES ($1, $2);\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "fa0550c82a70dc880c6f8e5e770646485654fcfdac844551d4aca5ccb08e3b19": {
+    "query": "\n                    INSERT INTO extra_file(path, mime_type)\n                    VALUES(?1, ?2);\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  }
+}
