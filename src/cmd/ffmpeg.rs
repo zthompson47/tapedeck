@@ -1,7 +1,8 @@
 use std::process::Stdio;
 
-// use isahc::prelude::*;
 use tokio::process::Command;
+
+use crate::pls;
 
 pub async fn read(uri: &str) -> Command {
     let stream_url = stream_from_playlist(uri).await.unwrap();
@@ -16,18 +17,17 @@ pub async fn read(uri: &str) -> Command {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
+
     cmd
 }
 
 pub async fn stream_from_playlist(uri: &str) -> reqwest::Result<String> {
-    use crate::pls;
-
-    // Fetch remote playlist file
     let text = reqwest::get(uri).await?.text().await?;
 
     // Parse out primary stream url
     let playlist = pls::parse(text.as_str()).unwrap();
     let files = playlist.files();
+
     Ok(files[0].clone())
 }
 
