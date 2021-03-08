@@ -1,11 +1,37 @@
-mkdir -p .run
-export RUST_LOG=DEBUG
-export TAPEDECK_DEV_DIR=`realpath .run`
-export DATABASE_URL=sqlite:`realpath .run`/tapedeck.db
+RUNCMD="tapedeck"
+RUNDIR=".tapedeck"
+
+mkdir -p "$RUNDIR"
+
+# Use .run as override location for log files, unix sockets,
+# config, etc. Essentially overrides XDG_* and dumps everything
+# into .run for development
+#
+export RUST_LOG="DEBUG"
+export TAPEDECK_DEV_DIR=`realpath "$RUNDIR"`
+export DATABASE_URL=sqlite:`realpath "$RUNDIR"`"/tapedeck.db"
+
+# Cute icon next to prompt to signify env set
+#
+C="#1111aa"
 export PS1="%F{#68ff00}☀%f$PS1"
+
+# Create a shell script to run cargo --bin with args
+# from within CARGO_MANIFEST_DIR. Can be used from
+# other dirs where `cwd` != CARGO_MANIFEST_DIR
+#
+_CARGO_MANIFEST_DIR=`dirname "$0"`
 echo '#!/bin/sh
 cmd=$1
 shift
-cargo run --bin $cmd -- $@' > run
-chmod 755 run
+cd '"$_CARGO_MANIFEST_DIR"'
+cargo run --bin $cmd -- $@
+cd - > /dev/null' \
+> "$RUNCMD"
+chmod 755 "$RUNCMD"
+
+# sqlx needs to find CARGO_MANIFEST_DIR/migrations
+#
+cd "$_CARGO_MANIFEST_DIR"
 cargo sqlx db setup
+cd - > /dev/null
