@@ -13,8 +13,9 @@ export DATABASE_URL=sqlite:`realpath "$RUNDIR"`"/tapedeck.db"
 
 # Cute icon next to prompt to signify env set
 #
-C="#1111aa"
-export PS1="%F{#68ff00}☀%f$PS1"
+C="#68ff00"
+#export PS1="%F{#68ff00}☀%f$PS1"
+export PS1="%F{""$C""}[✇_✇]%f$PS1"
 
 # Create a shell script to run cargo --bin with args
 # from within CARGO_MANIFEST_DIR. Can be used from

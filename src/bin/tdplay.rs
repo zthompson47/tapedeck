@@ -1,7 +1,10 @@
-use std::{self, path::PathBuf, str};
+use std::path::PathBuf;
 
+use libpulse_binding::sample::{Format, Spec};
+use libpulse_binding::stream::Direction;
+use libpulse_simple_binding::Simple as Pulse;
 use structopt::StructOpt;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tracing::debug;
@@ -15,93 +18,87 @@ struct Cli {
 }
 
 fn main() {
-    let _guard = init_logging("tapedeck");
-    let args = Cli::from_args();
     term::with_raw_mode(|| {
-        let (tx_quit, rx_quit) = mpsc::unbounded_channel();
         let rt = Runtime::new().unwrap();
-        rt.spawn(quit(tx_quit));
-        rt.block_on(play(args.fname, rx_quit)).unwrap();
+        rt.block_on(run(&rt));
     });
 }
 
-/// Play an audio stream.
-async fn play(
-    fname: PathBuf,
-    mut rx_quit: mpsc::UnboundedReceiver<&str>,
-) -> Result<(), std::io::Error> {
-    let fname = fname.to_str().unwrap();
+async fn run(rt: &Runtime) {
+    let _guard = init_logging("tapedeck");
+    let (tx_audio, mut rx_audio) = mpsc::unbounded_channel::<[u8; 4096]>();
 
-    let mut source = cmd::ffmpeg::read(fname).await.spawn()?;
+    std::thread::spawn(move || {
+        let spec = Spec {
+            format: Format::S16le,
+            channels: 2,
+            rate: 44100,
+        };
+        assert!(spec.is_valid());
+
+        let s = Pulse::new(
+            None,                // Use the default server
+            "tapedeck",          // Our application’s name
+            Direction::Playback, // We want a playback stream
+            None,                // Use the default device
+            "Music",             // Description of our stream
+            &spec,               // Our sample format
+            None,                // Use default channel map
+            None,                // Use default buffering attributes
+        )
+        .unwrap();
+
+        while let Some(buf) = rx_audio.blocking_recv() {
+            s.write(&buf).unwrap();
+            // s.drain().unwrap();
+        }
+    });
+
+    let args = Cli::from_args();
+    let music_file = args.fname.to_str().unwrap();
+    let mut source = cmd::ffmpeg::read(music_file).await.spawn().unwrap();
     let mut reader = source.stdout.take().unwrap();
-    let mut sink = cmd::sox::play().spawn()?;
-    let mut writer = sink.stdin.take().unwrap();
+    let mut buf: [u8; 4096] = [0; 4096];
 
-    let (snd, mut rcv) = mpsc::channel(1);
-
-    let playlist = tokio::spawn(async move {
-        let mut buf: [u8; 1024] = [0; 1024];
-        loop {
-            reader.read(&mut buf).await.unwrap();
-            match snd.send(buf).await {
-                Ok(()) => {}
-                Err(err) => {
-                    debug!("!!!{}!!!", err.to_string());
-                    break;
-                }
+    rt.spawn(async move {
+        while let Ok(len) = reader.read_exact(&mut buf).await {
+            if len != 4096 {
+                dbg!("WTF wrong size chunk from ffmpeg reader");
             }
+            tx_audio.send(buf).unwrap();
         }
     });
 
-    let player = tokio::spawn(async move {
-        loop {
-            let buf: [u8; 1024] = rcv.recv().await.unwrap();
-            match writer.write(&buf).await {
-                Ok(_n) => {
-                    // TODO compare num bytes written to bytes from buf
-                    /*print!("{:?}", buf)*/
-                }
-                Err(err) => {
-                    debug!("!!!{}!!!", err.to_string());
-                    break;
-                }
-            }
-        }
-    });
-
-    // Receive quit signal
-    rx_quit.recv().await.unwrap();
-    source.kill().await.unwrap();
-    sink.kill().await.unwrap();
-
-    // Wait for processes
-    source.wait().await.unwrap();
-    sink.wait().await.unwrap();
-
-    // Wait for tasks
-    playlist.await.unwrap();
-    player.await.unwrap();
-
-    Ok(())
+    KeyCommand::listen_and_quit().await;
 }
 
-/// Process a quit signal from the keyboard.
-async fn quit(quit_out: mpsc::UnboundedSender<&str>) {
-    let mut stdin = tokio::io::stdin();
-    let mut buf: [u8; 1] = [0; 1];
+enum KeyCommand {
+    Quit,
+    Unknown(u8),
+}
 
-    loop {
-        stdin.read(&mut buf).await.expect("can't read stdin");
-        match buf[0] {
-            3 | 113 => {
-                // `^C` or `q`
-                debug!("Got QUIT signal");
-                quit_out.send("42").ok();
-                break;
-            }
-            _ => {
-                debug!("keyboard input >{}<", buf[0]);
-                continue;
+impl KeyCommand {
+    fn from_byte(b: u8) -> Self {
+        match b {
+            3 | 113 => Self::Quit,
+            _ => Self::Unknown(b),
+        }
+    }
+
+    async fn listen_and_quit() {
+        let mut stdin = tokio::io::stdin();
+        let mut buf: [u8; 1] = [0; 1];
+
+        loop {
+            stdin.read_exact(&mut buf).await.unwrap();
+            match KeyCommand::from_byte(buf[0]) {
+                KeyCommand::Quit => {
+                    debug!("Got QUIT signal");
+                    break;
+                }
+                KeyCommand::Unknown(cmd) => {
+                    debug!("keyboard input >{}<", cmd);
+                }
             }
         }
     }
