@@ -37,7 +37,7 @@ pub fn init_logging(app_name: &str) -> WorkerGuard {
         .event_format(SimpleFmt)
         .try_init()
     {
-        Ok(_) => info!("Starting barnine..."),
+        Ok(_) => info!("Starting {}...", app_name),
         Err(e) => eprintln!("{}", e.to_string()),
     }
 
@@ -115,16 +115,16 @@ mod tests {
         // Use tempdir for log files
         let dir = tempdir().unwrap().into_path();
         env::set_var("XDG_CACHE_DIR", &dir);
-        let _guard = init_logging("barnine-test");
+        let _guard = init_logging("appname-test");
 
         // Try both logging crates
         log::info!("test log INFO");
         tracing::debug!("test tracing DEBUG");
 
         // Confirm log file created
-        let dir = dir.join("barnine-test");
+        let dir = dir.join("appname-test");
         assert!(dir.is_dir());
-        let log_file = dir.join("barnine-test.log");
+        let log_file = dir.join("appname-test.log");
         assert!(log_file.is_file());
 
         // Drop logging guard to flush logs.
