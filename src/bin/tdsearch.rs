@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::env::{self, args};
+use std::env::args;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -11,6 +11,7 @@ use sqlx::sqlite::SqlitePool;
 use walkdir::WalkDir;
 
 use tapedeck::audio::dir::{AudioDir, AudioFile};
+use tapedeck::database::get_database_url;
 
 static MIGRATOR: Migrator = sqlx::migrate!();
 
@@ -121,6 +122,7 @@ fn print_audio_dir(dir: &AudioDir) {
     }
 }
 
+/*
 fn get_database_url(name: &str) -> Result<String, ()> {
     let result = match env::var("DATABASE_URL") {
         Ok(url) => Ok(url),
@@ -140,3 +142,4 @@ fn get_database_url(name: &str) -> Result<String, ()> {
 
     result
 }
+*/

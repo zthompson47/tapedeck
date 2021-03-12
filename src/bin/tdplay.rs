@@ -1,20 +1,31 @@
 use std::path::PathBuf;
 
-use libpulse_binding::sample::{Format, Spec};
-use libpulse_binding::stream::Direction;
+use libpulse_binding::{
+    sample::{Format, Spec},
+    stream::Direction,
+};
 use libpulse_simple_binding::Simple as Pulse;
+use sqlx::sqlite::SqlitePool;
 use structopt::StructOpt;
-use tokio::io::AsyncReadExt;
-use tokio::runtime::Runtime;
-use tokio::sync::mpsc;
+use tokio::{io::AsyncReadExt, runtime::Runtime, sync::mpsc};
 use tracing::debug;
 
-use tapedeck::{cmd, logging::init_logging, term};
+use tapedeck::{
+    audio::dir::AudioDir,
+    cmd::ffmpeg,
+    database::{get_database_url, MIGRATOR},
+    logging::init_logging,
+    term,
+};
+
+const CHUNK: usize = 4096;
 
 #[derive(StructOpt)]
 struct Cli {
+    #[structopt(short, long)]
+    id: Option<i64>,
     #[structopt(parse(from_os_str))]
-    fname: PathBuf,
+    music_url: Option<PathBuf>,
 }
 
 fn main() {
@@ -26,8 +37,9 @@ fn main() {
 
 async fn run(rt: &Runtime) {
     let _guard = init_logging("tapedeck");
-    let (tx_audio, mut rx_audio) = mpsc::unbounded_channel::<[u8; 4096]>();
+    let (tx_audio, mut rx_audio) = mpsc::channel::<[u8; CHUNK]>(1);
 
+    // PulseSink::get_sender|new(&self) -> mpsc::Sender
     std::thread::spawn(move || {
         let spec = Spec {
             format: Format::S16le,
@@ -36,7 +48,7 @@ async fn run(rt: &Runtime) {
         };
         assert!(spec.is_valid());
 
-        let s = Pulse::new(
+        let pulse = Pulse::new(
             None,                // Use the default server
             "tapedeck",          // Our application’s name
             Direction::Playback, // We want a playback stream
@@ -49,25 +61,67 @@ async fn run(rt: &Runtime) {
         .unwrap();
 
         while let Some(buf) = rx_audio.blocking_recv() {
-            s.write(&buf).unwrap();
-            // s.drain().unwrap();
+            pulse.drain().unwrap();
+            pulse.write(&buf).unwrap();
         }
     });
+
+    // Connect to database
+    let pool = SqlitePool::connect(&get_database_url("tapedeck").unwrap())
+        .await
+        .unwrap();
+    MIGRATOR.run(&pool).await.unwrap();
 
     let args = Cli::from_args();
-    let music_file = args.fname.to_str().unwrap();
-    let mut source = cmd::ffmpeg::read(music_file).await.spawn().unwrap();
-    let mut reader = source.stdout.take().unwrap();
-    let mut buf: [u8; 4096] = [0; 4096];
 
-    rt.spawn(async move {
-        while let Ok(len) = reader.read_exact(&mut buf).await {
-            if len != 4096 {
-                dbg!("WTF wrong size chunk from ffmpeg reader");
-            }
-            tx_audio.send(buf).unwrap();
+    match args.music_url {
+        // Play single file, directory, or web stream
+        Some(ref music_url) => {
+            let music_url = music_url.to_str().unwrap();
+            let mut source = ffmpeg::read(music_url).await.spawn().unwrap();
+            let mut reader = source.stdout.take().unwrap();
+            let mut buf: [u8; CHUNK] = [0; CHUNK];
+
+            rt.spawn(async move {
+                while let Ok(len) = reader.read_exact(&mut buf).await {
+                    if len != CHUNK {
+                        debug!("WTF wrong size chunk from ffmpeg reader");
+                    }
+                    tx_audio.send(buf).await.unwrap();
+                }
+            });
         }
-    });
+        None => match args.id {
+            // Play music_dir from database
+            Some(id) => {
+                let music_files = AudioDir::get_audio_files(&pool, id).await;
+                let mut playlist = Vec::<tokio::process::Child>::new();
+                for file in music_files.iter() {
+                    match ffmpeg::read(file.path.as_str()).await.spawn() {
+                        Ok(task) => {
+                            playlist.push(task);
+                        }
+                        Err(e) => debug!("{:?}", e),
+                    }
+                }
+                rt.spawn(async move {
+                    let mut buf: [u8; CHUNK] = [0; CHUNK];
+                    for file in playlist.iter_mut() {
+                        debug!("--READ-->> {:?}", file);
+                        let mut reader = file.stdout.take().unwrap();
+                        while let Ok(len) = reader.read_exact(&mut buf).await {
+                            tx_audio.send(buf).await.unwrap();
+                            if len != buf.len() {
+                                break;
+                            }
+                        }
+                    }
+                });
+                //return;  TODO quit when playlist is done playing
+            }
+            None => {}
+        },
+    }
 
     KeyCommand::listen_and_quit().await;
 }

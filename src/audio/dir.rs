@@ -1,11 +1,13 @@
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt;
 use std::path::PathBuf;
-use std::collections::HashMap;
 
 use crossterm::style::Colorize;
 use mime_guess::{self, Mime};
 use sqlx::sqlite::SqlitePool;
+use tokio_stream::StreamExt;
+use tracing::debug;
 
 #[derive(Debug, Default)]
 pub struct AudioDir {
@@ -16,6 +18,38 @@ pub struct AudioDir {
 }
 
 impl AudioDir {
+    pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<AudioFileSql> {
+        let mut files = sqlx::query_as!(
+            AudioFileSql,
+            r#"
+            SELECT
+                id AS id,
+                path AS path,
+                mime_type AS mime_type
+            FROM audio_file
+            WHERE id IN (
+                SELECT
+                    audio_file_id AS id
+                FROM audio_dir_audio_file
+                WHERE audio_dir_id = ?
+            )
+            "#,
+            id
+        )
+        .fetch(pool);
+
+        let mut result = Vec::new();
+        while let Ok(file) = files.try_next().await {
+            debug!("FILE: {:?}", file);
+            match file {
+                Some(file) => result.push(file),
+                None => break,
+            }
+        }
+
+        result
+    }
+
     pub async fn db_insert(&mut self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
         let transaction = pool.begin().await?;
 
@@ -24,7 +58,7 @@ impl AudioDir {
             r#"
             INSERT INTO audio_dir(path)
             VALUES(?1)
-        "#,
+            "#,
             dir_path
         )
         .execute(pool)
@@ -39,7 +73,7 @@ impl AudioDir {
                 r#"
                 INSERT INTO audio_file(path, mime_type)
                 VALUES(?1, ?2);
-            "#,
+                "#,
                 path,
                 mime_type,
             )
@@ -51,7 +85,7 @@ impl AudioDir {
                 r#"
                 INSERT INTO audio_dir_audio_file(audio_dir_id, audio_file_id)
                 VALUES ($1, $2);
-            "#,
+                "#,
                 self.id,
                 audio_file_id,
             )
@@ -67,7 +101,7 @@ impl AudioDir {
                     r#"
                     INSERT INTO extra_file(path, mime_type)
                     VALUES(?1, ?2);
-                "#,
+                    "#,
                     path,
                     extension,
                 )
@@ -79,7 +113,7 @@ impl AudioDir {
                     r#"
                     INSERT INTO audio_dir_extra_file(audio_dir_id, extra_file_id)
                     VALUES ($1, $2);
-                "#,
+                    "#,
                     self.id,
                     extra_file_id,
                 )
@@ -90,6 +124,13 @@ impl AudioDir {
 
         transaction.commit().await
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioFileSql {
+    pub id: i64,
+    pub path: String,
+    pub mime_type: Option<String>,
 }
 
 #[derive(Clone, Debug)]

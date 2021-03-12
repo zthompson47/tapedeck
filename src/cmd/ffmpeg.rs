@@ -4,12 +4,16 @@ use tokio::process::Command;
 
 use crate::pls;
 
-pub async fn read(uri: &str) -> Command {
-    let stream_url = stream_from_playlist(uri).await.unwrap();
+pub async fn read(url: &str) -> Command {
+    let url = match url {
+        url if url.starts_with("http") => stream_from_playlist(url).await.unwrap(),
+        _ => url.to_string(),
+    };
+
     let mut cmd = Command::new("ffmpeg");
 
     cmd.args(&["-ac", "2"])
-        .args(&["-i", stream_url.as_str()])
+        .args(&["-i", url.as_str()])
         .args(&["-f", "s16le"])
         .args(&["-ar", "44.1k"])
         .args(&["-acodec", "pcm_s16le"])
@@ -21,8 +25,8 @@ pub async fn read(uri: &str) -> Command {
     cmd
 }
 
-pub async fn stream_from_playlist(uri: &str) -> reqwest::Result<String> {
-    let text = reqwest::get(uri).await?.text().await?;
+pub async fn stream_from_playlist(url: &str) -> reqwest::Result<String> {
+    let text = reqwest::get(url).await?.text().await?;
 
     // Parse out primary stream url
     let playlist = pls::parse(text.as_str()).unwrap();
