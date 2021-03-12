@@ -39,7 +39,6 @@ async fn run(rt: &Runtime) {
     let _guard = init_logging("tapedeck");
     let (tx_audio, mut rx_audio) = mpsc::channel::<[u8; CHUNK]>(1);
 
-    // PulseSink::get_sender|new(&self) -> mpsc::Sender
     std::thread::spawn(move || {
         let spec = Spec {
             format: Format::S16le,
@@ -61,7 +60,7 @@ async fn run(rt: &Runtime) {
         .unwrap();
 
         while let Some(buf) = rx_audio.blocking_recv() {
-            pulse.drain().unwrap();
+            //pulse.drain().unwrap();
             pulse.write(&buf).unwrap();
         }
     });
