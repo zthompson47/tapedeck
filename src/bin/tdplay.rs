@@ -1,21 +1,23 @@
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    thread::{self, JoinHandle},
+};
 
+use crossterm::terminal;
 use libpulse_binding::{
     sample::{Format, Spec},
     stream::Direction,
 };
 use libpulse_simple_binding::Simple as Pulse;
-use sqlx::sqlite::SqlitePool;
 use structopt::StructOpt;
-use tokio::{io::AsyncReadExt, runtime::Runtime, sync::mpsc};
+use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::debug;
 
 use tapedeck::{
     audio::dir::AudioDir,
-    cmd::ffmpeg,
-    database::{get_database_url, MIGRATOR},
+    database::{get_db_pool, MIGRATOR},
+    ffmpeg::audio_from_url,
     logging::init_logging,
-    term,
 };
 
 const CHUNK: usize = 4096;
@@ -28,60 +30,26 @@ struct Cli {
     music_url: Option<PathBuf>,
 }
 
-fn main() {
-    term::with_raw_mode(|| {
-        let rt = Runtime::new().unwrap();
-        rt.block_on(run(&rt));
-    });
-}
-
-async fn run(rt: &Runtime) {
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     let _guard = init_logging("tapedeck");
-    let (tx_audio, mut rx_audio) = mpsc::channel::<[u8; CHUNK]>(1);
-
-    std::thread::spawn(move || {
-        let spec = Spec {
-            format: Format::S16le,
-            channels: 2,
-            rate: 44100,
-        };
-        assert!(spec.is_valid());
-
-        let pulse = Pulse::new(
-            None,                // Use the default server
-            "tapedeck",          // Our application’s name
-            Direction::Playback, // We want a playback stream
-            None,                // Use the default device
-            "Music",             // Description of our stream
-            &spec,               // Our sample format
-            None,                // Use default channel map
-            None,                // Use default buffering attributes
-        )
-        .unwrap();
-
-        while let Some(buf) = rx_audio.blocking_recv() {
-            //pulse.drain().unwrap();
-            pulse.write(&buf).unwrap();
-        }
-    });
-
-    // Connect to database
-    let pool = SqlitePool::connect(&get_database_url("tapedeck").unwrap())
-        .await
-        .unwrap();
-    MIGRATOR.run(&pool).await.unwrap();
-
     let args = Cli::from_args();
+
+    let db = get_db_pool("tapedeck").await?;
+    MIGRATOR.run(&db).await?;
+
+    let (tx_audio, rx_audio) = mpsc::channel::<[u8; CHUNK]>(2);
+    let _pulse = init_pulse(rx_audio);
 
     match args.music_url {
         // Play single file, directory, or web stream
         Some(ref music_url) => {
             let music_url = music_url.to_str().unwrap();
-            let mut source = ffmpeg::read(music_url).await.spawn().unwrap();
+            let mut source = audio_from_url(music_url).await.spawn()?;
             let mut reader = source.stdout.take().unwrap();
             let mut buf: [u8; CHUNK] = [0; CHUNK];
 
-            rt.spawn(async move {
+            tokio::spawn(async move {
                 while let Ok(len) = reader.read_exact(&mut buf).await {
                     if len != CHUNK {
                         debug!("WTF wrong size chunk from ffmpeg reader");
@@ -93,20 +61,17 @@ async fn run(rt: &Runtime) {
         None => match args.id {
             // Play music_dir from database
             Some(id) => {
-                let music_files = AudioDir::get_audio_files(&pool, id).await;
+                let music_files = AudioDir::get_audio_files(&db, id).await;
                 let mut playlist = Vec::<tokio::process::Child>::new();
                 for file in music_files.iter() {
-                    match ffmpeg::read(file.path.as_str()).await.spawn() {
-                        Ok(task) => {
-                            playlist.push(task);
-                        }
+                    match audio_from_url(file.path.as_str()).await.spawn() {
+                        Ok(task) => playlist.push(task),
                         Err(e) => debug!("{:?}", e),
                     }
                 }
-                rt.spawn(async move {
+                tokio::spawn(async move {
                     let mut buf: [u8; CHUNK] = [0; CHUNK];
                     for file in playlist.iter_mut() {
-                        debug!("--READ-->> {:?}", file);
                         let mut reader = file.stdout.take().unwrap();
                         while let Ok(len) = reader.read_exact(&mut buf).await {
                             tx_audio.send(buf).await.unwrap();
@@ -123,6 +88,8 @@ async fn run(rt: &Runtime) {
     }
 
     KeyCommand::listen_and_quit().await;
+
+    Ok(())
 }
 
 enum KeyCommand {
@@ -142,6 +109,7 @@ impl KeyCommand {
         let mut stdin = tokio::io::stdin();
         let mut buf: [u8; 1] = [0; 1];
 
+        terminal::enable_raw_mode().unwrap();
         loop {
             stdin.read_exact(&mut buf).await.unwrap();
             match KeyCommand::from_byte(buf[0]) {
@@ -154,5 +122,45 @@ impl KeyCommand {
                 }
             }
         }
+        terminal::disable_raw_mode().unwrap();
     }
+}
+
+fn init_pulse(mut rx_audio: mpsc::Receiver<[u8; CHUNK]>) -> JoinHandle<()> {
+    thread::spawn(move || {
+        let spec = Spec {
+            format: Format::S16le,
+            channels: 2,
+            rate: 44100,
+        };
+        if !spec.is_valid() {
+            debug!("Spec not valid: {:?}", spec);
+            panic!("!!!!!!!!SPEC NOT VALID!!!!!!!!");
+        }
+
+        let pulse = match Pulse::new(
+            None,                // Use the default server
+            "tapedeck",          // Our application’s name
+            Direction::Playback, // We want a playback stream
+            None,                // Use the default device
+            "Music",             // Description of our stream
+            &spec,               // Our sample format
+            None,                // Use default channel map
+            None,                // Use default buffering attributes
+        ) {
+            Ok(pulse) => pulse,
+            Err(e) => {
+                debug!("{:?}", e);
+                panic!("!!!!!!!!NO PULSEAUDIO!!!!!!!!");
+            }
+        };
+
+        while let Some(buf) = rx_audio.blocking_recv() {
+            match pulse.write(&buf) {
+                Ok(_) => {}
+                Err(e) => debug!("{:?}", e),
+            }
+            //pulse.drain().unwrap();
+        }
+    })
 }

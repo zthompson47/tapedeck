@@ -4,7 +4,7 @@ use tokio::process::Command;
 
 use crate::pls;
 
-pub async fn read(url: &str) -> Command {
+pub async fn audio_from_url(url: &str) -> Command {
     let url = match url {
         url if url.starts_with("http") => stream_from_playlist(url).await.unwrap(),
         _ => url.to_string(),

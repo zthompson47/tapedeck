@@ -1,11 +1,25 @@
-use std::env;
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 
-use sqlx::migrate::Migrator;
+use sqlx::{
+    migrate::Migrator,
+    sqlite::{SqliteConnectOptions, SqlitePool},
+    ConnectOptions, Error, Pool, Sqlite, SqliteConnection,
+};
 
 pub static MIGRATOR: Migrator = sqlx::migrate!();
 
-pub fn get_database_url(name: &str) -> Result<String, ()> {
+pub async fn get_db_connection(name: &str) -> Result<SqliteConnection, Error> {
+    SqliteConnectOptions::new()
+        .filename(get_db_url(name).unwrap())
+        .connect()
+        .await
+}
+
+pub async fn get_db_pool(name: &str) -> Result<Pool<Sqlite>, Error> {
+    SqlitePool::connect(&get_db_url(name).unwrap()).await
+}
+
+pub fn get_db_url(name: &str) -> Result<String, ()> {
     match env::var("DATABASE_URL") {
         Ok(url) => Ok(url),
         Err(_) => match env::var("HOME") {

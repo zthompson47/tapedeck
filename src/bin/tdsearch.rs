@@ -11,7 +11,7 @@ use sqlx::sqlite::SqlitePool;
 use walkdir::WalkDir;
 
 use tapedeck::audio::dir::{AudioDir, AudioFile};
-use tapedeck::database::get_database_url;
+use tapedeck::database::get_db_url;
 
 static MIGRATOR: Migrator = sqlx::migrate!();
 
@@ -23,9 +23,9 @@ async fn main() {
     let mut extensions: HashMap<OsString, usize> = HashMap::new();
     let mut extra: HashMap<OsString, Vec<PathBuf>> = HashMap::new();
 
-    tracing::debug!("{:?}", get_database_url("tapedeck"));
+    tracing::debug!("{:?}", get_db_url("tapedeck"));
 
-    let pool = SqlitePool::connect(&get_database_url("tapedeck").unwrap())
+    let pool = SqlitePool::connect(&get_db_url("tapedeck").unwrap())
         .await
         .unwrap();
     MIGRATOR.run(&pool).await.unwrap();
@@ -121,25 +121,3 @@ fn print_audio_dir(dir: &AudioDir) {
         }
     }
 }
-
-/*
-fn get_database_url(name: &str) -> Result<String, ()> {
-    let result = match env::var("DATABASE_URL") {
-        Ok(url) => Ok(url),
-        Err(_) => match env::var("HOME") {
-            Ok(dir) => {
-                let mut path = PathBuf::from(dir)
-                    .join(".local")
-                    .join("share")
-                    .join(name)
-                    .join(name);
-                path.set_extension("db");
-                Ok(path.to_str().unwrap().to_string())
-            }
-            Err(_) => Ok("tmp".to_string()),
-        },
-    };
-
-    result
-}
-*/

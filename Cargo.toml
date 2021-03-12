@@ -5,8 +5,8 @@ authors = ["Zach Thompson <zach@allotropic.com>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.38"
 bytes = "0.6.0"
-#cpal = "0.13.1"
 crossterm = { version = "0.18.2", features = ["event-stream"] }
 libc = "0.2.81"
 libpulse-binding = "2.23.0"
