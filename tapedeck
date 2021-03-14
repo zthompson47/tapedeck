@@ -1,0 +1,18 @@
+#!/bin/sh
+RUNDIR=".tapedeck"
+mkdir -p "$RUNDIR"
+
+export RUST_LOG="DEBUG"
+export TAPEDECK_DEV_DIR=`realpath "$RUNDIR"`
+
+# Sqlx needs a database to compile
+DATABASE_URL=sqlite:`realpath "$RUNDIR"`"/sqlx.db" cargo sqlx db setup
+
+if [ $# -eq 0 ]; then
+    echo "No --bin provided"
+    exit 1
+fi
+
+cmd=$1
+shift
+cargo run --bin $cmd -- $@

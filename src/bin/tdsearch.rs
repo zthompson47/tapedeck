@@ -6,14 +6,10 @@ use std::path::PathBuf;
 
 use crossterm::style::Colorize;
 use mime_guess;
-use sqlx::migrate::Migrator;
-use sqlx::sqlite::SqlitePool;
 use walkdir::WalkDir;
 
 use tapedeck::audio::dir::{AudioDir, AudioFile};
-use tapedeck::database::get_db_url;
-
-static MIGRATOR: Migrator = sqlx::migrate!();
+use tapedeck::database::get_database;
 
 #[tokio::main]
 async fn main() {
@@ -23,15 +19,10 @@ async fn main() {
     let mut extensions: HashMap<OsString, usize> = HashMap::new();
     let mut extra: HashMap<OsString, Vec<PathBuf>> = HashMap::new();
 
-    tracing::debug!("{:?}", get_db_url("tapedeck"));
+    let db = get_database("tapedeck").await.unwrap();
 
-    let pool = SqlitePool::connect(&get_db_url("tapedeck").unwrap())
-        .await
-        .unwrap();
-    MIGRATOR.run(&pool).await.unwrap();
-
-    // Sort directories-first with file entries forming an alpahbetized contiguous
-    // list followed by their parent directory.
+    // Sort directories-first with file entries forming an alpahbetized
+    // contiguous list followed by their parent directory.
     for entry in WalkDir::new(args().nth(1).unwrap())
         .contents_first(true)
         .sort_by(
@@ -89,7 +80,7 @@ async fn main() {
                         extra: std::mem::take(&mut extra),
                         ..AudioDir::default()
                     };
-                    audio_dir.db_insert(&pool).await.unwrap();
+                    audio_dir.db_insert(&db).await.unwrap();
                     print_audio_dir(&audio_dir);
                 } else {
                     extra.clear();

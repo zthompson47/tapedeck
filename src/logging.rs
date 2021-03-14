@@ -13,12 +13,10 @@ use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
 
 pub fn init_logging(app_name: &str) -> WorkerGuard {
-    let default_level = Level::INFO;
     let log_dir = get_log_dir(app_name);
-    let mut file_name = app_name.to_string();
-    file_name.push_str(".log");
 
-    let file_appender = rolling::never(log_dir, file_name);
+    let default_level = Level::INFO;
+    let file_appender = rolling::never(log_dir, String::from("log"));
     let (log_writer, guard) = tracing_appender::non_blocking(file_appender);
 
     match tracing_subscriber::fmt()

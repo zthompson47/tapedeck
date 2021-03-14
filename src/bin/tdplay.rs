@@ -3,24 +3,37 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crossterm::terminal;
 use libpulse_binding::{
     sample::{Format, Spec},
     stream::Direction,
 };
 use libpulse_simple_binding::Simple as Pulse;
 use structopt::StructOpt;
-use tokio::{io::AsyncReadExt, sync::mpsc};
+use tokio::{io::AsyncReadExt, runtime::Runtime, sync::mpsc};
 use tracing::debug;
 
 use tapedeck::{
     audio::dir::AudioDir,
-    database::{get_db_pool, MIGRATOR},
+    database::get_database,
     ffmpeg::audio_from_url,
     logging::init_logging,
+    terminal::with_raw_mode,
 };
 
 const CHUNK: usize = 4096;
+
+type Chunk = [u8; CHUNK];
+
+trait ChunkLen {
+    fn len() -> usize {
+        CHUNK
+    }
+    fn new() -> Chunk {
+        [0; CHUNK]
+    }
+}
+
+impl ChunkLen for Chunk {}
 
 #[derive(StructOpt)]
 struct Cli {
@@ -30,31 +43,36 @@ struct Cli {
     music_url: Option<PathBuf>,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
-    let _guard = init_logging("tapedeck");
+fn main() -> Result<(), anyhow::Error> {
     let args = Cli::from_args();
+    with_raw_mode(|| {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(run(&rt, args)).unwrap();
+    })
+}
 
-    let db = get_db_pool("tapedeck").await?;
-    MIGRATOR.run(&db).await?;
+async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
+    let _guard = init_logging("tapedeck");
 
-    let (tx_audio, rx_audio) = mpsc::channel::<[u8; CHUNK]>(2);
+    let db = get_database("tapedeck").await?;
+
+    let (tx_audio, rx_audio) = mpsc::channel::<Chunk>(2);
     let _pulse = init_pulse(rx_audio);
 
     match args.music_url {
         // Play single file, directory, or web stream
         Some(ref music_url) => {
             let music_url = music_url.to_str().unwrap();
-            let mut source = audio_from_url(music_url).await.spawn()?;
-            let mut reader = source.stdout.take().unwrap();
-            let mut buf: [u8; CHUNK] = [0; CHUNK];
+            let mut music_task = audio_from_url(music_url).await.spawn()?;
+            let mut audio = music_task.stdout.take().unwrap();
+            let mut buf = Chunk::new();
 
-            tokio::spawn(async move {
-                while let Ok(len) = reader.read_exact(&mut buf).await {
-                    if len != CHUNK {
-                        debug!("WTF wrong size chunk from ffmpeg reader");
-                    }
+            rt.spawn(async move {
+                while let Ok(len) = audio.read_exact(&mut buf).await {
                     tx_audio.send(buf).await.unwrap();
+                    if len != Chunk::len() {
+                        break;
+                    }
                 }
             });
         }
@@ -69,13 +87,13 @@ async fn main() -> Result<(), anyhow::Error> {
                         Err(e) => debug!("{:?}", e),
                     }
                 }
-                tokio::spawn(async move {
-                    let mut buf: [u8; CHUNK] = [0; CHUNK];
+                rt.spawn(async move {
+                    let mut buf = Chunk::new();
                     for file in playlist.iter_mut() {
                         let mut reader = file.stdout.take().unwrap();
                         while let Ok(len) = reader.read_exact(&mut buf).await {
                             tx_audio.send(buf).await.unwrap();
-                            if len != buf.len() {
+                            if len != Chunk::len() {
                                 break;
                             }
                         }
@@ -109,7 +127,6 @@ impl KeyCommand {
         let mut stdin = tokio::io::stdin();
         let mut buf: [u8; 1] = [0; 1];
 
-        terminal::enable_raw_mode().unwrap();
         loop {
             stdin.read_exact(&mut buf).await.unwrap();
             match KeyCommand::from_byte(buf[0]) {
@@ -122,11 +139,10 @@ impl KeyCommand {
                 }
             }
         }
-        terminal::disable_raw_mode().unwrap();
     }
 }
 
-fn init_pulse(mut rx_audio: mpsc::Receiver<[u8; CHUNK]>) -> JoinHandle<()> {
+fn init_pulse(mut rx_audio: mpsc::Receiver<Chunk>) -> JoinHandle<()> {
     thread::spawn(move || {
         let spec = Spec {
             format: Format::S16le,
