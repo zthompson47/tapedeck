@@ -1,4 +1,5 @@
 use std::{
+    io::Read,
     path::PathBuf,
     thread::{self, JoinHandle},
 };
@@ -9,14 +10,11 @@ use libpulse_binding::{
 };
 use libpulse_simple_binding::Simple as Pulse;
 use structopt::StructOpt;
-use tokio::{io::AsyncReadExt, runtime::Runtime, sync::mpsc};
+use tokio::{io::AsyncReadExt, process, runtime::Runtime, sync::mpsc};
 use tracing::debug;
 
 use tapedeck::{
-    audio::dir::AudioDir,
-    database::get_database,
-    ffmpeg::audio_from_url,
-    logging::init_logging,
+    audio::dir::AudioDir, database::get_database, ffmpeg::audio_from_url, logging::init_logging,
     terminal::with_raw_mode,
 };
 
@@ -59,9 +57,12 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     let (tx_audio, rx_audio) = mpsc::channel::<Chunk>(2);
     let _pulse = init_pulse(rx_audio);
 
+    let (tx_quit, mut rx_quit) = mpsc::unbounded_channel();
+    let _key_cmd = init_key_command(tx_quit.clone());
+
     match args.music_url {
-        // Play single file, directory, or web stream
         Some(ref music_url) => {
+            // Play single file, directory, or web stream
             let music_url = music_url.to_str().unwrap();
             let mut music_task = audio_from_url(music_url).await.spawn()?;
             let mut audio = music_task.stdout.take().unwrap();
@@ -74,22 +75,31 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
                         break;
                     }
                 }
+                tx_quit.send(()).unwrap();
             });
         }
         None => match args.id {
-            // Play music_dir from database
             Some(id) => {
+                // Get music_dir from database
                 let music_files = AudioDir::get_audio_files(&db, id).await;
-                let mut playlist = Vec::<tokio::process::Child>::new();
-                for file in music_files.iter() {
-                    match audio_from_url(file.path.as_str()).await.spawn() {
-                        Ok(task) => playlist.push(task),
-                        Err(e) => debug!("{:?}", e),
+
+                // Backpressure queue to limit open files
+                let (tx, mut rx) = mpsc::channel::<process::Child>(2);
+
+                // Read the files
+                rt.spawn(async move {
+                    for file in music_files.iter() {
+                        match audio_from_url(file.path.as_str()).await.spawn() {
+                            Ok(task) => tx.send(task).await.unwrap(),
+                            Err(e) => debug!("{:?}", e),
+                        }
                     }
-                }
+                });
+
+                // Play the audio
                 rt.spawn(async move {
                     let mut buf = Chunk::new();
-                    for file in playlist.iter_mut() {
+                    while let Some(mut file) = rx.recv().await {
                         let mut reader = file.stdout.take().unwrap();
                         while let Ok(len) = reader.read_exact(&mut buf).await {
                             tx_audio.send(buf).await.unwrap();
@@ -98,15 +108,15 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
                             }
                         }
                     }
+                    tx_quit.send(()).unwrap();
                 });
-                //return;  TODO quit when playlist is done playing
             }
             None => {}
         },
     }
 
-    KeyCommand::listen_and_quit().await;
-
+    // Wait for quit signal
+    rx_quit.recv().await.unwrap();
     Ok(())
 }
 
@@ -122,16 +132,19 @@ impl KeyCommand {
             _ => Self::Unknown(b),
         }
     }
+}
 
-    async fn listen_and_quit() {
-        let mut stdin = tokio::io::stdin();
+fn init_key_command(tx_quit: mpsc::UnboundedSender<()>) -> JoinHandle<()> {
+    thread::spawn(move || {
+        let mut stdin = std::io::stdin();
         let mut buf: [u8; 1] = [0; 1];
 
         loop {
-            stdin.read_exact(&mut buf).await.unwrap();
+            stdin.read_exact(&mut buf).unwrap();
             match KeyCommand::from_byte(buf[0]) {
                 KeyCommand::Quit => {
                     debug!("Got QUIT signal");
+                    tx_quit.send(()).unwrap();
                     break;
                 }
                 KeyCommand::Unknown(cmd) => {
@@ -139,7 +152,7 @@ impl KeyCommand {
                 }
             }
         }
-    }
+    })
 }
 
 fn init_pulse(mut rx_audio: mpsc::Receiver<Chunk>) -> JoinHandle<()> {
@@ -179,4 +192,8 @@ fn init_pulse(mut rx_audio: mpsc::Receiver<Chunk>) -> JoinHandle<()> {
             //pulse.drain().unwrap();
         }
     })
+}
+
+fn _println(s: &str) {
+    print!("{}\r\n", s);
 }

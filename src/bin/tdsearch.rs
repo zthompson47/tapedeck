@@ -104,7 +104,7 @@ fn print_audio_dir(dir: &AudioDir) {
     let mut i = 0;
     for file in dir.files.iter() {
         if i > 5 {
-            println!("  {}{}", file, "...".to_string().red());
+            println!("  {}{}", file, "...".to_string().green());
             break;
         } else {
             println!("  {}", file);
