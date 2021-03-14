@@ -2,7 +2,7 @@ use std::process::Stdio;
 
 use tokio::process::Command;
 
-use crate::pls;
+use crate::playlist;
 
 pub async fn audio_from_url(url: &str) -> Command {
     let url = match url {
@@ -29,7 +29,7 @@ pub async fn stream_from_playlist(url: &str) -> reqwest::Result<String> {
     let text = reqwest::get(url).await?.text().await?;
 
     // Parse out primary stream url
-    let playlist = pls::parse(text.as_str()).unwrap();
+    let playlist = playlist::parse(text.as_str()).unwrap();
     let files = playlist.files();
 
     Ok(files[0].clone())

@@ -1,37 +1,17 @@
-use std::{
-    io::Read,
-    path::PathBuf,
-    thread::{self, JoinHandle},
-};
+use std::path::PathBuf;
 
-use libpulse_binding::{
-    sample::{Format, Spec},
-    stream::Direction,
-};
-use libpulse_simple_binding::Simple as Pulse;
 use structopt::StructOpt;
 use tokio::{io::AsyncReadExt, process, runtime::Runtime, sync::mpsc};
 use tracing::debug;
 
 use tapedeck::{
-    audio::dir::AudioDir, database::get_database, ffmpeg::audio_from_url, logging::init_logging,
+    audio::{dir::AudioDir, init_pulse, Chunk, ChunkLen},
+    database::get_database,
+    ffmpeg::audio_from_url,
+    keyboard::init_key_command,
+    logging::init_logging,
     terminal::with_raw_mode,
 };
-
-const CHUNK: usize = 4096;
-
-type Chunk = [u8; CHUNK];
-
-trait ChunkLen {
-    fn len() -> usize {
-        CHUNK
-    }
-    fn new() -> Chunk {
-        [0; CHUNK]
-    }
-}
-
-impl ChunkLen for Chunk {}
 
 #[derive(StructOpt)]
 struct Cli {
@@ -51,18 +31,20 @@ fn main() -> Result<(), anyhow::Error> {
 
 async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     let _guard = init_logging("tapedeck");
-
     let db = get_database("tapedeck").await?;
 
+    // Initialize audio output
     let (tx_audio, rx_audio) = mpsc::channel::<Chunk>(2);
     let _pulse = init_pulse(rx_audio);
 
+    // Use keyboard to generate commands
     let (tx_quit, mut rx_quit) = mpsc::unbounded_channel();
     let _key_cmd = init_key_command(tx_quit.clone());
 
+    // Process command line arguments
     match args.music_url {
+        // Play one music file and quit
         Some(ref music_url) => {
-            // Play single file, directory, or web stream
             let music_url = music_url.to_str().unwrap();
             let mut music_task = audio_from_url(music_url).await.spawn()?;
             let mut audio = music_task.stdout.take().unwrap();
@@ -79,14 +61,13 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
             });
         }
         None => match args.id {
+            // Play list of music files from database
             Some(id) => {
                 // Get music_dir from database
                 let music_files = AudioDir::get_audio_files(&db, id).await;
 
-                // Backpressure queue to limit open files
+                // Read files and send to backpressure queue
                 let (tx, mut rx) = mpsc::channel::<process::Child>(2);
-
-                // Read the files
                 rt.spawn(async move {
                     for file in music_files.iter() {
                         match audio_from_url(file.path.as_str()).await.spawn() {
@@ -96,7 +77,7 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
                     }
                 });
 
-                // Play the audio
+                // Play audio from queue
                 rt.spawn(async move {
                     let mut buf = Chunk::new();
                     while let Some(mut file) = rx.recv().await {
@@ -118,80 +99,6 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     // Wait for quit signal
     rx_quit.recv().await.unwrap();
     Ok(())
-}
-
-enum KeyCommand {
-    Quit,
-    Unknown(u8),
-}
-
-impl KeyCommand {
-    fn from_byte(b: u8) -> Self {
-        match b {
-            3 | 113 => Self::Quit,
-            _ => Self::Unknown(b),
-        }
-    }
-}
-
-fn init_key_command(tx_quit: mpsc::UnboundedSender<()>) -> JoinHandle<()> {
-    thread::spawn(move || {
-        let mut stdin = std::io::stdin();
-        let mut buf: [u8; 1] = [0; 1];
-
-        loop {
-            stdin.read_exact(&mut buf).unwrap();
-            match KeyCommand::from_byte(buf[0]) {
-                KeyCommand::Quit => {
-                    debug!("Got QUIT signal");
-                    tx_quit.send(()).unwrap();
-                    break;
-                }
-                KeyCommand::Unknown(cmd) => {
-                    debug!("keyboard input >{}<", cmd);
-                }
-            }
-        }
-    })
-}
-
-fn init_pulse(mut rx_audio: mpsc::Receiver<Chunk>) -> JoinHandle<()> {
-    thread::spawn(move || {
-        let spec = Spec {
-            format: Format::S16le,
-            channels: 2,
-            rate: 44100,
-        };
-        if !spec.is_valid() {
-            debug!("Spec not valid: {:?}", spec);
-            panic!("!!!!!!!!SPEC NOT VALID!!!!!!!!");
-        }
-
-        let pulse = match Pulse::new(
-            None,                // Use the default server
-            "tapedeck",          // Our application’s name
-            Direction::Playback, // We want a playback stream
-            None,                // Use the default device
-            "Music",             // Description of our stream
-            &spec,               // Our sample format
-            None,                // Use default channel map
-            None,                // Use default buffering attributes
-        ) {
-            Ok(pulse) => pulse,
-            Err(e) => {
-                debug!("{:?}", e);
-                panic!("!!!!!!!!NO PULSEAUDIO!!!!!!!!");
-            }
-        };
-
-        while let Some(buf) = rx_audio.blocking_recv() {
-            match pulse.write(&buf) {
-                Ok(_) => {}
-                Err(e) => debug!("{:?}", e),
-            }
-            //pulse.drain().unwrap();
-        }
-    })
 }
 
 fn _println(s: &str) {

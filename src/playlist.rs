@@ -143,7 +143,7 @@ fn fold_line(mut playlist: Playlist, input: &str) -> Playlist {
 
 #[cfg(test)]
 mod tests {
-    use crate::pls::parse;
+    use crate::playlist::parse;
 
     static PLS: &str = "\
 [playlist]
