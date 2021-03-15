@@ -8,8 +8,6 @@ use libpulse_simple_binding::Simple as Pulse;
 use tokio::sync::mpsc;
 use tracing::debug;
 
-pub mod dir;
-
 const CHUNK: usize = 4096;
 
 pub type Chunk = [u8; CHUNK];

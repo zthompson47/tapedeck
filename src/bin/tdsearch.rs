@@ -1,7 +1,4 @@
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::ffi::OsString;
-use std::path::PathBuf;
+use std::{cmp::Ordering, collections::HashMap, ffi::OsString, path::PathBuf};
 
 use crossterm::style::Colorize;
 use mime_guess;
@@ -9,8 +6,10 @@ use structopt::StructOpt;
 use tokio::runtime::Runtime;
 use walkdir::WalkDir;
 
-use tapedeck::audio::dir::{AudioDir, AudioFile};
-use tapedeck::database::get_database;
+use tapedeck::{
+    audio_dir::{AudioDir, AudioFile},
+    database::get_database,
+};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -24,12 +23,19 @@ fn main() {
     let args = Cli::from_args();
     let rt = Runtime::new().unwrap();
     match args.list {
-        true => rt.block_on(list_dirs(args)),
-        false => rt.block_on(search_dirs(args)),
+        // --list
+        true => rt.block_on(list_dirs()),
+        false => {
+            if let Some(path) = args.search_path {
+                // search_path
+                rt.block_on(import_dirs(path));
+            }
+        }
     }
 }
 
-async fn list_dirs(_args: Cli) {
+/// Get all audio_dir records from the database and print them to stdout.
+async fn list_dirs() {
     let _guard = tapedeck::logging::init_logging("tapedeck");
     let db = get_database("tapedeck").await.unwrap();
     let audio_dirs = AudioDir::get_audio_dirs(&db).await;
@@ -43,7 +49,8 @@ async fn list_dirs(_args: Cli) {
     }
 }
 
-async fn search_dirs(args: Cli) {
+/// Search search_path for audio directories and save to database.
+async fn import_dirs(search_path: PathBuf) {
     let _guard = tapedeck::logging::init_logging("tapedeck");
     let db = get_database("tapedeck").await.unwrap();
     let mut music_dirs: HashMap<PathBuf, Vec<AudioFile>> = HashMap::new();
@@ -52,7 +59,7 @@ async fn search_dirs(args: Cli) {
 
     // Sort directories-first with file entries forming an alpahbetized
     // contiguous list followed by their parent directory.
-    for entry in WalkDir::new(args.search_path.unwrap())
+    for entry in WalkDir::new(search_path)
         .contents_first(true)
         .sort_by(
             |a, b| match (a.file_type().is_dir(), b.file_type().is_dir()) {
@@ -110,7 +117,7 @@ async fn search_dirs(args: Cli) {
                     };
                     // Try to insert into database
                     match audio_dir.db_insert(&db).await {
-                        Ok(_) => print_audio_dir(&audio_dir),
+                        Ok(_) => print!("{}", &audio_dir),
                         Err(_) => println!("dup"),
                     }
                 } else {
@@ -120,34 +127,4 @@ async fn search_dirs(args: Cli) {
         }
     }
     println!("{:#?}", extensions);
-}
-
-fn print_audio_dir(dir: &AudioDir) {
-    println!(
-        "{}. {}",
-        dir.id.unwrap_or(-1).to_string().magenta(),
-        dir.path.to_str().unwrap().blue()
-    );
-
-    let mut i = 0;
-    for file in dir.files.iter() {
-        if i > 5 {
-            println!(" {}{}", file, "...".to_string().green());
-            break;
-        } else {
-            println!(" {}", file);
-            i += 1
-        }
-    }
-
-    if dir.extra.len() > 0 {
-        for key in dir.extra.keys() {
-            print!(
-                " [{}:{}]",
-                key.to_str().unwrap(),
-                dir.extra.get(key).unwrap().len()
-            );
-        }
-        println!();
-    }
 }

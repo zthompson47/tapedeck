@@ -11,6 +11,8 @@ use tracing::debug;
 pub static MIGRATOR: Migrator = sqlx::migrate!();
 
 /// Find an appropriate place for the database and make sure it exists there.
+///
+/// Return a database pool.
 pub async fn get_database(app_name: &str) -> Result<Pool<Sqlite>, anyhow::Error> {
     // Look for APPNAME_DEV_DIR environment variable to override default
     let mut dev_dir = app_name.to_uppercase();

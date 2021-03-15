@@ -5,11 +5,12 @@ use tokio::{io::AsyncReadExt, process, runtime::Runtime, sync::mpsc};
 use tracing::debug;
 
 use tapedeck::{
-    audio::{dir::AudioDir, init_pulse, Chunk, ChunkLen},
+    audio_dir::AudioDir,
     database::get_database,
     ffmpeg::audio_from_url,
     keyboard::init_key_command,
     logging::init_logging,
+    system::{init_pulse, Chunk, ChunkLen},
     terminal::with_raw_mode,
 };
 

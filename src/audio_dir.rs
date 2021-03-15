@@ -181,6 +181,45 @@ impl fmt::Display for AudioFile {
     }
 }
 
+impl fmt::Display for AudioDir {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Id and path
+        writeln!(
+            f,
+            "{}. {}",
+            self.id.unwrap_or(-1).to_string().magenta(),
+            self.path.to_str().unwrap().blue()
+        )?;
+
+        // Limited list of `audio_file`s
+        let mut i = 0;
+        for file in self.files.iter() {
+            if i > 5 {
+                writeln!(f, " {}{}", file, "...".to_string().green())?;
+                break;
+            } else {
+                writeln!(f, " {}", file)?;
+                i += 1
+            }
+        }
+
+        // Summary of `extra_file`s
+        if self.extra.len() > 0 {
+            for key in self.extra.keys() {
+                write!(
+                    f,
+                    " [{}:{}]",
+                    key.to_str().unwrap(),
+                    self.extra.get(key).unwrap().len()
+                )?;
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct ExtraFile {
     pub id: Option<i64>,
