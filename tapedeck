@@ -6,7 +6,6 @@ export RUST_LOG="DEBUG"
 export TAPEDECK_DEV_DIR=`realpath "$RUNDIR"`
 
 # Sqlx needs a database to compile
-source `realpath .env`
 cargo sqlx db setup
 
 if [ $# -eq 0 ]; then
