@@ -71,13 +71,13 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
                 rt.spawn(async move {
                     for file in music_files.iter() {
                         match audio_from_url(file.path.as_str()).await.spawn() {
-                            Ok(task) => tx.send(task).await.unwrap(),
+                            Ok(file) => tx.send(file).await.unwrap(),
                             Err(e) => debug!("{:?}", e),
                         }
                     }
                 });
 
-                // Play audio from queue
+                // Play audio from backpressure queue
                 rt.spawn(async move {
                     let mut buf = Chunk::new();
                     while let Some(mut file) = rx.recv().await {

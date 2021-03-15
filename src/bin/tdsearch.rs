@@ -1,29 +1,58 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::env::args;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
 use crossterm::style::Colorize;
 use mime_guess;
+use structopt::StructOpt;
+use tokio::runtime::Runtime;
 use walkdir::WalkDir;
 
 use tapedeck::audio::dir::{AudioDir, AudioFile};
 use tapedeck::database::get_database;
 
-#[tokio::main]
-async fn main() {
-    let _guard = tapedeck::logging::init_logging("tapedeck");
+#[derive(StructOpt)]
+struct Cli {
+    #[structopt(short, long)]
+    list: bool,
+    #[structopt(parse(from_os_str))]
+    search_path: Option<PathBuf>,
+}
 
+fn main() {
+    let args = Cli::from_args();
+    let rt = Runtime::new().unwrap();
+    match args.list {
+        true => rt.block_on(list_dirs(args)),
+        false => rt.block_on(search_dirs(args)),
+    }
+}
+
+async fn list_dirs(_args: Cli) {
+    let _guard = tapedeck::logging::init_logging("tapedeck");
+    let db = get_database("tapedeck").await.unwrap();
+    let audio_dirs = AudioDir::get_audio_dirs(&db).await;
+    for dir in audio_dirs.iter() {
+        let path = PathBuf::from(&dir.path);
+        println!(
+            "{}. {}",
+            &dir.id.to_string().magenta(),
+            &path.file_name().unwrap().to_string_lossy().yellow()
+        );
+    }
+}
+
+async fn search_dirs(args: Cli) {
+    let _guard = tapedeck::logging::init_logging("tapedeck");
+    let db = get_database("tapedeck").await.unwrap();
     let mut music_dirs: HashMap<PathBuf, Vec<AudioFile>> = HashMap::new();
     let mut extensions: HashMap<OsString, usize> = HashMap::new();
     let mut extra: HashMap<OsString, Vec<PathBuf>> = HashMap::new();
 
-    let db = get_database("tapedeck").await.unwrap();
-
     // Sort directories-first with file entries forming an alpahbetized
     // contiguous list followed by their parent directory.
-    for entry in WalkDir::new(args().nth(1).unwrap())
+    for entry in WalkDir::new(args.search_path.unwrap())
         .contents_first(true)
         .sort_by(
             |a, b| match (a.file_type().is_dir(), b.file_type().is_dir()) {
@@ -50,7 +79,6 @@ async fn main() {
                         path: path.into(),
                         mime_type: guess,
                     });
-
                     // Count by extension
                     let ext = path.extension().unwrap().into();
                     let counter = extensions.entry(ext).or_insert(0);
@@ -80,8 +108,11 @@ async fn main() {
                         extra: std::mem::take(&mut extra),
                         ..AudioDir::default()
                     };
-                    audio_dir.db_insert(&db).await.unwrap();
-                    print_audio_dir(&audio_dir);
+                    // Try to insert into database
+                    match audio_dir.db_insert(&db).await {
+                        Ok(_) => print_audio_dir(&audio_dir),
+                        Err(_) => println!("dup"),
+                    }
                 } else {
                     extra.clear();
                 }
@@ -92,23 +123,31 @@ async fn main() {
 }
 
 fn print_audio_dir(dir: &AudioDir) {
-    println!("{}", dir.path.to_str().unwrap().blue());
-
-    if dir.extra.len() > 0 {
-        for key in dir.extra.keys() {
-            print!("[{:?}:{}]", key, dir.extra.get(key).unwrap().len());
-        }
-        println!();
-    }
+    println!(
+        "{}. {}",
+        dir.id.unwrap_or(-1).to_string().magenta(),
+        dir.path.to_str().unwrap().blue()
+    );
 
     let mut i = 0;
     for file in dir.files.iter() {
         if i > 5 {
-            println!("  {}{}", file, "...".to_string().green());
+            println!(" {}{}", file, "...".to_string().green());
             break;
         } else {
-            println!("  {}", file);
+            println!(" {}", file);
             i += 1
         }
+    }
+
+    if dir.extra.len() > 0 {
+        for key in dir.extra.keys() {
+            print!(
+                " [{}:{}]",
+                key.to_str().unwrap(),
+                dir.extra.get(key).unwrap().len()
+            );
+        }
+        println!();
     }
 }

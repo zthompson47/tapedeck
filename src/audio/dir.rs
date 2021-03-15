@@ -17,7 +17,37 @@ pub struct AudioDir {
     pub extra: HashMap<OsString, Vec<PathBuf>>,
 }
 
+#[derive(Debug, Default)]
+pub struct AudioDirSql {
+    pub id: i64,
+    pub path: String,
+}
+
 impl AudioDir {
+    pub async fn get_audio_dirs(pool: &SqlitePool) -> Vec<AudioDirSql> {
+        let mut result = Vec::new();
+
+        let mut dirs = sqlx::query_as!(
+            AudioDirSql,
+            r#"
+            SELECT
+                id as id,
+                path as path
+            FROM audio_dir
+            "#,
+        )
+        .fetch(pool);
+
+        while let Ok(dir) = dirs.try_next().await {
+            match dir {
+                Some(dir) => result.push(dir),
+                None => break,
+            }
+        }
+
+        result
+    }
+
     pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<AudioFileSql> {
         let mut files = sqlx::query_as!(
             AudioFileSql,
@@ -146,7 +176,7 @@ impl fmt::Display for AudioFile {
             f,
             "{}:{}",
             self.mime_type.to_string().green(),
-            self.path.file_name().unwrap().to_str().unwrap()
+            self.path.file_name().unwrap().to_str().unwrap().magenta()
         )
     }
 }
