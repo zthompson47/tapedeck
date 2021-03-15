@@ -1,15 +1,15 @@
 create table audio_dir(
     id integer primary key not null,
-    path text not null
+    path text not null unique
 );
 create table audio_file(
     id integer primary key not null,
-    path text not null,
+    path text not null unique,
     mime_type text
 );
 create table extra_file(
     id integer primary key not null,
-    path text not null,
+    path text not null unique,
     mime_type text
 );
 create table audio_dir_audio_file(
