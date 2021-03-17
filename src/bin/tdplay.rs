@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use bytes::BytesMut;
 use structopt::StructOpt;
 use tokio::{io::AsyncReadExt, process, runtime::Runtime, sync::mpsc};
 use tracing::debug;
@@ -10,7 +11,7 @@ use tapedeck::{
     ffmpeg::audio_from_url,
     keyboard::init_key_command,
     logging::init_logging,
-    system::{init_pulse, Chunk, ChunkLen},
+    system::init_pulse,
     terminal::with_raw_mode,
 };
 
@@ -34,8 +35,8 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     let _guard = init_logging("tapedeck");
     let db = get_database("tapedeck").await?;
 
-    // Initialize audio output
-    let (tx_audio, rx_audio) = mpsc::channel::<Chunk>(2);
+    // Initialize audio output device
+    let (tx_audio, rx_audio) = mpsc::channel::<BytesMut>(2);
     let _pulse = init_pulse(rx_audio);
 
     // Use keyboard to generate commands
@@ -49,12 +50,13 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
             let music_url = music_url.to_str().unwrap();
             let mut music_task = audio_from_url(music_url).await.spawn()?;
             let mut audio = music_task.stdout.take().unwrap();
-            let mut buf = Chunk::new();
+            let mut buf = BytesMut::with_capacity(4096);
+            buf.resize(4096, 0);
 
             rt.spawn(async move {
                 while let Ok(len) = audio.read_exact(&mut buf).await {
-                    tx_audio.send(buf).await.unwrap();
-                    if len != Chunk::len() {
+                    tx_audio.send(buf.clone()).await.unwrap();
+                    if len != 4096 {
                         break;
                     }
                 }
@@ -80,12 +82,13 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
 
                 // Play audio from backpressure queue
                 rt.spawn(async move {
-                    let mut buf = Chunk::new();
+                    let mut buf = BytesMut::with_capacity(4096);
+                    buf.resize(4096, 0);
                     while let Some(mut file) = rx.recv().await {
                         let mut reader = file.stdout.take().unwrap();
                         while let Ok(len) = reader.read_exact(&mut buf).await {
-                            tx_audio.send(buf).await.unwrap();
-                            if len != Chunk::len() {
+                            tx_audio.send(buf.clone()).await.unwrap();
+                            if len != 4096 {
                                 break;
                             }
                         }
@@ -100,8 +103,4 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     // Wait for quit signal
     rx_quit.recv().await.unwrap();
     Ok(())
-}
-
-fn _println(s: &str) {
-    print!("{}\r\n", s);
 }

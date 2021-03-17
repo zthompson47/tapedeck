@@ -1,5 +1,6 @@
 use std::thread::{self, JoinHandle};
 
+use bytes::BytesMut;
 use libpulse_binding::{
     sample::{Format, Spec},
     stream::Direction,
@@ -8,22 +9,7 @@ use libpulse_simple_binding::Simple as Pulse;
 use tokio::sync::mpsc;
 use tracing::debug;
 
-const CHUNK: usize = 4096;
-
-pub type Chunk = [u8; CHUNK];
-
-pub trait ChunkLen {
-    fn len() -> usize {
-        CHUNK
-    }
-    fn new() -> Chunk {
-        [0; CHUNK]
-    }
-}
-
-impl ChunkLen for Chunk {}
-
-pub fn init_pulse(mut rx_audio: mpsc::Receiver<Chunk>) -> JoinHandle<()> {
+pub fn init_pulse(mut rx_audio: mpsc::Receiver<BytesMut>) -> JoinHandle<()> {
     thread::spawn(move || {
         let spec = Spec {
             format: Format::S16le,
