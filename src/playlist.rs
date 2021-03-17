@@ -1,30 +1,6 @@
-// Rust's world is harsh.
-// The environment is not kind.
-// Bears and wolves will chase and kill you.
-// Falling from a height will kill you.
-// Being exposed to radiation for an extended period will kill you.
-// Starving will kill you.
-// Being cold will kill you.
-// Other players can find you, kill you, and take your stuff.
-// Fortunately for you, you can kill others and take their stuff.
-use nom::{
-    bytes::complete::tag,
-    character::complete::{
-        alpha1,
-        alphanumeric1,
-        digit1,
-        line_ending,
-        not_line_ending,
-    },
-    multi::fold_many1,
-    sequence::{
-        pair,
-        separated_pair,
-        terminated,
-    },
-    IResult,
-};
 use std::collections::HashMap;
+
+use pest::Parser;
 
 #[derive(Clone, Debug, Default)]
 pub struct Playlist {
@@ -35,9 +11,10 @@ pub struct Playlist {
 }
 
 impl Playlist {
+    /// Return a list of just the urls from the entries.
     pub fn files(&self) -> Vec<String> {
         let mut result = Vec::new();
-        for i in (1..=self.number_of_entries).rev() {
+        for i in 1..=self.number_of_entries {
             let entry = self.entries.get(&i).unwrap();
             result.push(entry.file.to_string());
         }
@@ -52,93 +29,64 @@ struct Entry {
     length: i32,
 }
 
+#[derive(Parser)]
+#[grammar = "pls.pest"]
+pub struct PlsParser;
+
 pub fn parse(input: &str) -> std::result::Result<Playlist, String> {
+    let file = PlsParser::parse(Rule::file, input).unwrap().next().unwrap();
     let mut playlist = Playlist::default();
 
-    // Confirm .pls filetype
-    let (input, _) = header(input).map_err(|e| e.to_string())?;
-    playlist.has_header = true;
+    for row in file.into_inner() {
+        match row.as_rule() {
+            Rule::row => {
+                for keyval in row.into_inner() {
+                    match keyval.as_rule() {
+                        Rule::version => {
+                            playlist.version = keyval.into_inner().as_str().to_string();
+                        }
+                        Rule::num_entries => {
+                            playlist.number_of_entries =
+                                keyval.into_inner().as_str().parse::<u32>().unwrap();
+                        }
+                        Rule::entry_part => {
+                            let mut kv_iter = keyval.into_inner();
 
-    // Accumulate lines
-    match fold_many1(line, playlist, fold_line)(input) {
-        Ok(result) => Ok(result.1),
-        Err(err) => Err(err.to_string())
-    }
-}
+                            if let Some(key) = kv_iter.next() {
+                                let inner_key = key.into_inner().next().unwrap();
+                                let key_type = inner_key.as_rule();
 
-fn header(input: &str) -> IResult<&str, &str> {
-    tag("[playlist]\n")(input)
-}
+                                let index = inner_key
+                                    .into_inner()
+                                    .as_str()
+                                    .parse::<u32>()
+                                    .unwrap();
 
-fn line(input: &str) -> IResult<&str, &str> {
-    terminated(not_line_ending, line_ending)(input)
-}
+                                let entry =
+                                    playlist.entries.entry(index).or_insert(Entry::default());
 
-// --------------- HACK -----------------------------------------
-fn not_line_ending_(input: &str) -> IResult<&str, &str> {
-    // Needed to put this in separate function to avoid
-    // some weird error with the type system.
-    not_line_ending(input)
-}
-fn alpha1_(input: &str) -> IResult<&str, &str> {
-    alpha1(input)
-}
-fn digit1_(input: &str) -> IResult<&str, &str> {
-    digit1(input)
-}
-// --------------- /HACK ----------------------------------------
-
-fn fold_line(mut playlist: Playlist, input: &str) -> Playlist {
-    let split_line = separated_pair(
-        alphanumeric1, tag("="), not_line_ending_
-    )(input);
-
-    match split_line {
-        Ok((input, (left, right))) => {
-            assert!(input == "");
-            let result = pair(alpha1_, digit1_)(left);
-            if result.is_ok() {
-                // Part of an entry
-                let (_, (field, entry_num)) = result.unwrap();
-                let entry_num = entry_num.parse::<u32>().unwrap();
-                if !playlist.entries.contains_key(&entry_num) {
-                    let entry = Entry::default();
-                    playlist.entries.insert(entry_num, entry);
-                }
-                let mut entry = playlist
-                    .entries
-                    .get_mut(&entry_num)
-                    .unwrap();
-                match field {
-                    "File" => entry.file = right.to_string(),
-                    "Title" => entry.title = right.to_string(),
-                    "Length" => {
-                        entry.length = right.parse::<i32>().unwrap();
-                    },
-                    _ => {}
-                }
-            } else {
-                // Check for meta tag
-                let result = alpha1_(left);
-                if result.is_ok() {
-                    match result.unwrap().1 {
-                        "numberofentries" => {
-                            playlist.number_of_entries = right
-                                .parse::<u32>()
-                                .unwrap();
-                        },
-                        "Version" => {
-                            playlist.version = right.to_string();
-                        },
+                                if let Some(val) = kv_iter.next() {
+                                    let val = val.into_inner().as_str();
+                                    match key_type {
+                                        Rule::file_idx => (*entry).file = val.to_string(),
+                                        Rule::title_idx => (*entry).title = val.to_string(),
+                                        Rule::length_idx => {
+                                            (*entry).length = val.parse::<i32>().unwrap()
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
                         _ => {}
                     }
                 }
             }
-        },
-        Err(err) => tracing::warn!("ERRRRRR:{:?}", err),
+            _ => {}
+        }
     }
 
-    playlist
+    Ok(playlist)
 }
 
 #[cfg(test)]
@@ -161,6 +109,8 @@ File4=http://ice1.somafm.com/christmas-128-mp3
 Title4=SomaFM: Christmas Lounge (#4): Chilled holiday grooves and classic winter lounge tracks. (Kid and Parent safe!)
 Length4=-1
 Version=2
+  
+
 ";
 
     #[test]
@@ -171,6 +121,12 @@ Version=2
         assert_eq!(playlist.files().len(), 4);
         assert_eq!(playlist.number_of_entries, 4);
         assert_eq!(playlist.version, "2");
+        let file2 = &playlist.files()[1];
+        println!("{:?}", &playlist.files());
+        assert_eq!(file2, "http://ice4.somafm.com/christmas-128-mp3");
+        let file2 = playlist.entries.get(&2).unwrap();
+        assert_eq!(file2.file, "http://ice4.somafm.com/christmas-128-mp3");
+        assert!(file2.title.as_str().starts_with("SomaFM"));
+        assert_eq!(file2.length, -1);
     }
-
 }

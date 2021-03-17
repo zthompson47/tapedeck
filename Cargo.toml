@@ -11,6 +11,8 @@ crossterm = { version = "0.18.2", features = ["event-stream"] }
 libc = "0.2.81"
 libpulse-binding = "2.23.0"
 libpulse-simple-binding = "2.23.0"
+pest = "2.1.3"
+pest_derive = "2.1.0"
 structopt = "0.3.20"
 tokio-stream = "0.1.4"
 tracing = { version = "0.1.22", features = ["log"] }

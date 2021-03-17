@@ -1,0 +1,22 @@
+file = { SOI ~ header ~ row+ ~ EOI }
+header = _{ "[playlist]" ~ NEWLINE }
+
+row = { version | num_entries | entry_part | empty_line }
+
+version = { ^"version=" ~ number ~ NEWLINE}
+num_entries = { ^"numberofentries=" ~ number ~ NEWLINE }
+
+entry_part = { key ~ "=" ~ val ~ NEWLINE }
+
+key = { file_idx | title_idx | length_idx }
+file_idx = { ^"file" ~ index }
+title_idx = { ^"title" ~ index }
+length_idx = { ^"length" ~ index }
+index = { NUMBER+ }
+
+val = { text | url | number }
+text = { (LETTER | NUMBER | PUNCTUATION | SYMBOL | SPACE_SEPARATOR)+ }
+url = { (LETTER | NUMBER | PUNCTUATION | SYMBOL)+ }
+number = { "-"? ~ NUMBER+ }
+
+empty_line = { SPACE_SEPARATOR* ~ NEWLINE }
