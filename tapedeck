@@ -9,7 +9,7 @@ export TAPEDECK_DEV_DIR=`realpath "$RUNDIR"`
 cargo sqlx db setup
 
 if [ $# -eq 0 ]; then
-    echo "No --bin provided"
+    echo "Please provide args for 'cargo --bin' (e.g. tdplay, tdsearch)"
     exit 1
 fi
 

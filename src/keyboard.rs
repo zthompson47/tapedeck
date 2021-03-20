@@ -1,40 +1,46 @@
-use std::io::Read;
 use std::thread::{self, JoinHandle};
 
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use tokio::sync::mpsc;
-use tracing::debug;
 
-enum KeyCommand {
+#[derive(Debug, PartialEq)]
+pub enum KeyCommand {
+    NextTrack,
+    PrevTrack,
     Quit,
-    Unknown(u8),
 }
 
-impl KeyCommand {
-    fn from_byte(b: u8) -> Self {
-        match b {
-            3 | 113 => Self::Quit,
-            _ => Self::Unknown(b),
-        }
-    }
-}
-
-pub fn init_key_command(tx_quit: mpsc::UnboundedSender<()>) -> JoinHandle<()> {
-    thread::spawn(move || {
-        let mut stdin = std::io::stdin();
-        let mut buf: [u8; 1] = [0; 1];
-
-        loop {
-            stdin.read_exact(&mut buf).unwrap();
-            match KeyCommand::from_byte(buf[0]) {
-                KeyCommand::Quit => {
-                    debug!("Got QUIT signal");
-                    tx_quit.send(()).unwrap();
-                    break;
+pub fn init_key_command(tx_cmd: mpsc::UnboundedSender<KeyCommand>) -> JoinHandle<()> {
+    thread::spawn(move || loop {
+        match event::read().unwrap() {
+            Event::Key(event) => match event.code {
+                KeyCode::Char(c) => match c {
+                    'q' => {
+                        tracing::debug!("{:?}", KeyCommand::Quit);
+                        tx_cmd.send(KeyCommand::Quit).unwrap();
+                    }
+                    'c' => {
+                        if event.modifiers == KeyModifiers::CONTROL {
+                            tracing::debug!("{:?}", KeyCommand::Quit);
+                            tx_cmd.send(KeyCommand::Quit).unwrap();
+                        } else {
+                            tracing::debug!("{:?}", event);
+                        }
+                    }
+                    _ => tracing::debug!("{:?}", event),
+                },
+                KeyCode::Esc => {
+                    tracing::debug!("{:?}", KeyCommand::Quit);
+                    tx_cmd.send(KeyCommand::Quit).unwrap();
                 }
-                KeyCommand::Unknown(cmd) => {
-                    debug!("keyboard input >{}<", cmd);
+                KeyCode::Left => tracing::debug!("{:?}", KeyCommand::PrevTrack),
+                KeyCode::Right => {
+                    tracing::debug!("{:?}", KeyCommand::NextTrack);
+                    tx_cmd.send(KeyCommand::NextTrack).unwrap();
                 }
-            }
+                _ => tracing::debug!("{:?}", event),
+            },
+            _ => {}
         }
     })
 }
