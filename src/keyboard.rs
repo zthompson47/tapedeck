@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 pub enum KeyCommand {
     NextTrack,
     PrevTrack,
+    Print(String),
     Quit,
 }
 
@@ -33,7 +34,10 @@ pub fn init_key_command(tx_cmd: mpsc::UnboundedSender<KeyCommand>) -> JoinHandle
                     tracing::debug!("{:?}", KeyCommand::Quit);
                     tx_cmd.send(KeyCommand::Quit).unwrap();
                 }
-                KeyCode::Left => tracing::debug!("{:?}", KeyCommand::PrevTrack),
+                KeyCode::Left => {
+                    tracing::debug!("{:?}", KeyCommand::PrevTrack);
+                    tx_cmd.send(KeyCommand::PrevTrack).unwrap();
+                }
                 KeyCode::Right => {
                     tracing::debug!("{:?}", KeyCommand::NextTrack);
                     tx_cmd.send(KeyCommand::NextTrack).unwrap();

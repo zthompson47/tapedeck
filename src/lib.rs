@@ -9,3 +9,4 @@ pub mod logging;
 pub mod playlist;
 pub mod system;
 pub mod terminal;
+pub mod transport;
