@@ -44,7 +44,7 @@ async fn list_dirs() {
         let path = PathBuf::from(&dir.path);
         println!(
             "{}. {}",
-            &dir.id.to_string().magenta(),
+            &dir.id.unwrap().to_string().magenta(),
             &path.file_name().unwrap().to_string_lossy().yellow()
         );
     }
@@ -85,7 +85,7 @@ async fn import_dirs(search_path: PathBuf) {
                     (*file_list).push(AudioFile {
                         id: None,
                         path: path.into(),
-                        mime_type: guess,
+                        mime_type: Some(guess),
                     });
                     // Count by extension
                     let ext = path.extension().unwrap().into();

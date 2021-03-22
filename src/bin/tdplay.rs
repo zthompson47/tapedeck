@@ -62,22 +62,28 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
             // Play list of music files from database
             Some(id) => {
                 let music_files = AudioDir::get_audio_files(&db, id).await;
-                transport.queue(music_files.iter().map(|x| x.path.clone()).collect());
+                transport.queue(
+                    music_files
+                        .iter()
+                        .map(|x| x.path.clone().to_str().unwrap().to_string())
+                        .collect(),
+                );
                 rt.spawn(transport.run(tx_cmd.clone()));
             }
             _ => {}
         },
     }
 
-    while let Some(cmd) = rx_cmd.recv().await {
-        match cmd {
+    while let Some(command) = rx_cmd.recv().await {
+        match command {
+            Command::Info => {}
             Command::NextTrack => {
                 tx_transport.send(TransportCommand::NextTrack)?;
             }
             Command::PrevTrack => {
                 tx_transport.send(TransportCommand::PrevTrack)?;
             }
-            Command::Print(msg) => print!("{}\r\n", msg.red()),
+            Command::Print(msg) => print!("{}\r\n", msg.green()),
             Command::Quit => break,
         }
     }

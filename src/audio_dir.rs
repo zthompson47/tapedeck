@@ -17,18 +17,73 @@ pub struct AudioDir {
     pub extra: HashMap<OsString, Vec<PathBuf>>,
 }
 
-#[derive(Debug, Default)]
-pub struct AudioDirSql {
+#[derive(Debug)]
+pub struct ExtraFile {
+    pub id: Option<i64>,
+    pub path: PathBuf,
+    pub mime_type: Mime,
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioFileSql {
     pub id: i64,
     pub path: String,
+    pub mime_type: Option<String>,
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct AudioFile {
+    pub id: Option<i64>,
+    pub path: PathBuf,
+    pub mime_type: Option<Mime>,
 }
 
 impl AudioDir {
-    pub async fn get_audio_dirs(pool: &SqlitePool) -> Vec<AudioDirSql> {
-        let mut result = Vec::new();
+    pub async fn search_with_path(pool: &SqlitePool, pattern: &str) -> Vec<AudioDir> {
+        #[derive(Debug)]
+        struct Row {
+            pub id: i64,
+            pub path: String,
+        }
 
         let mut dirs = sqlx::query_as!(
-            AudioDirSql,
+            Row,
+            r#"
+            SELECT
+                id as id,
+                path as path
+            FROM audio_dir
+            WHERE path like ?
+            "#,
+            pattern
+        )
+        .fetch(pool);
+
+        let mut result = Vec::new();
+
+        while let Ok(dir) = dirs.try_next().await {
+            match dir {
+                Some(dir) => result.push(AudioDir {
+                    id: Some(dir.id),
+                    path: dir.path.into(),
+                    ..AudioDir::default()
+                }),
+                None => break,
+            }
+        }
+
+        result
+    }
+
+    pub async fn get_audio_dirs(pool: &SqlitePool) -> Vec<AudioDir> {
+        #[derive(Debug)]
+        pub struct Row {
+            pub id: i64,
+            pub path: String,
+        }
+
+        let mut rows = sqlx::query_as!(
+            Row,
             r#"
             SELECT
                 id as id,
@@ -38,9 +93,15 @@ impl AudioDir {
         )
         .fetch(pool);
 
-        while let Ok(dir) = dirs.try_next().await {
-            match dir {
-                Some(dir) => result.push(dir),
+        let mut result = Vec::new();
+
+        while let Ok(row) = rows.try_next().await {
+            match row {
+                Some(row) => result.push(AudioDir {
+                    id: Some(row.id),
+                    path: row.path.into(),
+                    ..AudioDir::default()
+                }),
                 None => break,
             }
         }
@@ -48,14 +109,19 @@ impl AudioDir {
         result
     }
 
-    pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<AudioFileSql> {
+    pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<AudioFile> {
+        #[derive(Debug)]
+        pub struct Row {
+            pub id: i64,
+            pub path: String,
+        }
+
         let mut files = sqlx::query_as!(
-            AudioFileSql,
+            Row,
             r#"
             SELECT
                 id AS id,
-                path AS path,
-                mime_type AS mime_type
+                path AS path
             FROM audio_file
             WHERE id IN (
                 SELECT
@@ -69,10 +135,15 @@ impl AudioDir {
         .fetch(pool);
 
         let mut result = Vec::new();
+
         while let Ok(file) = files.try_next().await {
             debug!("FILE: {:?}", file);
             match file {
-                Some(file) => result.push(file),
+                Some(row) => result.push(AudioFile {
+                    id: Some(row.id),
+                    path: row.path.into(),
+                    ..AudioFile::default()
+                }),
                 None => break,
             }
         }
@@ -98,7 +169,10 @@ impl AudioDir {
 
         for audio_file in &self.files[..] {
             let path = audio_file.path.to_str();
-            let mime_type = audio_file.mime_type.essence_str();
+            let mime_type = match &audio_file.mime_type {
+                Some(m) => Some(m.essence_str().to_string()),
+                None => None,
+            };
             let audio_file_id = sqlx::query!(
                 r#"
                 INSERT INTO audio_file(path, mime_type)
@@ -156,26 +230,15 @@ impl AudioDir {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct AudioFileSql {
-    pub id: i64,
-    pub path: String,
-    pub mime_type: Option<String>,
-}
-
-#[derive(Clone, Debug)]
-pub struct AudioFile {
-    pub id: Option<i64>,
-    pub path: PathBuf,
-    pub mime_type: Mime,
-}
-
 impl fmt::Display for AudioFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}:{}",
-            self.mime_type.to_string().green(),
+            match &self.mime_type {
+                Some(m) => m.to_string().green(),
+                None => "-/-".to_string().green(),
+            },
             self.path.file_name().unwrap().to_str().unwrap().magenta()
         )
     }
@@ -218,11 +281,4 @@ impl fmt::Display for AudioDir {
 
         Ok(())
     }
-}
-
-#[derive(Debug)]
-pub struct ExtraFile {
-    pub id: Option<i64>,
-    pub path: PathBuf,
-    pub mime_type: Mime,
 }

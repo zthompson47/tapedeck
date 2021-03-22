@@ -5,6 +5,7 @@ use tokio::sync::mpsc;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
+    Info,
     NextTrack,
     PrevTrack,
     Print(String),
