@@ -1,17 +1,18 @@
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 use bytes::Bytes;
+use crossterm::{style::Colorize, terminal::SetTitle, QueueableCommand};
 use structopt::StructOpt;
 use tokio::{runtime::Runtime, sync::mpsc};
 
 use tapedeck::{
     audio_dir::AudioDir,
     database::get_database,
-    keyboard::{init_key_command, KeyCommand},
-    logging::init_logging,
-    system::init_pulse,
+    logging::start_logging,
+    system::start_pulse,
     terminal::with_raw_mode,
     transport::{Transport, TransportCommand},
+    user::{start_tui, Command},
 };
 
 #[derive(StructOpt)]
@@ -24,6 +25,11 @@ struct Cli {
 
 fn main() -> Result<(), anyhow::Error> {
     let args = Cli::from_args();
+
+    let mut stdout = std::io::stdout();
+    stdout.queue(SetTitle("⦗✇ Tapedeck ✇⦘"))?;
+    stdout.flush()?;
+
     with_raw_mode(|| {
         let rt = Runtime::new().unwrap();
         rt.block_on(run(&rt, args)).unwrap();
@@ -31,16 +37,16 @@ fn main() -> Result<(), anyhow::Error> {
 }
 
 async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
-    let _guard = init_logging("tapedeck");
+    let _ = start_logging("tapedeck");
     let db = get_database("tapedeck").await?;
 
     // Initialize audio output device
     let (tx_audio, rx_audio) = mpsc::channel::<Bytes>(2);
-    let _pulse = init_pulse(rx_audio);
+    let _ = start_pulse(rx_audio);
 
     // Use keyboard for user interface
     let (tx_cmd, mut rx_cmd) = mpsc::unbounded_channel();
-    let _key_cmd = init_key_command(tx_cmd.clone());
+    let _ = start_tui(tx_cmd.clone());
 
     // Control the playback
     let (tx_transport, rx_transport) = mpsc::unbounded_channel::<TransportCommand>();
@@ -65,14 +71,14 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
 
     while let Some(cmd) = rx_cmd.recv().await {
         match cmd {
-            KeyCommand::NextTrack => {
-                tx_transport.send(TransportCommand::NextTrack).unwrap();
+            Command::NextTrack => {
+                tx_transport.send(TransportCommand::NextTrack)?;
             }
-            KeyCommand::PrevTrack => {
-                tx_transport.send(TransportCommand::PrevTrack).unwrap();
+            Command::PrevTrack => {
+                tx_transport.send(TransportCommand::PrevTrack)?;
             }
-            KeyCommand::Print(msg) => print!("{}\r\n", msg),
-            KeyCommand::Quit => break,
+            Command::Print(msg) => print!("{}\r\n", msg.red()),
+            Command::Quit => break,
         }
     }
 

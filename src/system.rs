@@ -9,7 +9,7 @@ use libpulse_simple_binding::Simple as Pulse;
 use tokio::sync::mpsc;
 use tracing::debug;
 
-pub fn init_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
+pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
     thread::spawn(move || {
         let spec = Spec {
             format: Format::S16le,

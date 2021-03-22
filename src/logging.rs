@@ -12,7 +12,7 @@ use tracing_subscriber::fmt::time::{ChronoLocal, FormatTime};
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
 
-pub fn init_logging(app_name: &str) -> WorkerGuard {
+pub fn start_logging(app_name: &str) -> WorkerGuard {
     let log_dir = get_log_dir(app_name);
 
     let default_level = Level::INFO;

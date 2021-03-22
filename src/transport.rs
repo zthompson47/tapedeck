@@ -4,7 +4,7 @@ use bytes::Bytes;
 use tokio::{io::AsyncReadExt, process, sync::mpsc, time::timeout};
 
 use crate::ffmpeg::audio_from_url;
-use crate::keyboard::KeyCommand;
+use crate::user::Command;
 
 #[derive(Debug)]
 pub struct Transport {
@@ -12,6 +12,12 @@ pub struct Transport {
     cursor: usize,
     rx_transport: mpsc::UnboundedReceiver<TransportCommand>,
     tx_audio: mpsc::Sender<Bytes>,
+}
+
+#[derive(Debug)]
+pub enum TransportCommand {
+    NextTrack,
+    PrevTrack,
 }
 
 impl Transport {
@@ -31,7 +37,7 @@ impl Transport {
         self.files.extend(files);
     }
 
-    pub async fn run(mut self, tx_cmd: mpsc::UnboundedSender<KeyCommand>) {
+    pub async fn run(mut self, tx_cmd: mpsc::UnboundedSender<Command>) {
         let mut buf = [0u8; 4096];
 
         'play: loop {
@@ -42,7 +48,7 @@ impl Transport {
             };
 
             tx_cmd
-                .send(KeyCommand::Print(self.files[self.cursor].clone()))
+                .send(Command::Print(self.files[self.cursor].clone()))
                 .unwrap();
 
             // PrevTrack usually restarts the current track, but it goes back
@@ -83,7 +89,7 @@ impl Transport {
             }
             self.cursor += 1;
         }
-        tx_cmd.send(KeyCommand::Quit).unwrap();
+        tx_cmd.send(Command::Quit).unwrap();
     }
 
     async fn get_reader(&mut self) -> Result<process::ChildStdout, anyhow::Error> {
@@ -97,10 +103,4 @@ impl Transport {
             .take()
             .ok_or(anyhow::Error::msg("could not take music file's stdout"))
     }
-}
-
-#[derive(Debug)]
-pub enum TransportCommand {
-    NextTrack,
-    PrevTrack,
 }

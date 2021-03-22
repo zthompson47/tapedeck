@@ -9,6 +9,7 @@ use walkdir::WalkDir;
 use tapedeck::{
     audio_dir::{AudioDir, AudioFile},
     database::get_database,
+    logging::start_logging,
 };
 
 #[derive(StructOpt)]
@@ -36,7 +37,7 @@ fn main() {
 
 /// Get all audio_dir records from the database and print them to stdout.
 async fn list_dirs() {
-    let _guard = tapedeck::logging::init_logging("tapedeck");
+    let _ = start_logging("tapedeck");
     let db = get_database("tapedeck").await.unwrap();
     let audio_dirs = AudioDir::get_audio_dirs(&db).await;
     for dir in audio_dirs.iter() {
@@ -51,7 +52,7 @@ async fn list_dirs() {
 
 /// Search search_path for audio directories and save to database.
 async fn import_dirs(search_path: PathBuf) {
-    let _guard = tapedeck::logging::init_logging("tapedeck");
+    let _ = start_logging("tapedeck");
     let db = get_database("tapedeck").await.unwrap();
     let mut music_dirs: HashMap<PathBuf, Vec<AudioFile>> = HashMap::new();
     let mut extensions: HashMap<OsString, usize> = HashMap::new();
