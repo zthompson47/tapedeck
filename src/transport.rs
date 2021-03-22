@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use bytes::BytesMut;
+use bytes::Bytes;
 use tokio::{io::AsyncReadExt, process, sync::mpsc, time::timeout};
 
 use crate::ffmpeg::audio_from_url;
@@ -11,12 +11,12 @@ pub struct Transport {
     files: Vec<String>,
     cursor: usize,
     rx_transport: mpsc::UnboundedReceiver<TransportCommand>,
-    tx_audio: mpsc::Sender<BytesMut>,
+    tx_audio: mpsc::Sender<Bytes>,
 }
 
 impl Transport {
     pub fn new(
-        tx_audio: mpsc::Sender<BytesMut>,
+        tx_audio: mpsc::Sender<Bytes>,
         rx_transport: mpsc::UnboundedReceiver<TransportCommand>,
     ) -> Self {
         Self {
@@ -32,9 +32,7 @@ impl Transport {
     }
 
     pub async fn run(mut self, tx_cmd: mpsc::UnboundedSender<KeyCommand>) {
-        const CHUNK: usize = 4096;
-        let mut buf = BytesMut::with_capacity(CHUNK);
-        buf.resize(CHUNK, 0);
+        let mut buf = [0u8; 4096];
 
         'play: loop {
             // Get reader for next queued music file
@@ -43,16 +41,27 @@ impl Transport {
                 Err(_) => break 'play,
             };
 
-            tx_cmd.send(KeyCommand::Print(self.files[self.cursor].clone())).unwrap();
+            tx_cmd
+                .send(KeyCommand::Print(self.files[self.cursor].clone()))
+                .unwrap();
 
+            // PrevTrack usually restarts the current track, but it goes back
+            // to the _actual_ previous track when called at the beginning of a track.
+            // Useful for navigating back and forth in the playlist.
             const DOUBLE_TAP: Duration = Duration::from_millis(333);
-            let song_start = Instant::now();
+            let start_time = Instant::now();
 
             // Send audio file to output device
-            while let Ok(_len) = audio.read_exact(&mut buf).await {
-                self.tx_audio.send(buf.clone()).await.unwrap();
+            while let Ok(len) = audio.read(&mut buf).await {
+                if len == 0 {
+                    self.cursor += 1;
+                    continue 'play;
+                } else {
+                    let chunk = Bytes::copy_from_slice(&buf[0..len]);
+                    self.tx_audio.send(chunk).await.unwrap();
+                }
 
-                // Poll for transport commands to interrupt playback
+                // Poll for transport commands that interrupt playback
                 if let Ok(Some(cmd)) =
                     timeout(Duration::from_millis(0), self.rx_transport.recv()).await
                 {
@@ -64,7 +73,7 @@ impl Transport {
                             continue 'play;
                         }
                         TransportCommand::PrevTrack => {
-                            if song_start.elapsed() < DOUBLE_TAP {
+                            if start_time.elapsed() < DOUBLE_TAP {
                                 self.cursor = self.cursor.saturating_sub(1);
                             }
                             continue 'play;
@@ -72,7 +81,6 @@ impl Transport {
                     }
                 }
             }
-
             self.cursor += 1;
         }
         tx_cmd.send(KeyCommand::Quit).unwrap();

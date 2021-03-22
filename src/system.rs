@@ -1,6 +1,6 @@
 use std::thread::{self, JoinHandle};
 
-use bytes::BytesMut;
+use bytes::Bytes;
 use libpulse_binding::{
     sample::{Format, Spec},
     stream::Direction,
@@ -9,7 +9,7 @@ use libpulse_simple_binding::Simple as Pulse;
 use tokio::sync::mpsc;
 use tracing::debug;
 
-pub fn init_pulse(mut rx_audio: mpsc::Receiver<BytesMut>) -> JoinHandle<()> {
+pub fn init_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
     thread::spawn(move || {
         let spec = Spec {
             format: Format::S16le,
@@ -17,8 +17,8 @@ pub fn init_pulse(mut rx_audio: mpsc::Receiver<BytesMut>) -> JoinHandle<()> {
             rate: 44100,
         };
         if !spec.is_valid() {
-            debug!("Spec not valid: {:?}", spec);
-            panic!("!!!!!!!!SPEC NOT VALID!!!!!!!!");
+            debug!("Audio spec not valid: {:?}", spec);
+            panic!("Audio spec not valid: {:?}", spec);
         }
 
         let pulse = match Pulse::new(
@@ -33,17 +33,17 @@ pub fn init_pulse(mut rx_audio: mpsc::Receiver<BytesMut>) -> JoinHandle<()> {
         ) {
             Ok(pulse) => pulse,
             Err(e) => {
-                debug!("{:?}", e);
-                panic!("!!!!!!!!NO PULSEAUDIO!!!!!!!!");
+                debug!("Can't connect PulseAudio: {:?}", e);
+                panic!("Can't connect PulseAudio: {:?}", e);
             }
         };
 
         while let Some(buf) = rx_audio.blocking_recv() {
             match pulse.write(&buf) {
                 Ok(_) => {}
-                Err(e) => debug!("{:?}", e),
+                Err(e) => debug!("{:?}", e.to_string()),
             }
-            //pulse.drain().unwrap();
+            //pulse.drain().unwrap(); TODO makes audio breakup.. but backpressure?
         }
     })
 }

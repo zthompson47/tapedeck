@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use bytes::BytesMut;
+use bytes::Bytes;
 use structopt::StructOpt;
 use tokio::{runtime::Runtime, sync::mpsc};
 
@@ -35,7 +35,7 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     let db = get_database("tapedeck").await?;
 
     // Initialize audio output device
-    let (tx_audio, rx_audio) = mpsc::channel::<BytesMut>(2);
+    let (tx_audio, rx_audio) = mpsc::channel::<Bytes>(2);
     let _pulse = init_pulse(rx_audio);
 
     // Use keyboard for user interface
