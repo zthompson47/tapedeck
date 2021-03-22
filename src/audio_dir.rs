@@ -9,7 +9,8 @@ use sqlx::sqlite::SqlitePool;
 use tokio_stream::StreamExt;
 use tracing::debug;
 
-#[derive(Debug, Default)]
+/// A directory containing audio files.
+#[derive(Clone, Debug, Default)]
 pub struct AudioDir {
     pub id: Option<i64>,
     pub path: PathBuf,
@@ -17,28 +18,24 @@ pub struct AudioDir {
     pub extra: HashMap<OsString, Vec<PathBuf>>,
 }
 
-#[derive(Debug)]
-pub struct ExtraFile {
-    pub id: Option<i64>,
-    pub path: PathBuf,
-    pub mime_type: Mime,
-}
-
-#[derive(Clone, Debug)]
-pub struct AudioFileSql {
-    pub id: i64,
-    pub path: String,
-    pub mime_type: Option<String>,
-}
-
-#[derive(Clone, Default, Debug)]
+/// An audio file.
+#[derive(Clone, Debug, Default)]
 pub struct AudioFile {
     pub id: Option<i64>,
     pub path: PathBuf,
     pub mime_type: Option<Mime>,
 }
 
+/// A non-audio file in an audio directory.
+#[derive(Clone, Debug, Default)]
+pub struct ExtraFile {
+    pub id: Option<i64>,
+    pub path: PathBuf,
+    pub mime_type: Option<Mime>,
+}
+
 impl AudioDir {
+    /// Find a list of directories by matching path with a pattern.
     pub async fn search_with_path(pool: &SqlitePool, pattern: &str) -> Vec<AudioDir> {
         #[derive(Debug)]
         struct Row {
@@ -75,6 +72,7 @@ impl AudioDir {
         result
     }
 
+    /// Return a list of all audio directories.
     pub async fn get_audio_dirs(pool: &SqlitePool) -> Vec<AudioDir> {
         #[derive(Debug)]
         pub struct Row {
@@ -109,6 +107,7 @@ impl AudioDir {
         result
     }
 
+    /// Return a list of all audio files in a particular audio directory.
     pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<AudioFile> {
         #[derive(Debug)]
         pub struct Row {
@@ -151,6 +150,7 @@ impl AudioDir {
         result
     }
 
+    /// Save all records to database.
     pub async fn db_insert(&mut self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
         let transaction = pool.begin().await?;
 

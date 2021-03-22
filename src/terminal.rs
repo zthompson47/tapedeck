@@ -5,7 +5,7 @@ use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 /// Create a scope with the terminal in raw mode.  Attempt to catch
 /// panics so we can disable raw mode before exiting.
 ///
-/// https://www.ralfj.de/blog/2019/11/25/how-to-panic-in-rust.html
+/// <https://www.ralfj.de/blog/2019/11/25/how-to-panic-in-rust.html>
 pub fn with_raw_mode(f: impl FnOnce() + panic::UnwindSafe) -> Result<(), anyhow::Error> {
     let saved_hook = panic::take_hook();
     panic::set_hook(Box::new(|p| {
