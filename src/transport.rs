@@ -3,17 +3,20 @@ use std::time::{Duration, Instant};
 use bytes::Bytes;
 use tokio::{io::AsyncReadExt, process, sync::mpsc, time::timeout};
 
+use crate::audio_dir::AudioFile;
 use crate::ffmpeg::audio_from_url;
 use crate::user::Command;
 
+/// Plays a playlist and responds to user commands.
 #[derive(Debug)]
 pub struct Transport {
-    files: Vec<String>,
+    files: Vec<AudioFile>,
     cursor: usize,
     rx_transport: mpsc::UnboundedReceiver<TransportCommand>,
     tx_audio: mpsc::Sender<Bytes>,
 }
 
+/// Commands for manipulating playback.
 #[derive(Debug)]
 pub enum TransportCommand {
     NextTrack,
@@ -21,6 +24,7 @@ pub enum TransportCommand {
 }
 
 impl Transport {
+    /// Create a new Transport out of channel endpoints.
     pub fn new(
         tx_audio: mpsc::Sender<Bytes>,
         rx_transport: mpsc::UnboundedReceiver<TransportCommand>,
@@ -33,22 +37,29 @@ impl Transport {
         }
     }
 
-    pub fn queue(&mut self, files: Vec<String>) {
+    /// Add files to the end of the playlist.
+    pub fn extend(&mut self, files: Vec<AudioFile>) {
         self.files.extend(files);
     }
 
+    /// Return the file at the cursor.
+    pub fn now_playing(&self) -> &AudioFile {
+        &self.files[self.cursor]
+    }
+
+    /// Stream audio to output device and respond to user commands.
     pub async fn run(mut self, tx_cmd: mpsc::UnboundedSender<Command>) {
         let mut buf = [0u8; 4096];
 
         'play: loop {
-            // Get reader for next queued music file
-            let mut audio = match self.get_reader().await {
+            // Get next file to play
+            let mut audio_reader = match self.get_reader_at_cursor().await {
                 Ok(reader) => reader,
                 Err(_) => break 'play,
             };
 
             tx_cmd
-                .send(Command::Print(self.files[self.cursor].clone()))
+                .send(Command::Print(self.now_playing().path_as_string()))
                 .unwrap();
 
             // PrevTrack usually restarts the current track, but it goes back
@@ -58,7 +69,7 @@ impl Transport {
             let start_time = Instant::now();
 
             // Send audio file to output device
-            while let Ok(len) = audio.read(&mut buf).await {
+            while let Ok(len) = audio_reader.read(&mut buf).await {
                 if len == 0 {
                     self.cursor += 1;
                     continue 'play;
@@ -92,13 +103,14 @@ impl Transport {
         tx_cmd.send(Command::Quit).unwrap();
     }
 
-    async fn get_reader(&mut self) -> Result<process::ChildStdout, anyhow::Error> {
+    /// Create a stream of audio data from the current playlist position.
+    async fn get_reader_at_cursor(&mut self) -> Result<process::ChildStdout, anyhow::Error> {
         if self.cursor >= self.files.len() {
             return Err(anyhow::Error::msg("cursor index out of bounds, just quit"));
         }
-        let file = self.files[self.cursor].as_str();
+        let file = self.now_playing().path_as_string();
         tracing::debug!("the file:{:?}", file);
-        let mut file = audio_from_url(file).await.spawn()?;
+        let mut file = audio_from_url(&file).await.spawn()?;
         file.stdout
             .take()
             .ok_or(anyhow::Error::msg("could not take music file's stdout"))

@@ -34,6 +34,31 @@ pub struct ExtraFile {
     pub mime_type: Option<Mime>,
 }
 
+impl AudioFile {
+    /// Generate a String representation of the path.
+    pub fn path_as_string(&self) -> String {
+        self.path.to_str().unwrap().to_string()
+    }
+}
+
+impl From<String> for AudioFile {
+    fn from(path: String) -> Self {
+        Self {
+            path: PathBuf::from(path),
+            ..Self::default()
+        }
+    }
+}
+
+impl From<&PathBuf> for AudioFile {
+    fn from(path: &PathBuf) -> Self {
+        Self {
+            path: PathBuf::from(path),
+            ..Self::default()
+        }
+    }
+}
+
 impl AudioDir {
     /// Find a list of directories by matching path with a pattern.
     pub async fn search_with_path(pool: &SqlitePool, pattern: &str) -> Vec<AudioDir> {

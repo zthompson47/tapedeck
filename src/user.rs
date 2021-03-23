@@ -6,13 +6,23 @@ use tokio::sync::mpsc;
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Info,
+    ListTracks,
+    Meter,
     NextTrack,
     PrevTrack,
     Print(String),
+    Spectrum,
+    Volume(LevelDelta),
     Quit,
 }
 
-pub fn start_tui(tx_cmd: mpsc::UnboundedSender<Command>) -> JoinHandle<()> {
+#[derive(Debug, PartialEq)]
+pub enum LevelDelta {
+    PercentUp(usize),
+    PercentDown(usize),
+}
+
+pub fn start_ui(tx_cmd: mpsc::UnboundedSender<Command>) -> JoinHandle<()> {
     thread::spawn(move || loop {
         match event::read().unwrap() {
             Event::Key(event) => match event.code {

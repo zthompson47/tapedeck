@@ -6,13 +6,13 @@ use structopt::StructOpt;
 use tokio::{runtime::Runtime, sync::mpsc};
 
 use tapedeck::{
-    audio_dir::AudioDir,
+    audio_dir::{AudioDir, AudioFile},
     database::get_database,
     logging::start_logging,
     system::start_pulse,
     terminal::with_raw_mode,
     transport::{Transport, TransportCommand},
-    user::{start_tui, Command},
+    user::{start_ui, Command},
 };
 
 #[derive(StructOpt)]
@@ -36,6 +36,7 @@ fn main() -> Result<(), anyhow::Error> {
     })
 }
 
+/// Run the application.
 async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     let _ = start_logging("tapedeck");
     let db = get_database("tapedeck").await?;
@@ -44,30 +45,25 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     let (tx_audio, rx_audio) = mpsc::channel::<Bytes>(2);
     let _ = start_pulse(rx_audio);
 
-    // Use keyboard for user interface
+    // Use keyboard as user interface
     let (tx_cmd, mut rx_cmd) = mpsc::unbounded_channel();
-    let _ = start_tui(tx_cmd.clone());
+    let _ = start_ui(tx_cmd.clone());
 
     // Control the playback
     let (tx_transport, rx_transport) = mpsc::unbounded_channel::<TransportCommand>();
     let mut transport = Transport::new(tx_audio, rx_transport);
 
     match args.music_url {
-        // Play one music file and quit
+        // Play one music url
         Some(ref music_url) => {
-            transport.queue(vec![music_url.to_str().unwrap().to_string()]);
+            transport.extend(vec![AudioFile::from(music_url)]);
             rt.spawn(transport.run(tx_cmd.clone()));
         }
         None => match args.id {
-            // Play list of music files from database
+            // Play an audio directory from the database
             Some(id) => {
                 let music_files = AudioDir::get_audio_files(&db, id).await;
-                transport.queue(
-                    music_files
-                        .iter()
-                        .map(|x| x.path.clone().to_str().unwrap().to_string())
-                        .collect(),
-                );
+                transport.extend(music_files);
                 rt.spawn(transport.run(tx_cmd.clone()));
             }
             _ => {}
@@ -85,6 +81,7 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
             }
             Command::Print(msg) => print!("{}\r\n", msg.green()),
             Command::Quit => break,
+            _ => {}
         }
     }
 
