@@ -9,43 +9,86 @@ use sqlx::sqlite::SqlitePool;
 use tokio_stream::StreamExt;
 use tracing::debug;
 
+#[derive(Clone, Debug)]
+pub enum Location {
+    Path(PathBuf),
+    None,
+    Url(String),
+}
+
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Path(p) => p.as_os_str().to_string_lossy().into_owned(),
+                Self::Url(s) => s.to_string(),
+                Self::None => "n/a".into(),
+            }
+        )
+    }
+}
+
 /// A directory containing audio files.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct AudioDir {
     pub id: Option<i64>,
-    pub path: PathBuf,
+    pub location: Location,
     pub files: Vec<AudioFile>,
     pub extra: HashMap<OsString, Vec<PathBuf>>,
 }
 
+impl Default for AudioDir {
+    fn default() -> Self {
+        Self {
+            id: Default::default(),
+            location: Location::None,
+            files: Default::default(),
+            extra: Default::default(),
+        }
+    }
+}
+
 /// An audio file.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct AudioFile {
     pub id: Option<i64>,
-    pub path: PathBuf,
+    pub location: Location,
     pub mime_type: Option<Mime>,
 }
 
+impl Default for AudioFile {
+    fn default() -> Self {
+        Self {
+            id: Default::default(),
+            location: Location::None,
+            mime_type: Default::default(),
+        }
+    }
+}
+
 /// A non-audio file in an audio directory.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ExtraFile {
     pub id: Option<i64>,
-    pub path: PathBuf,
+    pub location: Location,
     pub mime_type: Option<Mime>,
 }
 
 impl AudioFile {
     /// Generate a String representation of the path.
     pub fn path_as_string(&self) -> String {
-        self.path.to_str().unwrap().to_string()
+        self.location.to_string()
     }
 }
 
 impl From<String> for AudioFile {
     fn from(path: String) -> Self {
         Self {
-            path: PathBuf::from(path),
-            ..Self::default()
+            id: None,
+            location: Location::Path(PathBuf::from(path)),
+            mime_type: None, // TODO guess mime type
         }
     }
 }
@@ -53,26 +96,57 @@ impl From<String> for AudioFile {
 impl From<&PathBuf> for AudioFile {
     fn from(path: &PathBuf) -> Self {
         Self {
-            path: PathBuf::from(path),
-            ..Self::default()
+            id: None,
+            location: Location::Path(PathBuf::from(path)),
+            mime_type: None, // TODO guess mime type
         }
     }
 }
 
+// ---------------------------------------------
+// TODO system predicate
+use std::os::unix::ffi::OsStringExt;
+use std::os::unix::ffi::OsStrExt;
+
+#[derive(Debug)]
+struct Row {
+    id: i64,
+    url: Option<String>,
+    path: Option<Vec<u8>>,
+}
+
+impl Row {
+    fn location(&self) -> Location {
+        match &self.path {
+            Some(ref path) => Location::Path(PathBuf::from(OsString::from_vec(path.clone()))),
+            None => match &self.url {
+                Some(url) => Location::Url(url.clone()),
+                None => Location::None,
+            }
+        }
+    }
+
+    /*
+    fn location_parts(&self) -> (Option<String>, Option<PathBuf>) {
+        match self.location() {
+            Location::Path(path) => (None, Some(path.as_os_str().as_bytes())),
+            Location::Url(url) => (Some(url), None),
+            Location::None => (None, None),
+        }
+    }
+    */
+}
+// ---------------------------------------------
+
 impl AudioDir {
     /// Find a list of directories by matching path with a pattern.
-    pub async fn search_with_path(pool: &SqlitePool, pattern: &str) -> Vec<AudioDir> {
-        #[derive(Debug)]
-        struct Row {
-            pub id: i64,
-            pub path: String,
-        }
-
+    pub async fn get_with_path(pool: &SqlitePool, pattern: &str) -> Vec<AudioDir> {
         let mut dirs = sqlx::query_as!(
             Row,
             r#"
             SELECT
                 id as id,
+                url as url,
                 path as path
             FROM audio_dir
             WHERE path like ?
@@ -83,11 +157,11 @@ impl AudioDir {
 
         let mut result = Vec::new();
 
-        while let Ok(dir) = dirs.try_next().await {
-            match dir {
-                Some(dir) => result.push(AudioDir {
-                    id: Some(dir.id),
-                    path: dir.path.into(),
+        while let Ok(row) = dirs.try_next().await {
+            match row {
+                Some(row) => result.push(AudioDir {
+                    id: Some(row.id),
+                    location: row.location(),
                     ..AudioDir::default()
                 }),
                 None => break,
@@ -99,17 +173,12 @@ impl AudioDir {
 
     /// Return a list of all audio directories.
     pub async fn get_audio_dirs(pool: &SqlitePool) -> Vec<AudioDir> {
-        #[derive(Debug)]
-        pub struct Row {
-            pub id: i64,
-            pub path: String,
-        }
-
         let mut rows = sqlx::query_as!(
             Row,
             r#"
             SELECT
                 id as id,
+                url as url,
                 path as path
             FROM audio_dir
             "#,
@@ -122,7 +191,7 @@ impl AudioDir {
             match row {
                 Some(row) => result.push(AudioDir {
                     id: Some(row.id),
-                    path: row.path.into(),
+                    location: row.location(),
                     ..AudioDir::default()
                 }),
                 None => break,
@@ -134,26 +203,19 @@ impl AudioDir {
 
     /// Return a list of all audio files in a particular audio directory.
     pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<AudioFile> {
-        #[derive(Debug)]
-        pub struct Row {
-            pub id: i64,
-            pub path: String,
-        }
-
         let mut files = sqlx::query_as!(
             Row,
             r#"
-            SELECT
-                id AS id,
-                path AS path
-            FROM audio_file
-            WHERE id IN (
-                SELECT
-                    audio_file_id AS id
-                FROM audio_dir_audio_file
-                WHERE audio_dir_id = ?
-            )
-            "#,
+            select id as id,
+                path as path,
+                url as url
+            from audio_file
+            where id in (
+                select
+                    audio_file_id as id
+                from audio_dir_audio_file
+                where audio_dir_id = ?
+            )"#,
             id
         )
         .fetch(pool);
@@ -165,7 +227,7 @@ impl AudioDir {
             match file {
                 Some(row) => result.push(AudioFile {
                     id: Some(row.id),
-                    path: row.path.into(),
+                    location: row.location(),
                     ..AudioFile::default()
                 }),
                 None => break,
@@ -179,21 +241,41 @@ impl AudioDir {
     pub async fn db_insert(&mut self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
         let transaction = pool.begin().await?;
 
-        let dir_path = self.path.to_str();
+        let (url, path) = match &self.location {
+            Location::Path(path) => (None, Some(path.as_os_str().as_bytes())),
+            Location::Url(url) => (Some(url), None),
+            Location::None => (None, None),
+        };
+
         let insert_id = sqlx::query!(
             r#"
-            INSERT INTO audio_dir(path)
-            VALUES(?1)
+            INSERT INTO audio_dir(url, path)
+            VALUES(?1, ?2)
             "#,
-            dir_path
+            url,
+            path
         )
         .execute(pool)
         .await?
         .last_insert_rowid();
+
         self.id = Some(insert_id);
 
         for audio_file in &self.files[..] {
-            let path = audio_file.path.to_str();
+            //let path = audio_file.path.unwrap().as_os_str().as_bytes();
+            /*
+            let path = match audio_file.path {
+                Some(ref p) => Some(p.as_os_str().as_bytes()),
+                None => None,
+            };
+            */
+
+            let (_url, path) = &match audio_file.location {
+                Location::Path(ref path) => (None, Some(path.as_os_str().as_bytes())),
+                Location::Url(ref url) => (Some(url), None),
+                Location::None => (None, None),
+            };
+
             let mime_type = match &audio_file.mime_type {
                 Some(m) => Some(m.essence_str().to_string()),
                 None => None,
@@ -264,7 +346,7 @@ impl fmt::Display for AudioFile {
                 Some(m) => m.to_string().green(),
                 None => "-/-".to_string().green(),
             },
-            self.path.file_name().unwrap().to_str().unwrap().magenta()
+            self.location.to_string().magenta()
         )
     }
 }
@@ -276,7 +358,7 @@ impl fmt::Display for AudioDir {
             f,
             "{}. {}",
             self.id.unwrap_or(-1).to_string().magenta(),
-            self.path.to_str().unwrap().blue()
+            self.location.to_string().blue()
         )?;
 
         // Limited list of `audio_file`s

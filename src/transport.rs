@@ -49,6 +49,7 @@ impl Transport {
 
     /// Stream audio to output device and respond to user commands.
     pub async fn run(mut self, tx_cmd: mpsc::UnboundedSender<Command>) {
+        tracing::debug!("----------/??????????????????????????????????????????");
         let mut buf = [0u8; 4096];
 
         'play: loop {
@@ -59,7 +60,7 @@ impl Transport {
             };
 
             tx_cmd
-                .send(Command::Print(self.now_playing().path_as_string()))
+                .send(Command::Print(self.now_playing().location.to_string()))
                 .unwrap();
 
             // PrevTrack usually restarts the current track, but it goes back
@@ -108,7 +109,7 @@ impl Transport {
         if self.cursor >= self.files.len() {
             return Err(anyhow::Error::msg("cursor index out of bounds, just quit"));
         }
-        let file = self.now_playing().path_as_string();
+        let file = self.now_playing().location.to_string();
         tracing::debug!("the file:{:?}", file);
         let mut file = audio_from_url(&file).await.spawn()?;
         file.stdout

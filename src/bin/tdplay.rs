@@ -38,16 +38,17 @@ fn main() -> Result<(), anyhow::Error> {
 
 /// Run the application.
 async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
-    let _ = start_logging("tapedeck");
+    let _logging = start_logging("tapedeck");
+    tracing::debug!("111111111111111111111111111111");
     let db = get_database("tapedeck").await?;
 
     // Initialize audio output device
     let (tx_audio, rx_audio) = mpsc::channel::<Bytes>(2);
-    let _ = start_pulse(rx_audio);
+    let _pulse = start_pulse(rx_audio);
 
     // Use keyboard as user interface
     let (tx_cmd, mut rx_cmd) = mpsc::unbounded_channel();
-    let _ = start_ui(tx_cmd.clone());
+    let _ui = start_ui(tx_cmd.clone());
 
     // Control the playback
     let (tx_transport, rx_transport) = mpsc::unbounded_channel::<TransportCommand>();

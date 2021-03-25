@@ -1,10 +1,12 @@
 create table audio_dir(
     id integer primary key not null,
-    path text not null unique
+    url text unique,
+    path blob unique
 );
 create table audio_file(
     id integer primary key not null,
-    path text not null unique,
+    url text unique,
+    path blob unique,
     mime_type text
 );
 create table extra_file(
@@ -24,3 +26,11 @@ create table audio_dir_extra_file(
     foreign key(audio_dir_id) references audio_dir(id),
     foreign key(extra_file_id) references extra_file(id)
 );
+
+/*
+create table audio_file(
+    id integer primary key not null,
+    path text not null unique,
+    mime_type text
+);
+*/

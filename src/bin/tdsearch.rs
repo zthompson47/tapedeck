@@ -7,7 +7,7 @@ use tokio::runtime::Runtime;
 use walkdir::WalkDir;
 
 use tapedeck::{
-    audio_dir::{AudioDir, AudioFile},
+    audio_dir::{AudioDir, AudioFile, Location},
     database::get_database,
     logging::start_logging,
 };
@@ -41,11 +41,10 @@ async fn list_dirs() {
     let db = get_database("tapedeck").await.unwrap();
     let audio_dirs = AudioDir::get_audio_dirs(&db).await;
     for dir in audio_dirs.iter() {
-        let path = PathBuf::from(&dir.path);
         println!(
             "{}. {}",
             &dir.id.unwrap().to_string().magenta(),
-            &path.file_name().unwrap().to_string_lossy().yellow()
+            &dir.location.to_string(),
         );
     }
 }
@@ -75,6 +74,8 @@ async fn import_dirs(search_path: PathBuf) {
             let path = entry.path();
             let guess = mime_guess::from_path(path);
             let mut found_audio = false;
+
+            // Store audio files
             if let Some(guess) = guess.first() {
                 if guess.type_() == "audio" {
                     found_audio = true;
@@ -83,9 +84,9 @@ async fn import_dirs(search_path: PathBuf) {
                         .entry(path.parent().unwrap().into())
                         .or_insert(Vec::new());
                     (*file_list).push(AudioFile {
-                        id: None,
-                        path: path.into(),
+                        location: Location::Path(path.to_owned()),
                         mime_type: Some(guess),
+                        ..AudioFile::default()
                     });
                     // Count by extension
                     let ext = path.extension().unwrap().into();
@@ -106,7 +107,7 @@ async fn import_dirs(search_path: PathBuf) {
             if path.is_dir() {
                 if music_dirs.contains_key(path) {
                     let mut audio_dir = AudioDir {
-                        path: path.into(),
+                        location: Location::Path(path.to_owned()),
                         files: {
                             match music_dirs.get(path) {
                                 Some(files) => files.to_vec(),
