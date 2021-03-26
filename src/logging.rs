@@ -106,14 +106,14 @@ mod tests {
     use tempfile::tempdir;
     use tracing;
 
-    use super::{get_log_dir, init_logging};
+    use super::{get_log_dir, start_logging};
 
     #[test]
     fn generate_log_records() {
         // Use tempdir for log files
         let dir = tempdir().unwrap().into_path();
         env::set_var("XDG_CACHE_DIR", &dir);
-        let _guard = init_logging("appname-test");
+        let _logging = start_logging("appname-test");
 
         // Try both logging crates
         log::info!("test log INFO");
@@ -122,13 +122,13 @@ mod tests {
         // Confirm log file created
         let dir = dir.join("appname-test");
         assert!(dir.is_dir());
-        let log_file = dir.join("appname-test.log");
+        let log_file = dir.join("log");
         assert!(log_file.is_file());
 
         // Drop logging guard to flush logs.
         // TODO test it??  failure below was intermittent
         //   hmm still dropping records after this drop..
-        drop(_guard);
+        drop(_logging);
 
         // Check log records
         let file = fs::File::open(&log_file).unwrap();

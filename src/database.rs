@@ -33,7 +33,7 @@ pub async fn get_database(app_name: &str) -> Result<Pool<Sqlite>, anyhow::Error>
     let mut url = dir.clone().join(app_name);
     url.set_extension("db");
     let mut conn_str = String::from("sqlite:");
-    conn_str.push_str(url.to_str().unwrap_or(":memory:"));
+    conn_str.push_str(url.to_str().unwrap_or(":memory:"));  // TODO memory fallback??
 
     tracing::debug!("Connection str: {:?}", &conn_str);
 
@@ -41,6 +41,15 @@ pub async fn get_database(app_name: &str) -> Result<Pool<Sqlite>, anyhow::Error>
     Sqlite::create_database(&conn_str).await?;
 
     // Connect and migrate
+    let db = SqlitePool::connect(&conn_str).await?;
+    let migrator = sqlx::migrate!();
+    migrator.run(&db).await?;
+
+    Ok(db)
+}
+
+pub async fn get_test_database() -> Result<Pool<Sqlite>, anyhow::Error> {
+    let conn_str = String::from("sqlite::memory:");
     let db = SqlitePool::connect(&conn_str).await?;
     let migrator = sqlx::migrate!();
     migrator.run(&db).await?;
