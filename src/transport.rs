@@ -61,7 +61,7 @@ impl Transport {
 
             tx_cmd
                 .send(Command::Print(self.now_playing().location.to_string()))
-                .unwrap();
+                .unwrap(); // TODO got panic here pressing esc to exit..
 
             // PrevTrack usually restarts the current track, but it goes back
             // to the _actual_ previous track when called at the beginning of a track.
@@ -114,6 +114,6 @@ impl Transport {
         let mut file = audio_from_url(&file).await.spawn()?;
         file.stdout
             .take()
-            .ok_or(anyhow::Error::msg("could not take music file's stdout"))
+            .ok_or_else(|| anyhow::Error::msg("could not take music file's stdout"))
     }
 }

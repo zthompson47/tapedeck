@@ -26,51 +26,49 @@ struct Cli {
 fn main() -> Result<(), anyhow::Error> {
     let args = Cli::from_args();
 
+    // Set window title
     let mut stdout = std::io::stdout();
     stdout.queue(SetTitle("⦗✇ Tapedeck ✇⦘"))?;
     stdout.flush()?;
 
+    // Enable unbuffered non-blocking stdin for reactive keyboard input
     with_raw_mode(|| {
         let rt = Runtime::new().unwrap();
         rt.block_on(run(&rt, args)).unwrap();
     })
 }
 
-/// Run the application.
 async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     let _logging = start_logging("tapedeck");
-    tracing::debug!("111111111111111111111111111111");
+
+    // Create sqlite connection pool
     let db = get_database("tapedeck").await?;
 
-    // Initialize audio output device
+    // Task to drive the audio output device
     let (tx_audio, rx_audio) = mpsc::channel::<Bytes>(2);
     let _pulse = start_pulse(rx_audio);
 
-    // Use keyboard as user interface
+    // Task to accept keyboard as user interface
     let (tx_cmd, mut rx_cmd) = mpsc::unbounded_channel();
     let _ui = start_ui(tx_cmd.clone());
 
-    // Control the playback
+    // Task to control audio playback
     let (tx_transport, rx_transport) = mpsc::unbounded_channel::<TransportCommand>();
     let mut transport = Transport::new(tx_audio, rx_transport);
 
-    match args.music_url {
+    // Execute command line
+    if let Some(music_url) = args.music_url {
         // Play one music url
-        Some(ref music_url) => {
-            transport.extend(vec![AudioFile::from(music_url)]);
-            rt.spawn(transport.run(tx_cmd.clone()));
-        }
-        None => match args.id {
-            // Play an audio directory from the database
-            Some(id) => {
-                let music_files = AudioDir::get_audio_files(&db, id).await;
-                transport.extend(music_files);
-                rt.spawn(transport.run(tx_cmd.clone()));
-            }
-            _ => {}
-        },
+        transport.extend(vec![AudioFile::from(music_url)]);
+        rt.spawn(transport.run(tx_cmd.clone()));
+    } else if let Some(id) = args.id {
+        // Play an audio directory from the database
+        let music_files = AudioDir::get_audio_files(&db, id).await;
+        transport.extend(music_files);
+        rt.spawn(transport.run(tx_cmd.clone()));
     }
 
+    // Wait for commands and dispatch
     while let Some(command) = rx_cmd.recv().await {
         match command {
             Command::Info => {}

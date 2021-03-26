@@ -29,6 +29,7 @@ struct Entry {
     length: i32,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Parser)]
 #[grammar = "pls.pest"]
 pub struct PlsParser;
@@ -37,52 +38,46 @@ pub fn parse(input: &str) -> std::result::Result<Playlist, String> {
     let file = PlsParser::parse(Rule::file, input).unwrap().next().unwrap();
     let mut playlist = Playlist::default();
 
+    // TODO comment so I can remember how this works
     for row in file.into_inner() {
-        match row.as_rule() {
-            Rule::row => {
-                for keyval in row.into_inner() {
-                    match keyval.as_rule() {
-                        Rule::version => {
-                            playlist.version = keyval.into_inner().as_str().to_string();
-                        }
-                        Rule::num_entries => {
-                            playlist.number_of_entries =
-                                keyval.into_inner().as_str().parse::<u32>().unwrap();
-                        }
-                        Rule::entry_part => {
-                            let mut kv_iter = keyval.into_inner();
+        if row.as_rule() == Rule::row {
+            for keyval in row.into_inner() {
+                match keyval.as_rule() {
+                    Rule::version => {
+                        playlist.version = keyval.into_inner().as_str().to_string();
+                    }
+                    Rule::num_entries => {
+                        playlist.number_of_entries =
+                            keyval.into_inner().as_str().parse::<u32>().unwrap();
+                    }
+                    Rule::entry_part => {
+                        let mut kv_iter = keyval.into_inner();
 
-                            if let Some(key) = kv_iter.next() {
-                                let inner_key = key.into_inner().next().unwrap();
-                                let key_type = inner_key.as_rule();
+                        if let Some(key) = kv_iter.next() {
+                            let inner_key = key.into_inner().next().unwrap();
+                            let key_type = inner_key.as_rule();
 
-                                let index = inner_key
-                                    .into_inner()
-                                    .as_str()
-                                    .parse::<u32>()
-                                    .unwrap();
+                            let index = inner_key.into_inner().as_str().parse::<u32>().unwrap();
 
-                                let entry =
-                                    playlist.entries.entry(index).or_insert(Entry::default());
+                            let entry =
+                                playlist.entries.entry(index).or_insert_with(Entry::default);
 
-                                if let Some(val) = kv_iter.next() {
-                                    let val = val.into_inner().as_str();
-                                    match key_type {
-                                        Rule::file_idx => (*entry).file = val.to_string(),
-                                        Rule::title_idx => (*entry).title = val.to_string(),
-                                        Rule::length_idx => {
-                                            (*entry).length = val.parse::<i32>().unwrap()
-                                        }
-                                        _ => {}
+                            if let Some(val) = kv_iter.next() {
+                                let val = val.into_inner().as_str();
+                                match key_type {
+                                    Rule::file_idx => (*entry).file = val.to_string(),
+                                    Rule::title_idx => (*entry).title = val.to_string(),
+                                    Rule::length_idx => {
+                                        (*entry).length = val.parse::<i32>().unwrap()
                                     }
+                                    _ => {}
                                 }
                             }
                         }
-                        _ => {}
                     }
+                    _ => {}
                 }
             }
-            _ => {}
         }
     }
 

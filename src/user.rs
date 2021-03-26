@@ -24,8 +24,9 @@ pub enum LevelDelta {
 
 pub fn start_ui(tx_cmd: mpsc::UnboundedSender<Command>) -> JoinHandle<()> {
     thread::spawn(move || loop {
-        match event::read().unwrap() {
-            Event::Key(event) => match event.code {
+        if let Event::Key(event) = event::read().unwrap() { match event.code {
+        //match event::read().unwrap() {
+            //Event::Key(event) => match event.code {
                 KeyCode::Char(ch) => match ch {
                     'c' => {
                         if event.modifiers == KeyModifiers::CONTROL {
@@ -51,8 +52,8 @@ pub fn start_ui(tx_cmd: mpsc::UnboundedSender<Command>) -> JoinHandle<()> {
                     tx_cmd.send(Command::NextTrack).unwrap();
                 }
                 _ => {}
-            },
-            _ => {}
+            }
+            //_ => {}
         }
     })
 }
