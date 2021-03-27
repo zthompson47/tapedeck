@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.38"
 bytes = "0.6.0"
+chrono = "0.4.19"
 crossterm = { version = "0.18.2", features = ["event-stream"] }
 libc = "0.2.81"
 libpulse-binding = "2.23.0"
