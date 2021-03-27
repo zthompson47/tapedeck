@@ -254,8 +254,6 @@ impl AudioDir {
             Location::None => (None, None),
         };
 
-        println!("about to insert self: {:#?}", self);
-
         let insert_id = sqlx::query!(
             r#"
             INSERT INTO audio_dir(url, path, last_modified)
