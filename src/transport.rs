@@ -12,7 +12,7 @@ use crate::user::Command;
 pub struct Transport {
     files: Vec<AudioFile>,
     cursor: usize,
-    rx_transport: mpsc::UnboundedReceiver<TransportCommand>,
+    rx_transport_cmd: mpsc::UnboundedReceiver<TransportCommand>,
     tx_audio: mpsc::Sender<Bytes>,
 }
 
@@ -27,13 +27,13 @@ impl Transport {
     /// Create a new Transport out of channel endpoints.
     pub fn new(
         tx_audio: mpsc::Sender<Bytes>,
-        rx_transport: mpsc::UnboundedReceiver<TransportCommand>,
+        rx_transport_cmd: mpsc::UnboundedReceiver<TransportCommand>,
     ) -> Self {
         Self {
             files: Vec::new(),
             cursor: 0,
             tx_audio,
-            rx_transport,
+            rx_transport_cmd,
         }
     }
 
@@ -49,7 +49,6 @@ impl Transport {
 
     /// Stream audio to output device and respond to user commands.
     pub async fn run(mut self, tx_cmd: mpsc::UnboundedSender<Command>) {
-        tracing::debug!("----------/??????????????????????????????????????????");
         let mut buf = [0u8; 4096];
 
         'play: loop {
@@ -60,12 +59,14 @@ impl Transport {
             };
 
             tx_cmd
-                .send(Command::Print(self.now_playing().location.to_string()))
+                .send(Command::Print(
+                    self.now_playing().location.to_string_lossy().to_string(), // TODO ? Cow?
+                ))
                 .unwrap(); // TODO got panic here pressing esc to exit..
 
             // PrevTrack usually restarts the current track, but it goes back
-            // to the _actual_ previous track when called at the beginning of a track.
-            // Useful for navigating back and forth in the playlist.
+            // to the _actual_ previous track when called at the beginning of
+            // a track. Useful for navigating back and forth in the playlist.
             const DOUBLE_TAP: Duration = Duration::from_millis(333);
             let start_time = Instant::now();
 
@@ -81,7 +82,7 @@ impl Transport {
 
                 // Poll for transport commands that interrupt playback
                 if let Ok(Some(cmd)) =
-                    timeout(Duration::from_millis(0), self.rx_transport.recv()).await
+                    timeout(Duration::from_millis(0), self.rx_transport_cmd.recv()).await
                 {
                     match cmd {
                         TransportCommand::NextTrack => {
@@ -106,11 +107,11 @@ impl Transport {
 
     /// Create a stream of audio data from the current playlist position.
     async fn get_reader_at_cursor(&mut self) -> Result<process::ChildStdout, anyhow::Error> {
+        // TODO ! not returning reader, so bad name
         if self.cursor >= self.files.len() {
             return Err(anyhow::Error::msg("cursor index out of bounds, just quit"));
         }
-        let file = self.now_playing().location.to_string();
-        tracing::debug!("the file:{:?}", file);
+        let file = self.now_playing().location.to_string_lossy();
         let mut file = audio_from_url(&file).await.spawn()?;
         file.stdout
             .take()

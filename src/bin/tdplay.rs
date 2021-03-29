@@ -53,13 +53,13 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
     let _ui = start_ui(tx_cmd.clone());
 
     // Task to control audio playback
-    let (tx_transport, rx_transport) = mpsc::unbounded_channel::<TransportCommand>();
-    let mut transport = Transport::new(tx_audio, rx_transport);
+    let (tx_transport_cmd, rx_transport_cmd) = mpsc::unbounded_channel::<TransportCommand>();
+    let mut transport = Transport::new(tx_audio, rx_transport_cmd);
 
     // Execute command line
     if let Some(music_url) = args.music_url {
         // Play one music url
-        transport.extend(vec![AudioFile::from(music_url)]);
+        transport.extend(vec![AudioFile::from(music_url)]); // TODO only use of audio_dir.url
         rt.spawn(transport.run(tx_cmd.clone()));
     } else if let Some(id) = args.id {
         // Play an audio directory from the database
@@ -73,10 +73,10 @@ async fn run(rt: &Runtime, args: Cli) -> Result<(), anyhow::Error> {
         match command {
             Command::Info => {}
             Command::NextTrack => {
-                tx_transport.send(TransportCommand::NextTrack)?;
+                tx_transport_cmd.send(TransportCommand::NextTrack)?;
             }
             Command::PrevTrack => {
-                tx_transport.send(TransportCommand::PrevTrack)?;
+                tx_transport_cmd.send(TransportCommand::PrevTrack)?;
             }
             Command::Print(msg) => print!("{}\r\n", msg.green()),
             Command::Quit => break,

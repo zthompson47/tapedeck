@@ -1,3 +1,5 @@
+use std::ffi::OsString;
+
 use tapedeck::{
     audio_dir::{AudioDir, AudioFile},
     database::get_test_database,
@@ -9,13 +11,15 @@ async fn audio_dir_create_and_read() {
 
     // Create records
     let mut dir = AudioDir::default();
-    for _ in 0..4 {
-        dir.push_file(AudioFile {
+    for i in 0..4 {
+        // TODO maybe implement push()?
+        dir.extend(Vec::from([AudioFile {
+            location: OsString::from(i.to_string()),
             file_size: Some(42),
             ..AudioFile::default()
-        });
+        }]));
     }
-    dir.extend_files(vec![AudioFile::default()]);
+    dir.extend(vec![AudioFile::default()]);
     dir.last_modified = 47;
 
     // TODO need methods on dir to add files
