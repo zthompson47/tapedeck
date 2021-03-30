@@ -1,5 +1,8 @@
 #!/bin/sh
 RUNDIR=".tapedeck"
+if [ "$1" == "init" ]; then
+    rm -rf "$RUNDIR"
+fi
 mkdir -p "$RUNDIR"
 
 export RUST_LOG="DEBUG"
@@ -7,6 +10,10 @@ export TAPEDECK_DEV_DIR=`realpath "$RUNDIR"`
 
 # Sqlx needs a database to compile
 cargo sqlx db setup
+
+if [ "$1" == "init" ]; then
+    exit 0
+fi
 
 if [ $# -eq 0 ]; then
     echo "Please provide args for 'cargo --bin' (e.g. tdplay, tdsearch)"
