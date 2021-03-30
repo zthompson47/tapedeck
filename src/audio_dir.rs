@@ -22,8 +22,35 @@ pub struct AudioDir {
 pub struct AudioFile {
     pub id: Option<i64>,
     pub file_size: Option<i64>,
-    pub mime_type: Option<Mime>,
+    pub media_type: MediaType,
     pub location: OsString,
+}
+
+#[derive(Clone, Debug)]
+pub enum MediaType {
+    Audio(Mime),
+    Md5(OsString),
+    Unknown,
+}
+
+impl Default for MediaType {
+    fn default() -> Self {
+        MediaType::Unknown
+    }
+}
+
+impl fmt::Display for MediaType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Audio(m) => m.essence_str().to_string(),
+                Self::Md5(m) => format!("_td/{}", m.to_str().unwrap_or("-").to_string()),
+                Self::Unknown => "-/-".to_string(),
+            }
+        )
+    }
 }
 
 impl Extend<AudioFile> for AudioDir {
@@ -138,7 +165,8 @@ impl AudioDir {
     /// Save all records to database.
     pub async fn db_insert(&mut self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
         let transaction = pool.begin().await?;
-        // Create AudioDir record for self
+
+        // Create MediaDir record
         let location = self.location.as_bytes();
         let insert_id = sqlx::query!(
             r#"
@@ -151,22 +179,21 @@ impl AudioDir {
         .execute(pool)
         .await?
         .last_insert_rowid();
+
         self.id = Some(insert_id);
 
+        // Create MediaFile records
         for audio_file in &mut self.files[..] {
-            let mime_type = audio_file
-                .mime_type
-                .as_ref()
-                .map(|m| m.essence_str().to_string());
             let location = audio_file.location.as_bytes();
+            let media_type = audio_file.media_type.to_string();
 
             let audio_file_id = sqlx::query!(
                 r#"
-                insert into audio_file(location, mime_type, file_size, audio_dir_id)
+                insert into audio_file(location, media_type, file_size, audio_dir_id)
                 values(?1, ?2, ?3, ?4);
                 "#,
                 location,
-                mime_type,
+                media_type,
                 audio_file.file_size,
                 self.id,
             )
@@ -186,10 +213,7 @@ impl fmt::Display for AudioFile {
         write!(
             f,
             "{}:{}",
-            match &self.mime_type {
-                Some(m) => m.to_string().green(),
-                None => "-/-".to_string().green(),
-            },
+            self.media_type.to_string().green(),
             self.location.to_string_lossy().magenta()
         )
     }

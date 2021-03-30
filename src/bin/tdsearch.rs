@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, ffi::OsString, path::PathBuf};
+use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, path::PathBuf};
 
 use crossterm::style::Colorize;
 use structopt::StructOpt;
@@ -6,7 +6,7 @@ use tokio::runtime::Runtime;
 use walkdir::WalkDir;
 
 use tapedeck::{
-    audio_dir::{AudioDir, AudioFile},
+    audio_dir::{AudioDir, AudioFile, MediaType},
     database::get_database,
     logging::start_logging,
 };
@@ -54,9 +54,9 @@ async fn list_dirs() -> Result<(), anyhow::Error> {
 async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
     let _logging = start_logging("tapedeck");
     let db = get_database("tapedeck").await?;
-    let mut extensions: HashMap<OsString, usize> = HashMap::new();
-    let mut extra: HashMap<OsString, Vec<PathBuf>> = HashMap::new();
-    let mut new_audio_dir: Vec<AudioFile> = Vec::new();
+    let mut mime_type_count: HashMap<String, usize> = HashMap::new();
+    let mut new_files: Vec<AudioFile> = Vec::new();
+    let mut found_audio = false;
 
     // Sort directories-first with file entries forming an alpahbetized
     // contiguous list followed by their parent directory.
@@ -73,47 +73,52 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
         .flatten()
     {
         let path = entry.path();
-        let mut found_audio = false;
         let guess = mime_guess::from_path(path);
 
-        // Store audio files
+        // Try to identify file by mime type
         if let Some(guess) = guess.first() {
             if guess.type_() == "audio" {
                 found_audio = true;
+            }
 
-                // Count by extension
-                let ext = path.extension().unwrap().into();
-                let counter = extensions.entry(ext).or_insert(0);
+            if ["audio", "text"].contains(&guess.type_().as_str()) {
+                // Count by mime type for summary output
+                let counter = mime_type_count
+                    .entry(guess.essence_str().to_string())
+                    .or_insert(0);
                 *counter += 1;
 
                 // Create new AudioFile
-                new_audio_dir.push(AudioFile {
+                new_files.push(AudioFile {
+                    id: None,
                     location: path.as_os_str().to_owned(),
-                    mime_type: Some(guess),
+                    media_type: MediaType::Audio(guess.clone()),
                     file_size: i64::try_from(entry.metadata()?.len()).ok(),
-                    ..AudioFile::default()
                 });
             }
         }
 
-        // Store extra non-audio files to keep with any audio dirs
-        if entry.file_type().is_file() && !found_audio {
-            let extra_list = extra
-                .entry(path.extension().unwrap_or(&OsString::from("n/a")).into())
-                .or_insert_with(Vec::new);
-            (*extra_list).push(path.into());
+        // Look for non-mime support files
+        if path.is_file() {
+            if let Some(ext) = path.extension() {
+                if ["md5", "st5"].contains(&ext.to_str().unwrap_or("")) {
+                    new_files.push(AudioFile {
+                        id: None,
+                        location: path.as_os_str().to_owned(),
+                        media_type: MediaType::Md5(ext.to_os_string()),
+                        file_size: i64::try_from(entry.metadata()?.len()).ok(),
+                    });
+                }
+            }
         }
 
         // Fold each completed directory into results
         if path.is_dir() {
-            if !new_audio_dir.is_empty() {
+            if found_audio {
+                found_audio = false;
                 // Create new AudioDir
                 let mut audio_dir = AudioDir::from(path.to_owned());
-
-                //audio_dir.extend_files(std::mem::take(&mut new_audio_dir));
-                audio_dir.extend(std::mem::take(&mut new_audio_dir));
-
-                //audio_dir.extra = std::mem::take(&mut extra);
+                audio_dir.extend(std::mem::take(&mut new_files));
                 audio_dir.last_modified = timestamp(entry.metadata()?.modified()?);
 
                 // Insert into database
@@ -122,11 +127,11 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
                     Err(_) => println!("dup"), // TODO
                 }
             } else {
-                extra.clear();
+                new_files.clear();
             }
         }
     }
-    println!("{:#?}", extensions);
+    println!("{:#?}", mime_type_count);
 
     Ok(())
 }
