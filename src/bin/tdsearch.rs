@@ -6,7 +6,7 @@ use tokio::runtime::Runtime;
 use walkdir::WalkDir;
 
 use tapedeck::{
-    audio_dir::{AudioDir, AudioFile, MediaType},
+    audio_dir::{MaybeFetched, MediaDir, MediaFile, MediaType},
     database::get_database,
     logging::start_logging,
 };
@@ -36,7 +36,7 @@ fn main() -> Result<(), anyhow::Error> {
 async fn list_dirs() -> Result<(), anyhow::Error> {
     let _logging = start_logging("tapedeck");
     let db = get_database("tapedeck").await?;
-    let audio_dirs = AudioDir::get_audio_dirs(&db).await;
+    let audio_dirs = MediaDir::get_audio_dirs(&db).await;
 
     for dir in audio_dirs.iter() {
         println!(
@@ -55,7 +55,7 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
     let _logging = start_logging("tapedeck");
     let db = get_database("tapedeck").await?;
     let mut mime_type_count: HashMap<String, usize> = HashMap::new();
-    let mut new_files: Vec<AudioFile> = Vec::new();
+    let mut new_files: Vec<MediaFile> = Vec::new();
     let mut found_audio = false;
 
     // Sort directories-first with file entries forming an alpahbetized
@@ -89,11 +89,12 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
                 *counter += 1;
 
                 // Create new AudioFile
-                new_files.push(AudioFile {
+                new_files.push(MediaFile {
                     id: None,
                     location: path.as_os_str().to_owned(),
                     media_type: MediaType::Audio(guess.clone()),
                     file_size: i64::try_from(entry.metadata()?.len()).ok(),
+                    directory: MaybeFetched::None,
                 });
             }
         }
@@ -102,11 +103,12 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
         if path.is_file() {
             if let Some(ext) = path.extension() {
                 if ["md5", "st5"].contains(&ext.to_str().unwrap_or("")) {
-                    new_files.push(AudioFile {
+                    new_files.push(MediaFile {
                         id: None,
                         location: path.as_os_str().to_owned(),
-                        media_type: MediaType::Md5(ext.to_os_string()),
+                        media_type: MediaType::Checksum(ext.to_os_string()),
                         file_size: i64::try_from(entry.metadata()?.len()).ok(),
+                        directory: MaybeFetched::None,
                     });
                 }
             }
@@ -116,8 +118,8 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
         if path.is_dir() {
             if found_audio {
                 found_audio = false;
-                // Create new AudioDir
-                let mut audio_dir = AudioDir::from(path.to_owned());
+                // Create new MediaDir
+                let mut audio_dir = MediaDir::from(path.to_owned());
                 audio_dir.extend(std::mem::take(&mut new_files));
                 audio_dir.last_modified = timestamp(entry.metadata()?.modified()?);
 

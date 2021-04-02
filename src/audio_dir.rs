@@ -8,28 +8,42 @@ use mime_guess::{self, Mime};
 use sqlx::sqlite::SqlitePool;
 use tokio_stream::StreamExt;
 
-/// A directory containing audio files.
+/// A directory containing media files.
 #[derive(Clone, Debug, Default)]
-pub struct AudioDir {
+pub struct MediaDir {
     pub id: Option<i64>,
     pub last_modified: i64,
     pub location: OsString,
-    files: Vec<AudioFile>,
+    files: Vec<MediaFile>,
 }
 
-/// An audio file.
+/// A media file.
 #[derive(Clone, Debug, Default)]
-pub struct AudioFile {
+pub struct MediaFile {
     pub id: Option<i64>,
     pub file_size: Option<i64>,
     pub media_type: MediaType,
     pub location: OsString,
+    pub directory: MaybeFetched<MediaDir>,
+}
+
+#[derive(Clone, Debug)]
+pub enum MaybeFetched<T> {
+    Id(i64),
+    Record(T),
+    None,
+}
+
+impl<T> Default for MaybeFetched<T> {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 #[derive(Clone, Debug)]
 pub enum MediaType {
     Audio(Mime),
-    Md5(OsString),
+    Checksum(OsString),
     Unknown,
 }
 
@@ -46,50 +60,78 @@ impl fmt::Display for MediaType {
             "{}",
             match self {
                 Self::Audio(m) => m.essence_str().to_string(),
-                Self::Md5(m) => format!("_td/{}", m.to_str().unwrap_or("-").to_string()),
+                Self::Checksum(m) => format!("checksum/{}", m.to_str().unwrap_or("-").to_string()),
                 Self::Unknown => "-/-".to_string(),
             }
         )
     }
 }
 
-impl Extend<AudioFile> for AudioDir {
-    fn extend<T: IntoIterator<Item = AudioFile>>(&mut self, iter: T) {
+impl Extend<MediaFile> for MediaDir {
+    fn extend<T: IntoIterator<Item = MediaFile>>(&mut self, iter: T) {
         for f in iter {
             self.files.push(f);
         }
     }
 }
 
-impl From<PathBuf> for AudioFile {
+impl From<PathBuf> for MediaFile {
     fn from(p: PathBuf) -> Self {
         Self {
             location: p.as_os_str().to_owned(),
-            ..AudioFile::default()
+            ..MediaFile::default()
         }
     }
 }
 
-impl From<PathBuf> for AudioDir {
+impl From<PathBuf> for MediaDir {
     fn from(p: PathBuf) -> Self {
         Self {
             location: p.as_os_str().to_owned(),
-            ..AudioDir::default()
+            ..MediaDir::default()
         }
     }
 }
 
-impl AudioDir {
-    pub fn files(&self) -> &Vec<AudioFile> {
+impl MediaFile {
+    pub async fn directory(&self, pool: &SqlitePool) -> Option<MediaDir> {
+        match &self.directory {
+            MaybeFetched::Id(id) => {
+                let directory = sqlx::query!(
+                    r#"
+                    select id, location, last_modified
+                    from media_dir
+                    where id = ?
+                    "#,
+                    id
+                )
+                .fetch_one(pool)
+                .await
+                .unwrap();
+                Some(MediaDir {
+                    id: Some(directory.id),
+                    last_modified: directory.last_modified.unwrap(),
+                    location: OsString::from_vec(directory.location),
+                    files: Vec::new(),
+                })
+            }
+            MaybeFetched::Record(r) => Some(r.to_owned()),
+            MaybeFetched::None => None,
+        }
+    }
+}
+
+impl MediaDir {
+    pub fn files(&self) -> &Vec<MediaFile> {
         &self.files
     }
 
     /// Find a list of directories by matching path with a pattern.
-    pub async fn get_with_path(pool: &SqlitePool, pattern: &str) -> Vec<AudioDir> {
+    pub async fn get_with_path(pool: &SqlitePool, pattern: &str) -> Vec<MediaDir> {
         let mut dirs = sqlx::query!(
             r#"
             select id, location, last_modified
-            from audio_dir
+            from media_dir
             where location like ?
             "#,
             pattern
@@ -99,10 +141,10 @@ impl AudioDir {
         let mut result = Vec::new();
 
         while let Ok(Some(row)) = dirs.try_next().await {
-            result.push(AudioDir {
+            result.push(MediaDir {
                 id: Some(row.id),
                 location: OsString::from_vec(row.location),
-                ..AudioDir::default()
+                ..MediaDir::default()
             });
         }
 
@@ -110,11 +152,11 @@ impl AudioDir {
     }
 
     /// Return a list of all audio directories.
-    pub async fn get_audio_dirs(pool: &SqlitePool) -> Vec<AudioDir> {
+    pub async fn get_audio_dirs(pool: &SqlitePool) -> Vec<MediaDir> {
         let mut rows = sqlx::query!(
             r#"
             select id, location, last_modified
-            from audio_dir
+            from media_dir
             "#,
         )
         .fetch(pool);
@@ -122,11 +164,11 @@ impl AudioDir {
         let mut result = Vec::new();
 
         while let Ok(Some(row)) = rows.try_next().await {
-            result.push(AudioDir {
+            result.push(MediaDir {
                 id: Some(row.id),
                 last_modified: row.last_modified.unwrap(), // TODO!
                 location: OsString::from_vec(row.location),
-                ..AudioDir::default()
+                ..MediaDir::default()
             });
         }
 
@@ -134,12 +176,12 @@ impl AudioDir {
     }
 
     /// Return a list of all audio files in a particular audio directory.
-    pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<AudioFile> {
+    pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<MediaFile> {
         let mut files = sqlx::query!(
             r#"
             select id, location, file_size
-            from audio_file
-            where audio_dir_id = ?
+            from media_file
+            where media_dir_id = ?
             "#,
             id
         )
@@ -149,11 +191,48 @@ impl AudioDir {
 
         while let Ok(file) = files.try_next().await {
             match file {
-                Some(row) => result.push(AudioFile {
+                Some(row) => result.push(MediaFile {
                     id: Some(row.id),
                     location: OsString::from_vec(row.location),
                     file_size: row.file_size,
-                    ..AudioFile::default()
+                    directory: MaybeFetched::Id(id),
+                    ..MediaFile::default()
+                }),
+                None => break,
+            }
+        }
+
+        result
+    }
+
+    pub async fn text_files(&self, pool: &SqlitePool) -> Option<Vec<MediaFile>> {
+        if let Some(id) = self.id {
+            Some(Self::get_text_files(pool, id).await)
+        } else {
+            None
+        }
+    }
+
+    pub async fn get_text_files(pool: &SqlitePool, id: i64) -> Vec<MediaFile> {
+        let mut files = sqlx::query!(
+            r#"
+            select id, location, file_size
+            from media_file
+            where media_dir_id = ?
+            and media_type like 'text/%'
+            "#,
+            id
+        )
+        .fetch(pool);
+        let mut result = Vec::new();
+
+        while let Ok(file) = files.try_next().await {
+            match file {
+                Some(row) => result.push(MediaFile {
+                    id: Some(row.id),
+                    location: OsString::from_vec(row.location),
+                    file_size: row.file_size,
+                    ..MediaFile::default()
                 }),
                 None => break,
             }
@@ -170,7 +249,7 @@ impl AudioDir {
         let location = self.location.as_bytes();
         let insert_id = sqlx::query!(
             r#"
-            insert into audio_dir(location, last_modified)
+            insert into media_dir(location, last_modified)
             values(?1, ?2)
             "#,
             location,
@@ -189,7 +268,7 @@ impl AudioDir {
 
             let audio_file_id = sqlx::query!(
                 r#"
-                insert into audio_file(location, media_type, file_size, audio_dir_id)
+                insert into media_file(location, media_type, file_size, media_dir_id)
                 values(?1, ?2, ?3, ?4);
                 "#,
                 location,
@@ -208,7 +287,7 @@ impl AudioDir {
     }
 }
 
-impl fmt::Display for AudioFile {
+impl fmt::Display for MediaFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -219,7 +298,7 @@ impl fmt::Display for AudioFile {
     }
 }
 
-impl fmt::Display for AudioDir {
+impl fmt::Display for MediaDir {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Id and path
         writeln!(
@@ -251,7 +330,7 @@ mod tests {
 
     #[test]
     fn defaults() {
-        assert_eq!(AudioDir::default().id, None);
-        assert_eq!(AudioFile::default().id, None);
+        assert_eq!(MediaDir::default().id, None);
+        assert_eq!(MediaFile::default().id, None);
     }
 }

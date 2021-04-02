@@ -33,7 +33,31 @@ pub fn start_ui(tx_cmd: mpsc::UnboundedSender<Command>) -> JoinHandle<()> {
                             tx_cmd.send(Command::Quit).unwrap();
                         }
                     }
-                    'i' => {}
+                    'i' => {
+                        tx_cmd.send(Command::Info).unwrap();
+                    }
+                    'g' => {
+                        use std::io::Write;
+                        use crossterm::{terminal::{size, SetSize}, QueueableCommand};
+                        let mut stdout = std::io::stdout();
+                        stdout.queue(SetSize(10, 10)).unwrap();
+                        print!("{:?}\r\n", size().unwrap());
+                        stdout.flush().unwrap();
+                    }
+                    'j' => {
+                        use std::io::Write;
+                        use crossterm::{terminal::ScrollUp, QueueableCommand};
+                        let mut stdout = std::io::stdout();
+                        stdout.queue(ScrollUp(2)).unwrap();
+                        stdout.flush().unwrap();
+                    }
+                    'k' => {
+                        use std::io::Write;
+                        use crossterm::{terminal::ScrollDown, QueueableCommand};
+                        let mut stdout = std::io::stdout();
+                        stdout.queue(ScrollDown(2)).unwrap();
+                        stdout.flush().unwrap();
+                    }
                     'q' => {
                         tx_cmd.send(Command::Quit).unwrap();
                     }

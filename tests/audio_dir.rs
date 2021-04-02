@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 
 use tapedeck::{
-    audio_dir::{AudioDir, AudioFile},
+    audio_dir::{MediaDir, MediaFile},
     database::get_test_database,
 };
 
@@ -10,22 +10,17 @@ async fn audio_dir_create_and_read() {
     let db = get_test_database().await.unwrap();
 
     // Create records
-    let mut dir = AudioDir::default();
+    let mut dir = MediaDir::default();
     for i in 0..4 {
         // TODO maybe implement push()?
-        dir.extend(Vec::from([AudioFile {
+        dir.extend(Vec::from([MediaFile {
             location: OsString::from(i.to_string()),
             file_size: Some(42),
-            ..AudioFile::default()
+            ..MediaFile::default()
         }]));
     }
-    dir.extend(vec![AudioFile::default()]);
+    dir.extend(vec![MediaFile::default()]);
     dir.last_modified = 47;
-
-    // TODO need methods on dir to add files
-    //for _ in 0..3 {
-    //    dir.extra.push(ExtraFile::default());
-    //}
 
     dir.db_insert(&db).await.unwrap();
 
@@ -36,11 +31,11 @@ async fn audio_dir_create_and_read() {
 
     drop(dir);
 
-    let dirs = AudioDir::get_audio_dirs(&db).await;
+    let dirs = MediaDir::get_audio_dirs(&db).await;
     assert_eq!(dirs.len(), 1);
     assert_eq!(dirs[0].last_modified, 47);
 
-    let files = AudioDir::get_audio_files(&db, 1).await;
+    let files = MediaDir::get_audio_files(&db, 1).await;
     println!("{:#?}", files);
     assert_eq!(files.len(), 5);
     assert_eq!(files[3].file_size, Some(42));

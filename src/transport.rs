@@ -1,17 +1,19 @@
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
+use tokio::sync::oneshot;
 use tokio::{io::AsyncReadExt, process, sync::mpsc, time::timeout};
 
-use crate::audio_dir::AudioFile;
+use crate::audio_dir::MediaFile;
 use crate::ffmpeg::audio_from_url;
 use crate::user::Command;
 
 /// Plays a playlist and responds to user commands.
 #[derive(Debug)]
 pub struct Transport {
-    files: Vec<AudioFile>,
+    files: Vec<MediaFile>,
     cursor: usize,
+    tx_transport_cmd: mpsc::UnboundedSender<TransportCommand>,
     rx_transport_cmd: mpsc::UnboundedReceiver<TransportCommand>,
     tx_audio: mpsc::Sender<Bytes>,
 }
@@ -21,29 +23,58 @@ pub struct Transport {
 pub enum TransportCommand {
     NextTrack,
     PrevTrack,
+    NowPlaying(oneshot::Sender<MediaFile>),
+}
+
+pub struct TransportHandle {
+    pub tx_transport_cmd: mpsc::UnboundedSender<TransportCommand>,
+}
+
+impl TransportHandle {
+    pub fn next_track(&self) -> Result<(), anyhow::Error> {
+        self.tx_transport_cmd.send(TransportCommand::NextTrack)?;
+        Ok(())
+    }
+    pub fn prev_track(&self) -> Result<(), anyhow::Error> {
+        self.tx_transport_cmd.send(TransportCommand::PrevTrack)?;
+        Ok(())
+    }
+    pub async fn now_playing(&self) -> Result<MediaFile, anyhow::Error> {
+        let (tx, rx) = oneshot::channel();
+        self.tx_transport_cmd.send(TransportCommand::NowPlaying(tx))?;
+        Ok(rx.await?)
+    }
 }
 
 impl Transport {
     /// Create a new Transport out of channel endpoints.
     pub fn new(
         tx_audio: mpsc::Sender<Bytes>,
-        rx_transport_cmd: mpsc::UnboundedReceiver<TransportCommand>,
+        //rx_transport_cmd: mpsc::UnboundedReceiver<TransportCommand>,
     ) -> Self {
+        let (tx_transport_cmd, rx_transport_cmd) = mpsc::unbounded_channel();
         Self {
             files: Vec::new(),
             cursor: 0,
             tx_audio,
+            tx_transport_cmd,
             rx_transport_cmd,
         }
     }
 
+    pub fn get_handle(&mut self) -> TransportHandle {
+        let (tx_transport_cmd, rx_transport_cmd) = mpsc::unbounded_channel::<TransportCommand>();
+        self.rx_transport_cmd = rx_transport_cmd;
+        TransportHandle { tx_transport_cmd }
+    }
+
     /// Add files to the end of the playlist.
-    pub fn extend(&mut self, files: Vec<AudioFile>) {
+    pub fn extend(&mut self, files: Vec<MediaFile>) {
         self.files.extend(files);
     }
 
     /// Return the file at the cursor.
-    pub fn now_playing(&self) -> &AudioFile {
+    pub fn now_playing(&self) -> &MediaFile {
         &self.files[self.cursor]
     }
 
@@ -96,6 +127,9 @@ impl Transport {
                                 self.cursor = self.cursor.saturating_sub(1);
                             }
                             continue 'play;
+                        }
+                        TransportCommand::NowPlaying(tx) => {
+                            tx.send(self.now_playing().clone()).unwrap();
                         }
                     }
                 }
