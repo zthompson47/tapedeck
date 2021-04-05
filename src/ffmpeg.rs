@@ -1,19 +1,23 @@
+use std::ffi::OsString;
 use std::process::Stdio;
 
 use tokio::process::Command;
 
 use crate::playlist;
 
-pub async fn audio_from_url(url: &str) -> Command {
+pub async fn audio_from_url(url: &OsString) -> Command {
     let url = match url {
-        url if url.starts_with("http") => stream_from_playlist(url).await.unwrap(),
-        _ => url.to_string(),
+        url if url.to_string_lossy().starts_with("http") => {
+            let stream_url = stream_from_playlist(url).await.unwrap();
+            OsString::from(stream_url)
+        }
+        _ => url.to_owned(),
     };
 
     let mut cmd = Command::new("ffmpeg");
 
     cmd.args(&["-ac", "2"])
-        .args(&["-i", url.as_str()])
+        .args(&[OsString::from("-i"), url])
         .args(&["-f", "s16le"])
         .args(&["-ar", "44.1k"])
         .args(&["-acodec", "pcm_s16le"])
@@ -25,8 +29,9 @@ pub async fn audio_from_url(url: &str) -> Command {
     cmd
 }
 
-pub async fn stream_from_playlist(url: &str) -> reqwest::Result<String> {
-    let text = reqwest::get(url).await?.text().await?;
+pub async fn stream_from_playlist(url: &OsString) -> reqwest::Result<String> {
+    let url: String = OsString::from(url).to_string_lossy().to_string();
+    let text = reqwest::get(&url).await?.text().await?;
 
     // Parse out primary stream url
     let playlist = playlist::parse(text.as_str()).unwrap();

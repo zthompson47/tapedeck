@@ -1,8 +1,9 @@
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
+use futures::future::FutureExt;
 use tokio::sync::oneshot;
-use tokio::{io::AsyncReadExt, process, sync::mpsc, time::timeout};
+use tokio::{io::AsyncReadExt, process, sync::mpsc, task::unconstrained};
 
 use crate::audio_dir::MediaFile;
 use crate::ffmpeg::audio_from_url;
@@ -111,8 +112,7 @@ impl Transport {
                 }
 
                 // Poll for transport commands that interrupt playback
-                if let Ok(Some(cmd)) =
-                    timeout(Duration::from_millis(0), self.rx_transport_cmd.recv()).await
+                if let Some(Some(cmd)) = unconstrained(self.rx_transport_cmd.recv()).now_or_never()
                 {
                     match cmd {
                         TransportCommand::NextTrack => {
@@ -144,8 +144,8 @@ impl Transport {
         if self.cursor >= self.files.len() {
             return Err(anyhow::Error::msg("cursor index out of bounds, just quit"));
         }
-        let file = self.now_playing().location.to_string_lossy();
-        let mut file = audio_from_url(&file).await.spawn()?;
+        let file_url = &self.now_playing().location;
+        let mut file = audio_from_url(file_url).await.spawn()?;
         file.stdout
             .take()
             .ok_or_else(|| anyhow::Error::msg("could not take music file's stdout"))

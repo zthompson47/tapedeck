@@ -59,16 +59,17 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
     // Create sqlite connection pool
     let db = get_database("tapedeck").await?;
 
+    // Channel for processing top-level commands
+    let (tx_cmd, mut rx_cmd) = mpsc::unbounded_channel();
+
     // Task to drive the audio output device
     let (tx_audio, rx_audio) = mpsc::channel::<Bytes>(2);
     let _pulse = start_pulse(rx_audio);
 
     // Task to accept keyboard as user interface
-    let (tx_cmd, mut rx_cmd) = mpsc::unbounded_channel();
     let user = User::new(tx_cmd.clone());
     let ui = user.get_handle();
     tokio::spawn(user.run());
-    //let _ui = start_ui(tx_cmd.clone());
 
     // Task to control audio playback
     let mut transport = Transport::new(tx_audio);
@@ -86,8 +87,7 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
         tokio::spawn(transport.run(tx_cmd.clone()));
     }
 
-    let screen_task = Screen::new();
-    let screen = screen_task.get_handle();
+    let screen = Screen::new().run();
 
     // Wait for commands and dispatch
     while let Some(command) = rx_cmd.recv().await {
@@ -96,7 +96,7 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
                 // Concatenate and display text files from media directory
                 if let Some(directory) = playback.now_playing().await?.directory(&db).await {
                     if let Some(text_files) = directory.text_files(&db).await {
-                        if let Ok(pager) = Pager::new(text_files).await {
+                        if let Ok(mut pager) = Pager::new(text_files).await {
                             let screen = screen.clone();
                             let ui = ui.clone();
                             tokio::spawn(async move { pager.run(ui, screen).await });
@@ -132,7 +132,7 @@ impl Pager {
         })
     }
 
-    async fn run(&self, ui: UserHandle, screen: ScreenHandle) {
+    async fn run(&mut self, ui: UserHandle, screen: ScreenHandle) {
         screen.enter_alternate_screen();
         screen.draw(&self.lines[self.cursor..].to_vec());
 
@@ -140,12 +140,24 @@ impl Pager {
         let mut rx_input = ui.take_input().await;
         while let Some(event) = rx_input.recv().await {
             match event.code {
-                KeyCode::Char(ch) => {
-                    match ch {
-                        'q' => break,
-                        _ => {}
-                    }
-                }
+                KeyCode::Char(ch) => match ch {
+                    'q' => break,
+                    'j' => {
+                        tracing::debug!("j:{}:{}", self.cursor, self.lines.len());
+                        if self.cursor < self.lines.len() - 2 {
+                            self.cursor += 1;
+                            screen.draw(&self.lines[self.cursor..].to_vec());
+                        }
+                    },
+                    'k' => {
+                        tracing::debug!("k:{}:{}", self.cursor, self.lines.len());
+                        if self.cursor > 0 {
+                            self.cursor -= 1;
+                            screen.draw(&self.lines[self.cursor..].to_vec());
+                        }
+                    },
+                    _ => {}
+                },
                 _ => {}
             }
         }

@@ -13,17 +13,11 @@ use tokio::{
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Info,
-    //ListTracks,
-    //Meter,
     NextTrack,
     PrevTrack,
     Print(String),
-    //ScrollLeft(usize),
-    //ScrollRight(usize),
     ScrollUp(usize),
     ScrollDown(usize),
-    //Spectrum,
-    //Volume(LevelDelta),
     Quit,
 }
 
@@ -78,8 +72,7 @@ impl User {
         // Listen for keyboard and mouse events from separate thread
         let (tx, mut rx) = unbounded_channel::<Event>();
         {
-            //
-            let tx = tx.clone();
+            let tx = tx;
             thread::spawn(move || loop {
                 while let Ok(event) = event::read() {
                     tx.send(event).unwrap();
@@ -87,6 +80,7 @@ impl User {
             });
         }
 
+        // Channel to retrieve widget handles from UserCommand listener task
         let (tx_widget_stack, mut rx_widget_stack) = unbounded_channel();
 
         {
@@ -96,11 +90,11 @@ impl User {
                 while let Some(command) = rx_user.recv().await {
                     match command {
                         UserCommand::TakeInput(tx_oneshot) => {
+                            // Create channeel for intercepted events
                             let (tx, rx) = unbounded_channel();
-
-                            //widget_stack.push(tx);
+                            // Push tx end on widget stack
                             tx_widget_stack.send(tx).unwrap();
-
+                            // Return rx
                             tx_oneshot.send(rx).unwrap();
                         }
                     }
@@ -112,50 +106,38 @@ impl User {
 
         while let Some(event) = rx.recv().await {
             // Check for a new widget to take over the input
-            if let Some(Some(wot)) = unconstrained(rx_widget_stack.recv()).now_or_never() {
-                widget_stack.push(wot);
+            if let Some(Some(tx_widget)) = unconstrained(rx_widget_stack.recv()).now_or_never() {
+                widget_stack.push(tx_widget);
             }
             match event {
                 Event::Key(event) => match event.code {
                     KeyCode::Char(ch) => {
-                        if widget_stack.is_empty() {
-                            match ch {
-                                'c' => {
-                                    if event.modifiers == KeyModifiers::CONTROL {
-                                        self.tx_cmd.send(Command::Quit).unwrap();
-                                    }
-                                }
-                                'i' => {
-                                    self.tx_cmd.send(Command::Info).unwrap();
-                                }
-                                'j' => {
-                                    use crossterm::{terminal::ScrollUp, QueueableCommand};
-                                    use std::io::Write;
-                                    let mut stdout = std::io::stdout();
-                                    stdout.queue(ScrollUp(2)).unwrap();
-                                    stdout.flush().unwrap();
-                                }
-                                'k' => {
-                                    use crossterm::{terminal::ScrollDown, QueueableCommand};
-                                    use std::io::Write;
-                                    let mut stdout = std::io::stdout();
-                                    stdout.queue(ScrollDown(2)).unwrap();
-                                    stdout.flush().unwrap();
-                                }
-                                'q' => {
-                                    self.tx_cmd.send(Command::Quit).unwrap();
-                                }
-                                _ => {}
-                            }
-                        } else {
+                        if !widget_stack.is_empty() {
+                            // Try to send events to top widget
                             match widget_stack[widget_stack.len() - 1].send(event) {
-                                Ok(_) => {}
+                                Ok(_) => continue,
                                 Err(_) => {
+                                    // Dropped connection, so pop goes the weasel
                                     widget_stack.pop();
                                 }
                             }
                         }
-                    },
+                        // Default key commands
+                        match ch {
+                            'c' => {
+                                if event.modifiers == KeyModifiers::CONTROL {
+                                    self.tx_cmd.send(Command::Quit).unwrap();
+                                }
+                            }
+                            'i' => {
+                                self.tx_cmd.send(Command::Info).unwrap();
+                            }
+                            'q' => {
+                                self.tx_cmd.send(Command::Quit).unwrap();
+                            }
+                            _ => {}
+                        }
+                    }
                     KeyCode::Esc => {
                         tracing::debug!("{:?}", Command::Quit);
                         self.tx_cmd.send(Command::Quit).unwrap();
