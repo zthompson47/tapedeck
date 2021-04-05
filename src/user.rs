@@ -1,18 +1,29 @@
-use std::thread::{self, JoinHandle};
+use std::thread;
 
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use tokio::sync::mpsc;
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use futures::future::FutureExt;
+use tokio::{
+    sync::{
+        mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+        oneshot,
+    },
+    task::unconstrained,
+};
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Info,
-    ListTracks,
-    Meter,
+    //ListTracks,
+    //Meter,
     NextTrack,
     PrevTrack,
     Print(String),
-    Spectrum,
-    Volume(LevelDelta),
+    //ScrollLeft(usize),
+    //ScrollRight(usize),
+    ScrollUp(usize),
+    ScrollDown(usize),
+    //Spectrum,
+    //Volume(LevelDelta),
     Quit,
 }
 
@@ -22,62 +33,146 @@ pub enum LevelDelta {
     PercentDown(usize),
 }
 
-pub fn start_ui(tx_cmd: mpsc::UnboundedSender<Command>) -> JoinHandle<()> {
-    thread::spawn(move || loop {
-        if let Event::Key(event) = event::read().unwrap() { match event.code {
-        //match event::read().unwrap() {
-            //Event::Key(event) => match event.code {
-                KeyCode::Char(ch) => match ch {
-                    'c' => {
-                        if event.modifiers == KeyModifiers::CONTROL {
-                            tx_cmd.send(Command::Quit).unwrap();
+pub struct User {
+    tx_cmd: UnboundedSender<Command>,
+    tx_user: UnboundedSender<UserCommand>,
+    rx_user: UnboundedReceiver<UserCommand>,
+}
+
+#[derive(Clone)]
+pub struct UserHandle {
+    pub tx_user: UnboundedSender<UserCommand>,
+}
+
+impl UserHandle {
+    pub async fn take_input(&self) -> UnboundedReceiver<KeyEvent> {
+        let (tx, rx) = oneshot::channel::<UnboundedReceiver<KeyEvent>>();
+        self.tx_user.send(UserCommand::TakeInput(tx)).unwrap();
+
+        rx.await.unwrap()
+    }
+}
+
+#[derive(Debug)]
+pub enum UserCommand {
+    TakeInput(oneshot::Sender<UnboundedReceiver<KeyEvent>>),
+}
+
+impl User {
+    pub fn new(tx_cmd: UnboundedSender<Command>) -> Self {
+        let (tx_user, rx_user) = unbounded_channel::<UserCommand>();
+        Self {
+            tx_cmd,
+            tx_user,
+            rx_user,
+        }
+    }
+
+    pub fn get_handle(&self) -> UserHandle {
+        UserHandle {
+            tx_user: self.tx_user.clone(),
+        }
+    }
+
+    pub async fn run(self) {
+        // Listen for keyboard and mouse events from separate thread
+        let (tx, mut rx) = unbounded_channel::<Event>();
+        {
+            //
+            let tx = tx.clone();
+            thread::spawn(move || loop {
+                while let Ok(event) = event::read() {
+                    tx.send(event).unwrap();
+                }
+            });
+        }
+
+        let (tx_widget_stack, mut rx_widget_stack) = unbounded_channel();
+
+        {
+            // Handle incoming commands
+            let mut rx_user = self.rx_user;
+            tokio::spawn(async move {
+                while let Some(command) = rx_user.recv().await {
+                    match command {
+                        UserCommand::TakeInput(tx_oneshot) => {
+                            let (tx, rx) = unbounded_channel();
+
+                            //widget_stack.push(tx);
+                            tx_widget_stack.send(tx).unwrap();
+
+                            tx_oneshot.send(rx).unwrap();
                         }
                     }
-                    'i' => {
-                        tx_cmd.send(Command::Info).unwrap();
+                }
+            });
+        }
+
+        let mut widget_stack: Vec<UnboundedSender<KeyEvent>> = Vec::new();
+
+        while let Some(event) = rx.recv().await {
+            // Check for a new widget to take over the input
+            if let Some(Some(wot)) = unconstrained(rx_widget_stack.recv()).now_or_never() {
+                widget_stack.push(wot);
+            }
+            match event {
+                Event::Key(event) => match event.code {
+                    KeyCode::Char(ch) => {
+                        if widget_stack.is_empty() {
+                            match ch {
+                                'c' => {
+                                    if event.modifiers == KeyModifiers::CONTROL {
+                                        self.tx_cmd.send(Command::Quit).unwrap();
+                                    }
+                                }
+                                'i' => {
+                                    self.tx_cmd.send(Command::Info).unwrap();
+                                }
+                                'j' => {
+                                    use crossterm::{terminal::ScrollUp, QueueableCommand};
+                                    use std::io::Write;
+                                    let mut stdout = std::io::stdout();
+                                    stdout.queue(ScrollUp(2)).unwrap();
+                                    stdout.flush().unwrap();
+                                }
+                                'k' => {
+                                    use crossterm::{terminal::ScrollDown, QueueableCommand};
+                                    use std::io::Write;
+                                    let mut stdout = std::io::stdout();
+                                    stdout.queue(ScrollDown(2)).unwrap();
+                                    stdout.flush().unwrap();
+                                }
+                                'q' => {
+                                    self.tx_cmd.send(Command::Quit).unwrap();
+                                }
+                                _ => {}
+                            }
+                        } else {
+                            match widget_stack[widget_stack.len() - 1].send(event) {
+                                Ok(_) => {}
+                                Err(_) => {
+                                    widget_stack.pop();
+                                }
+                            }
+                        }
+                    },
+                    KeyCode::Esc => {
+                        tracing::debug!("{:?}", Command::Quit);
+                        self.tx_cmd.send(Command::Quit).unwrap();
                     }
-                    'g' => {
-                        use std::io::Write;
-                        use crossterm::{terminal::{size, SetSize}, QueueableCommand};
-                        let mut stdout = std::io::stdout();
-                        stdout.queue(SetSize(10, 10)).unwrap();
-                        print!("{:?}\r\n", size().unwrap());
-                        stdout.flush().unwrap();
+                    KeyCode::Left => {
+                        tracing::debug!("{:?}", Command::PrevTrack);
+                        self.tx_cmd.send(Command::PrevTrack).unwrap();
                     }
-                    'j' => {
-                        use std::io::Write;
-                        use crossterm::{terminal::ScrollUp, QueueableCommand};
-                        let mut stdout = std::io::stdout();
-                        stdout.queue(ScrollUp(2)).unwrap();
-                        stdout.flush().unwrap();
-                    }
-                    'k' => {
-                        use std::io::Write;
-                        use crossterm::{terminal::ScrollDown, QueueableCommand};
-                        let mut stdout = std::io::stdout();
-                        stdout.queue(ScrollDown(2)).unwrap();
-                        stdout.flush().unwrap();
-                    }
-                    'q' => {
-                        tx_cmd.send(Command::Quit).unwrap();
+                    KeyCode::Right => {
+                        tracing::debug!("{:?}", Command::NextTrack);
+                        self.tx_cmd.send(Command::NextTrack).unwrap();
                     }
                     _ => {}
                 },
-                KeyCode::Esc => {
-                    tracing::debug!("{:?}", Command::Quit);
-                    tx_cmd.send(Command::Quit).unwrap();
-                }
-                KeyCode::Left => {
-                    tracing::debug!("{:?}", Command::PrevTrack);
-                    tx_cmd.send(Command::PrevTrack).unwrap();
-                }
-                KeyCode::Right => {
-                    tracing::debug!("{:?}", Command::NextTrack);
-                    tx_cmd.send(Command::NextTrack).unwrap();
-                }
-                _ => {}
+                Event::Mouse(_) => {}
+                Event::Resize(_, _) => {}
             }
-            //_ => {}
         }
-    })
+    }
 }

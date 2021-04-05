@@ -41,17 +41,15 @@ impl TransportHandle {
     }
     pub async fn now_playing(&self) -> Result<MediaFile, anyhow::Error> {
         let (tx, rx) = oneshot::channel();
-        self.tx_transport_cmd.send(TransportCommand::NowPlaying(tx))?;
+        self.tx_transport_cmd
+            .send(TransportCommand::NowPlaying(tx))?;
         Ok(rx.await?)
     }
 }
 
 impl Transport {
     /// Create a new Transport out of channel endpoints.
-    pub fn new(
-        tx_audio: mpsc::Sender<Bytes>,
-        //rx_transport_cmd: mpsc::UnboundedReceiver<TransportCommand>,
-    ) -> Self {
+    pub fn new(tx_audio: mpsc::Sender<Bytes>) -> Self {
         let (tx_transport_cmd, rx_transport_cmd) = mpsc::unbounded_channel();
         Self {
             files: Vec::new(),
@@ -62,10 +60,10 @@ impl Transport {
         }
     }
 
-    pub fn get_handle(&mut self) -> TransportHandle {
-        let (tx_transport_cmd, rx_transport_cmd) = mpsc::unbounded_channel::<TransportCommand>();
-        self.rx_transport_cmd = rx_transport_cmd;
-        TransportHandle { tx_transport_cmd }
+    pub fn get_handle(&self) -> TransportHandle {
+        TransportHandle {
+            tx_transport_cmd: self.tx_transport_cmd.clone(),
+        }
     }
 
     /// Add files to the end of the playlist.
@@ -89,9 +87,10 @@ impl Transport {
                 Err(_) => break 'play,
             };
 
+            let path = std::path::PathBuf::from(&self.now_playing().location);
             tx_cmd
                 .send(Command::Print(
-                    self.now_playing().location.to_string_lossy().to_string(), // TODO ? Cow?
+                    path.file_name().unwrap().to_string_lossy().to_string(), // TODO ? Cow?
                 ))
                 .unwrap(); // TODO got panic here pressing esc to exit..
 

@@ -9,6 +9,7 @@ anyhow = "1.0.38"
 bytes = "0.6.0"
 chrono = "0.4.19"
 crossterm = { version = "0.18.2", features = ["event-stream"] }
+futures = "0.3"
 libc = "0.2.81"
 libpulse-binding = "2.23.0"
 libpulse-simple-binding = "2.23.0"
@@ -20,12 +21,13 @@ tracing = { version = "0.1.22", features = ["log"] }
 tracing-subscriber = "0.2.15"
 tracing-appender = "0.1.2"
 tracing-log = "0.1.1"
+unicode-width = "0.1.8"
 mime_guess = "2.0.3"
 nom = "6.0.1"
 pls = "0.2.2"
 reqwest = "0.11.1"
 sqlx = { version = "0.5", features = ["runtime-tokio-rustls", "sqlite", "offline"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.4", features = ["full"] }
 url = "2.2.0"
 walkdir = "2.3.1"
 

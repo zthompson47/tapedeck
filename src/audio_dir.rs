@@ -175,6 +175,14 @@ impl MediaDir {
         result
     }
 
+    pub async fn _audio_files(&self, pool: &SqlitePool) -> Option<Vec<MediaFile>> {
+        if let Some(id) = self.id {
+            Some(Self::get_audio_files(pool, id).await)
+        } else {
+            None
+        }
+    }
+
     /// Return a list of all audio files in a particular audio directory.
     pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<MediaFile> {
         let mut files = sqlx::query!(
