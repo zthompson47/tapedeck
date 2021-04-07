@@ -1,4 +1,4 @@
-# ⦗✇ Tapedeck ✇⦘
+# Tapedeck
 
 A cli tool for organizing and enjoying music collections.
 
@@ -15,7 +15,8 @@ $ tdsearch -l
 1. ~/tunes/Greatest Hits Album
 2. ~/tunes/Foxboro 90
 $ tdplay -i 2
-$ # then it's <i> for pager of text files in dir (<j>/<k> scroll)
+$ # then it's <i> for pager of text files in dir
+$ #   (<j>/<k> scroll)
 $ # <left>/<right> is next/prev
 $ # <q> or <esc> or <ctrl-c> is quit
 $ tdplay https://somafm.com/7soul.pls
