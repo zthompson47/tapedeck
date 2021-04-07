@@ -7,7 +7,6 @@ use libpulse_binding::{
 };
 use libpulse_simple_binding::Simple as Pulse;
 use tokio::sync::mpsc;
-use tracing::debug;
 
 pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
     thread::spawn(move || {
@@ -17,7 +16,6 @@ pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
             rate: 44100,
         };
         if !spec.is_valid() {
-            debug!("Audio spec not valid: {:?}", spec);
             panic!("Audio spec not valid: {:?}", spec);
         }
 
@@ -33,7 +31,6 @@ pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
         ) {
             Ok(pulse) => pulse,
             Err(e) => {
-                debug!("Can't connect PulseAudio: {:?}", e);
                 panic!("Can't connect PulseAudio: {:?}", e);
             }
         };
@@ -41,7 +38,7 @@ pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
         while let Some(buf) = rx_audio.blocking_recv() {
             match pulse.write(&buf) {
                 Ok(_) => {}
-                Err(e) => debug!("{:?}", e.to_string()),
+                Err(_e) => {}  // tracing::debug!("{:?}", e.to_string()),
             }
             //pulse.drain().unwrap(); TODO makes audio breakup.. but backpressure?
         }

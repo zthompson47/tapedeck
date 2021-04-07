@@ -16,15 +16,7 @@ pub enum Command {
     NextTrack,
     PrevTrack,
     Print(String),
-    ScrollUp(usize),
-    ScrollDown(usize),
     Quit,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum LevelDelta {
-    PercentUp(usize),
-    PercentDown(usize),
 }
 
 pub struct User {
@@ -71,36 +63,29 @@ impl User {
     pub async fn run(self) {
         // Listen for keyboard and mouse events from separate thread
         let (tx, mut rx) = unbounded_channel::<Event>();
-        {
-            let tx = tx;
-            thread::spawn(move || loop {
-                while let Ok(event) = event::read() {
-                    tx.send(event).unwrap();
-                }
-            });
-        }
+        thread::spawn(move || loop {
+            while let Ok(event) = event::read() {
+                tx.send(event).unwrap();
+            }
+        });
 
-        // Channel to retrieve widget handles from UserCommand listener task
+        // Handle incoming commands
         let (tx_widget_stack, mut rx_widget_stack) = unbounded_channel();
-
-        {
-            // Handle incoming commands
-            let mut rx_user = self.rx_user;
-            tokio::spawn(async move {
-                while let Some(command) = rx_user.recv().await {
-                    match command {
-                        UserCommand::TakeInput(tx_oneshot) => {
-                            // Create channeel for intercepted events
-                            let (tx, rx) = unbounded_channel();
-                            // Push tx end on widget stack
-                            tx_widget_stack.send(tx).unwrap();
-                            // Return rx
-                            tx_oneshot.send(rx).unwrap();
-                        }
+        let mut rx_user = self.rx_user;
+        tokio::spawn(async move {
+            while let Some(command) = rx_user.recv().await {
+                match command {
+                    UserCommand::TakeInput(tx_oneshot) => {
+                        // Create channeel for intercepted events
+                        let (tx, rx) = unbounded_channel();
+                        // Push tx end on widget stack
+                        tx_widget_stack.send(tx).unwrap();
+                        // Return rx
+                        tx_oneshot.send(rx).unwrap();
                     }
                 }
-            });
-        }
+            }
+        });
 
         let mut widget_stack: Vec<UnboundedSender<KeyEvent>> = Vec::new();
 
@@ -113,11 +98,11 @@ impl User {
                 Event::Key(event) => match event.code {
                     KeyCode::Char(ch) => {
                         if !widget_stack.is_empty() {
-                            // Try to send events to top widget
+                            // Try to send events to widget at top of stack
                             match widget_stack[widget_stack.len() - 1].send(event) {
                                 Ok(_) => continue,
                                 Err(_) => {
-                                    // Dropped connection, so pop goes the weasel
+                                    // Remove dropped connection
                                     widget_stack.pop();
                                 }
                             }
@@ -139,15 +124,12 @@ impl User {
                         }
                     }
                     KeyCode::Esc => {
-                        tracing::debug!("{:?}", Command::Quit);
                         self.tx_cmd.send(Command::Quit).unwrap();
                     }
                     KeyCode::Left => {
-                        tracing::debug!("{:?}", Command::PrevTrack);
                         self.tx_cmd.send(Command::PrevTrack).unwrap();
                     }
                     KeyCode::Right => {
-                        tracing::debug!("{:?}", Command::NextTrack);
                         self.tx_cmd.send(Command::NextTrack).unwrap();
                     }
                     _ => {}

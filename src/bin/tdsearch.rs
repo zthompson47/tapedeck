@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 use tapedeck::{
     audio_dir::{MaybeFetched, MediaDir, MediaFile, MediaType},
     database::get_database,
-    logging::start_logging,
+    logging::dev_log,
 };
 
 #[derive(StructOpt)]
@@ -20,6 +20,7 @@ struct Cli {
 }
 
 fn main() -> Result<(), anyhow::Error> {
+    let _ = dev_log();
     let args = Cli::from_args();
     let rt = Runtime::new()?;
 
@@ -34,7 +35,6 @@ fn main() -> Result<(), anyhow::Error> {
 
 /// Get all audio_dir records from the database and print them to stdout.
 async fn list_dirs() -> Result<(), anyhow::Error> {
-    let _logging = start_logging("tapedeck");
     let db = get_database("tapedeck").await?;
     let audio_dirs = MediaDir::get_audio_dirs(&db).await;
 
@@ -52,7 +52,6 @@ async fn list_dirs() -> Result<(), anyhow::Error> {
 
 /// Search search_path for audio directories and save to database.
 async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
-    let _logging = start_logging("tapedeck");
     let db = get_database("tapedeck").await?;
     let mut mime_type_count: HashMap<String, usize> = HashMap::new();
     let mut new_files: Vec<MediaFile> = Vec::new();

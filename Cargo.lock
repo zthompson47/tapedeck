@@ -1773,6 +1773,7 @@ dependencies = [
  "chrono",
  "crossterm",
  "futures",
+ "lazy_static",
  "libc",
  "libpulse-binding",
  "libpulse-simple-binding",

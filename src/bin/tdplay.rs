@@ -13,7 +13,7 @@ use tokio::{runtime::Runtime, sync::mpsc};
 use tapedeck::{
     audio_dir::{MediaDir, MediaFile},
     database::get_database,
-    logging::start_logging,
+    logging::dev_log,
     screen::{Screen, ScreenHandle},
     system::start_pulse,
     terminal::with_raw_mode,
@@ -30,6 +30,7 @@ struct Cli {
 }
 
 fn main() -> Result<(), anyhow::Error> {
+    let _ = dev_log();
     let args = Cli::from_args();
 
     // Set window title
@@ -45,7 +46,6 @@ fn main() -> Result<(), anyhow::Error> {
     })?;
 
     // Restore terminal
-    //stdout.queue(LeaveAlternateScreen)?;
     stdout.queue(cursor::Show)?;
     println!();
     stdout.flush()?;
@@ -54,8 +54,6 @@ fn main() -> Result<(), anyhow::Error> {
 }
 
 async fn run(args: Cli) -> Result<(), anyhow::Error> {
-    let _logging = start_logging("tapedeck");
-
     // Create sqlite connection pool
     let db = get_database("tapedeck").await?;
 
@@ -108,7 +106,6 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
             Command::PrevTrack => playback.prev_track()?,
             Command::Print(message) => screen.status(message),
             Command::Quit => break,
-            _ => {}
         }
     }
 
@@ -143,14 +140,14 @@ impl Pager {
                 KeyCode::Char(ch) => match ch {
                     'q' => break,
                     'j' => {
-                        tracing::debug!("j:{}:{}", self.cursor, self.lines.len());
+                        //tracing::debug!("j:{}:{}", self.cursor, self.lines.len());
                         if self.cursor < self.lines.len() - 2 {
                             self.cursor += 1;
                             screen.draw(&self.lines[self.cursor..].to_vec());
                         }
                     },
                     'k' => {
-                        tracing::debug!("k:{}:{}", self.cursor, self.lines.len());
+                        //tracing::debug!("k:{}:{}", self.cursor, self.lines.len());
                         if self.cursor > 0 {
                             self.cursor -= 1;
                             screen.draw(&self.lines[self.cursor..].to_vec());

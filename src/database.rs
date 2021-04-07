@@ -27,15 +27,11 @@ pub async fn get_database(app_name: &str) -> Result<Pool<Sqlite>, anyhow::Error>
     // Make sure the directory exists
     fs::create_dir_all(&dir).await?;
 
-    tracing::debug!("Created db dir: {:?}", dir.to_str());
-
     // Compose connection string
     let mut url = dir.clone().join(app_name);
     url.set_extension("db");
     let mut conn_str = String::from("sqlite:");
     conn_str.push_str(url.to_str().unwrap_or(":memory:"));  // TODO memory fallback??
-
-    tracing::debug!("Connection str: {:?}", &conn_str);
 
     // Create if it doesn't exist
     Sqlite::create_database(&conn_str).await?;
