@@ -40,7 +40,8 @@ pub fn dev_log() -> Option<WorkerGuard> {
         })
         .with_writer(log_writer)
         .event_format(SimpleFmt)
-        .try_init().unwrap();
+        .try_init()
+        .ok();
 
     Some(guard)
 }

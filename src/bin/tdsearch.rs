@@ -20,7 +20,7 @@ struct Cli {
 }
 
 fn main() -> Result<(), anyhow::Error> {
-    let _ = dev_log();
+    let _log = dev_log();
     let args = Cli::from_args();
     let rt = Runtime::new()?;
 

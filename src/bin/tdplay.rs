@@ -1,14 +1,9 @@
 use std::{io::Write, path::PathBuf};
 
 use bytes::Bytes;
-use crossterm::{
-    cursor,
-    event::KeyCode,
-    terminal::{LeaveAlternateScreen, SetTitle},
-    QueueableCommand,
-};
+use crossterm::{event::KeyCode, terminal::LeaveAlternateScreen, QueueableCommand};
 use structopt::StructOpt;
-use tokio::{runtime::Runtime, sync::mpsc};
+use tokio::sync::mpsc;
 
 use tapedeck::{
     audio_dir::{MediaDir, MediaFile},
@@ -16,7 +11,7 @@ use tapedeck::{
     logging::dev_log,
     screen::{Screen, ScreenHandle},
     system::start_pulse,
-    terminal::with_raw_mode,
+    terminal::TuiMode,
     transport::Transport,
     user::{Command, User, UserHandle},
 };
@@ -29,33 +24,20 @@ struct Cli {
     music_url: Option<PathBuf>,
 }
 
-fn main() -> Result<(), anyhow::Error> {
-    let _ = dev_log();
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
+    let _log = dev_log();
     let args = Cli::from_args();
 
-    // Set window title
-    let mut stdout = std::io::stdout();
-    stdout.queue(SetTitle("⦗✇ Tapedeck ✇⦘"))?;
-    stdout.queue(cursor::Hide)?;
-    stdout.flush()?;
-
-    // Enable unbuffered, non-blocking stdin for reactive keyboard input
-    with_raw_mode(|| {
-        let rt = Runtime::new().unwrap();
-        rt.block_on(run(args)).unwrap();
-    })?;
-
-    // Restore terminal
-    stdout.queue(cursor::Show)?;
-    println!();
-    stdout.flush()?;
+    if let Ok(_tui) = TuiMode::enter() {
+        run(args).await?;
+    }
 
     Ok(())
 }
 
 async fn run(args: Cli) -> Result<(), anyhow::Error> {
-    // Create sqlite connection pool
-    let db = get_database("tapedeck").await?;
+    let pool = get_database("tapedeck").await?;
 
     // Channel for processing top-level commands
     let (tx_cmd, mut rx_cmd) = mpsc::unbounded_channel();
@@ -80,7 +62,7 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
         tokio::spawn(transport.run(tx_cmd.clone()));
     } else if let Some(id) = args.id {
         // Play an audio directory from the database
-        let music_files = MediaDir::get_audio_files(&db, id).await;
+        let music_files = MediaDir::get_audio_files(&pool, id).await;
         transport.extend(music_files);
         tokio::spawn(transport.run(tx_cmd.clone()));
     }
@@ -92,8 +74,8 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
         match command {
             Command::Info => {
                 // Concatenate and display text files from media directory
-                if let Some(directory) = playback.now_playing().await?.directory(&db).await {
-                    if let Some(text_files) = directory.text_files(&db).await {
+                if let Some(directory) = playback.now_playing().await?.directory(&pool).await {
+                    if let Some(text_files) = directory.text_files(&pool).await {
                         if let Ok(mut pager) = Pager::new(text_files).await {
                             let screen = screen.clone();
                             let ui = ui.clone();
@@ -145,14 +127,14 @@ impl Pager {
                             self.cursor += 1;
                             screen.draw(&self.lines[self.cursor..].to_vec());
                         }
-                    },
+                    }
                     'k' => {
                         //tracing::debug!("k:{}:{}", self.cursor, self.lines.len());
                         if self.cursor > 0 {
                             self.cursor -= 1;
                             screen.draw(&self.lines[self.cursor..].to_vec());
                         }
-                    },
+                    }
                     _ => {}
                 },
                 _ => {}

@@ -1,12 +1,42 @@
-use std::panic;
+use std::{io::Write, panic};
 
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::{
+    cursor,
+    terminal::{disable_raw_mode, enable_raw_mode, SetTitle},
+    QueueableCommand,
+};
+
+pub struct TuiMode;
+
+impl TuiMode {
+    pub fn enter() -> Result<Self, anyhow::Error> {
+        let mut stdout = std::io::stdout();
+
+        stdout.queue(SetTitle("⦗✇ Tapedeck ✇⦘"))?;
+        stdout.queue(cursor::Hide)?;
+        stdout.flush()?;
+
+        enable_raw_mode()?;
+
+        Ok(Self)
+    }
+}
+
+impl Drop for TuiMode {
+    fn drop(&mut self) {
+        let mut stdout = std::io::stdout();
+        let _ = disable_raw_mode();
+        let _ = stdout.queue(cursor::Show);
+        println!();
+        let _ = stdout.flush();
+    }
+}
 
 /// Create a scope with the terminal in raw mode.  Attempt to catch
 /// panics so we can disable raw mode before exiting.
 ///
 /// <https://www.ralfj.de/blog/2019/11/25/how-to-panic-in-rust.html>
-pub fn with_raw_mode(f: impl FnOnce() + panic::UnwindSafe) -> Result<(), anyhow::Error> {
+pub fn _with_raw_mode(f: impl FnOnce() + panic::UnwindSafe) -> Result<(), anyhow::Error> {
     let saved_hook = panic::take_hook();
     panic::set_hook(Box::new(|p| {
         // Extract unformatted error message from panic:
