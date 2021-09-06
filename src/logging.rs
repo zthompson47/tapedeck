@@ -97,7 +97,7 @@ mod tests {
     fn generate_log_records() {
         // Use tempdir for log files
         let dir = tempdir().unwrap().into_path();
-        env::set_var("XDG_CACHE_DIR", &dir);
+        env::set_var("TAPEDECK_DEV_DIR", &dir);
         let _logging = dev_log();
 
         // Try both logging crates
@@ -105,7 +105,8 @@ mod tests {
         tracing::debug!("test tracing DEBUG");
 
         // Confirm log file created
-        let dir = dir.join("appname-test");
+        //let dir = dir.join("appname-test");
+        //let dir = dir.join("log");
         assert!(dir.is_dir());
         let log_file = dir.join("log");
         assert!(log_file.is_file());

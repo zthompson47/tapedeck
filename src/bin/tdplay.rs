@@ -106,7 +106,7 @@ impl Pager {
             lines.push_str(&tokio::fs::read_to_string(file.location).await?);
         }
         Ok(Self {
-            lines: lines.split("\n").map(|line| line.to_owned()).collect(),
+            lines: lines.split('\n').map(|line| line.to_owned()).collect(),
             cursor: 0,
         })
     }
@@ -118,8 +118,8 @@ impl Pager {
         // Take user input channel
         let mut rx_input = ui.take_input().await;
         while let Some(event) = rx_input.recv().await {
-            match event.code {
-                KeyCode::Char(ch) => match ch {
+            if let KeyCode::Char(ch) = event.code {
+                match ch {
                     'q' => break,
                     'j' => {
                         //tracing::debug!("j:{}:{}", self.cursor, self.lines.len());
@@ -136,8 +136,7 @@ impl Pager {
                         }
                     }
                     _ => {}
-                },
-                _ => {}
+                }
             }
         }
 

@@ -26,6 +26,12 @@ pub enum ScreenCommand {
     SetStatus(String),
 }
 
+impl Default for Screen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Screen {
     /// Create a channel and spawn a background task to process incoming commands.
     pub fn new() -> Self {
@@ -110,9 +116,10 @@ impl ScreenHandle {
             .unwrap();
     }
     /// Draw a page of text to the screen.
-    pub fn draw(&self, lines: &Vec<String>) {
+    //pub fn draw(&self, lines: &Vec<String>) {
+    pub fn draw(&self, lines: &[String]) {
         self.tx_screen_cmd
-            .send(ScreenCommand::Draw(lines.clone()))
+            .send(ScreenCommand::Draw(lines.to_owned()))
             .unwrap();
     }
     /// Enter the terminal's alternate screen.

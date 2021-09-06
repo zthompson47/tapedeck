@@ -197,6 +197,7 @@ impl MediaDir {
 
         let mut result = Vec::new();
 
+        /*
         while let Ok(file) = files.try_next().await {
             match file {
                 Some(row) => result.push(MediaFile {
@@ -208,6 +209,16 @@ impl MediaDir {
                 }),
                 None => break,
             }
+        }
+        */
+        while let Ok(Some(row)) = files.try_next().await {
+            result.push(MediaFile {
+                id: Some(row.id),
+                location: OsString::from_vec(row.location),
+                file_size: row.file_size,
+                directory: MaybeFetched::Id(id),
+                ..MediaFile::default()
+            })
         }
 
         result
@@ -234,6 +245,7 @@ impl MediaDir {
         .fetch(pool);
         let mut result = Vec::new();
 
+        /*
         while let Ok(file) = files.try_next().await {
             match file {
                 Some(row) => result.push(MediaFile {
@@ -244,6 +256,15 @@ impl MediaDir {
                 }),
                 None => break,
             }
+        }
+        */
+        while let Ok(Some(row)) = files.try_next().await {
+            result.push(MediaFile {
+                id: Some(row.id),
+                location: OsString::from_vec(row.location),
+                file_size: row.file_size,
+                ..MediaFile::default()
+            })
         }
 
         result

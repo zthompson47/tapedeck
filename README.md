@@ -14,9 +14,7 @@ $ tdsearch ~/tunes
 $ tdsearch -l
 1. ~/tunes/albums/Greatest Hits
 2. ~/tunes/shows/gd1973-05-26-kezar.shnf
-3. ~/tunes/shows/gd1977-05-18-barton.flacf
-4. ~/tunes/shows/Foxboro '90
-$ tdplay -i 4
+$ tdplay -i 2
 $ # <left>/<right> next/prev
 $ # <q> | <esc> | <ctrl-c> quit
 $ # <i> pager of text files in dir
