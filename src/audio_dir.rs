@@ -5,8 +5,9 @@ use std::path::PathBuf;
 
 use crossterm::style::Colorize;
 use mime_guess::{self, Mime};
-use sqlx::sqlite::SqlitePool;
-use tokio_stream::StreamExt;
+use rusqlite::{named_params, params};
+
+use crate::database::Store;
 
 /// A directory containing media files.
 #[derive(Clone, Debug, Default)]
@@ -94,30 +95,31 @@ impl From<PathBuf> for MediaDir {
 }
 
 impl MediaFile {
-    pub async fn directory(&self, pool: &SqlitePool) -> Option<MediaDir> {
-        match &self.directory {
+    pub async fn directory(&self, store: &Store) -> Option<MediaDir> {
+        tokio::task::block_in_place(|| match &self.directory {
             MaybeFetched::Id(id) => {
-                let directory = sqlx::query!(
-                    r#"
+                let mut stmt = store
+                    .conn
+                    .prepare(
+                        r#"
                     select id, location, last_modified
                     from media_dir
                     where id = ?
                     "#,
-                    id
-                )
-                .fetch_one(pool)
-                .await
-                .unwrap();
-                Some(MediaDir {
-                    id: Some(directory.id),
-                    last_modified: directory.last_modified.unwrap(),
-                    location: OsString::from_vec(directory.location),
+                    )
+                    .unwrap();
+                let mut rows = stmt.query(params![id]).unwrap();
+
+                rows.next().unwrap().map(|directory| MediaDir {
+                    id: Some(directory.get(0).unwrap()),
+                    last_modified: directory.get(2).unwrap(),
+                    location: OsString::from_vec(directory.get(1).unwrap()),
                     files: Vec::new(),
                 })
             }
             MaybeFetched::Record(r) => Some(r.to_owned()),
             MaybeFetched::None => None,
-        }
+        })
     }
 }
 
@@ -127,192 +129,158 @@ impl MediaDir {
     }
 
     /// Find a list of directories by matching path with a pattern.
-    pub async fn get_with_path(pool: &SqlitePool, pattern: &str) -> Vec<MediaDir> {
-        let mut dirs = sqlx::query!(
-            r#"
+    pub async fn get_with_path(store: &Store, pattern: &str) -> Vec<MediaDir> {
+        tokio::task::block_in_place(|| {
+            let mut stmt = store
+                .conn
+                .prepare(
+                    r#"
             select id, location, last_modified
             from media_dir
             where location like ?
             "#,
-            pattern
-        )
-        .fetch(pool);
+                )
+                .unwrap();
+            let rows = stmt
+                .query_map([pattern], |row| {
+                    Ok(MediaDir {
+                        id: Some(row.get(0)?),
+                        last_modified: row.get(2).unwrap(), // TODO!
+                        location: OsString::from_vec(row.get(1)?),
+                        ..MediaDir::default()
+                    })
+                })
+                .unwrap();
 
-        let mut result = Vec::new();
-
-        while let Ok(Some(row)) = dirs.try_next().await {
-            result.push(MediaDir {
-                id: Some(row.id),
-                location: OsString::from_vec(row.location),
-                ..MediaDir::default()
-            });
-        }
-
-        result
+            rows.map(|x| x.unwrap()).collect()
+        })
     }
 
-    /// Return a list of all audio directories.
-    pub async fn get_audio_dirs(pool: &SqlitePool) -> Vec<MediaDir> {
-        let mut rows = sqlx::query!(
-            r#"
+    pub async fn get_audio_dirs(store: &Store) -> Result<Vec<MediaDir>, anyhow::Error> {
+        tokio::task::block_in_place(|| {
+            let mut stmt = store.conn.prepare(
+                r#"
             select id, location, last_modified
             from media_dir
             "#,
-        )
-        .fetch(pool);
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok(MediaDir {
+                    id: Some(row.get(0)?),
+                    last_modified: row.get(2).unwrap(), // TODO!
+                    location: OsString::from_vec(row.get(1)?),
+                    ..MediaDir::default()
+                })
+            })?;
 
-        let mut result = Vec::new();
-
-        while let Ok(Some(row)) = rows.try_next().await {
-            result.push(MediaDir {
-                id: Some(row.id),
-                last_modified: row.last_modified.unwrap(), // TODO!
-                location: OsString::from_vec(row.location),
-                ..MediaDir::default()
-            });
-        }
-
-        result
-    }
-
-    pub async fn _audio_files(&self, pool: &SqlitePool) -> Option<Vec<MediaFile>> {
-        if let Some(id) = self.id {
-            Some(Self::get_audio_files(pool, id).await)
-        } else {
-            None
-        }
+            Ok(rows.map(|x| x.unwrap()).collect())
+        })
     }
 
     /// Return a list of all audio files in a particular audio directory.
-    pub async fn get_audio_files(pool: &SqlitePool, id: i64) -> Vec<MediaFile> {
-        let mut files = sqlx::query!(
-            r#"
+    pub async fn get_audio_files(store: &Store, id: i64) -> Result<Vec<MediaFile>, anyhow::Error> {
+        tokio::task::block_in_place(|| {
+            let mut stmt = store.conn.prepare(
+                r#"
             select id, location, file_size
             from media_file
             where media_dir_id = ?
             "#,
-            id
-        )
-        .fetch(pool);
-
-        let mut result = Vec::new();
-
-        /*
-        while let Ok(file) = files.try_next().await {
-            match file {
-                Some(row) => result.push(MediaFile {
-                    id: Some(row.id),
-                    location: OsString::from_vec(row.location),
-                    file_size: row.file_size,
+            )?;
+            let rows = stmt.query_map([id], |row| {
+                Ok(MediaFile {
+                    id: Some(row.get(0)?),
+                    location: OsString::from_vec(row.get(1)?),
+                    file_size: row.get(2)?,
                     directory: MaybeFetched::Id(id),
                     ..MediaFile::default()
-                }),
-                None => break,
-            }
-        }
-        */
-        while let Ok(Some(row)) = files.try_next().await {
-            result.push(MediaFile {
-                id: Some(row.id),
-                location: OsString::from_vec(row.location),
-                file_size: row.file_size,
-                directory: MaybeFetched::Id(id),
-                ..MediaFile::default()
-            })
-        }
+                })
+            })?;
 
-        result
+            Ok(rows.map(|x| x.unwrap()).collect())
+        })
     }
 
-    pub async fn text_files(&self, pool: &SqlitePool) -> Option<Vec<MediaFile>> {
+    pub async fn text_files(&self, store: &Store) -> Option<Vec<MediaFile>> {
         if let Some(id) = self.id {
-            Some(Self::get_text_files(pool, id).await)
+            Some(Self::get_text_files(store, id).await)
         } else {
             None
         }
     }
 
-    pub async fn get_text_files(pool: &SqlitePool, id: i64) -> Vec<MediaFile> {
-        let mut files = sqlx::query!(
-            r#"
+    pub async fn get_text_files(store: &Store, id: i64) -> Vec<MediaFile> {
+        tokio::task::block_in_place(|| {
+            let mut stmt = store
+                .conn
+                .prepare(
+                    r#"
             select id, location, file_size
             from media_file
             where media_dir_id = ?
             and media_type like 'text/%'
             "#,
-            id
-        )
-        .fetch(pool);
-        let mut result = Vec::new();
+                )
+                .unwrap();
 
-        /*
-        while let Ok(file) = files.try_next().await {
-            match file {
-                Some(row) => result.push(MediaFile {
-                    id: Some(row.id),
-                    location: OsString::from_vec(row.location),
-                    file_size: row.file_size,
-                    ..MediaFile::default()
-                }),
-                None => break,
-            }
-        }
-        */
-        while let Ok(Some(row)) = files.try_next().await {
-            result.push(MediaFile {
-                id: Some(row.id),
-                location: OsString::from_vec(row.location),
-                file_size: row.file_size,
-                ..MediaFile::default()
-            })
-        }
+            let rows = stmt
+                .query_map([id], |row| {
+                    Ok(MediaFile {
+                        id: Some(row.get(0).unwrap()),
+                        location: OsString::from_vec(row.get(1).unwrap()),
+                        file_size: row.get(2).unwrap(),
+                        ..MediaFile::default()
+                    })
+                })
+                .unwrap();
 
-        result
+            rows.map(|x| x.unwrap()).collect()
+        })
     }
 
     /// Save all records to database.
-    pub async fn db_insert(&mut self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
-        let transaction = pool.begin().await?;
-
-        // Create MediaDir record
-        let location = self.location.as_bytes();
-        let insert_id = sqlx::query!(
-            r#"
+    pub async fn db_insert(&mut self, store: &Store) -> Result<(), anyhow::Error> {
+        tokio::task::block_in_place(|| {
+            let mut stmt = store
+                .conn
+                .prepare(
+                    "\
             insert into media_dir(location, last_modified)
-            values(?1, ?2)
-            "#,
-            location,
-            self.last_modified,
-        )
-        .execute(pool)
-        .await?
-        .last_insert_rowid();
+            values(:location, :last_modified)",
+                )
+                .unwrap();
+            let location = self.location.as_bytes();
 
-        self.id = Some(insert_id);
+            self.id = Some(stmt.insert(named_params! {
+                ":location": location,
+                ":last_modified": self.last_modified,
+            })?);
 
-        // Create MediaFile records
-        for audio_file in &mut self.files[..] {
-            let location = audio_file.location.as_bytes();
-            let media_type = audio_file.media_type.to_string();
+            // Create MediaFile records
+            for audio_file in &mut self.files[..] {
+                let location = audio_file.location.as_bytes();
+                let media_type = audio_file.media_type.to_string();
 
-            let audio_file_id = sqlx::query!(
-                r#"
+                let mut stmt = store
+                    .conn
+                    .prepare(
+                        "\
                 insert into media_file(location, media_type, file_size, media_dir_id)
-                values(?1, ?2, ?3, ?4);
-                "#,
-                location,
-                media_type,
-                audio_file.file_size,
-                self.id,
-            )
-            .execute(pool)
-            .await?
-            .last_insert_rowid();
+                values(:location, :media_type, :file_size, :media_dir_id);
+            ",
+                    )
+                    .unwrap();
 
-            audio_file.id = Some(audio_file_id);
-        }
+                audio_file.id = Some(stmt.insert(named_params! {
+                    ":location": location,
+                    ":media_type": media_type,
+                    ":file_size": audio_file.file_size,
+                    ":media_dir_id": self.id,
+                })?);
+            }
 
-        transaction.commit().await
+            Ok(())
+        })
     }
 }
 

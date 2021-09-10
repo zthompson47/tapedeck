@@ -2,12 +2,12 @@ use std::ffi::OsString;
 
 use tapedeck::{
     audio_dir::{MediaDir, MediaFile},
-    database::get_test_database,
+    database::get_test_store,
 };
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn audio_dir_create_and_read() {
-    let db = get_test_database().await.unwrap();
+    let store = get_test_store().await.unwrap();
 
     // Create records
     let mut dir = MediaDir::default();
@@ -22,7 +22,7 @@ async fn audio_dir_create_and_read() {
     dir.extend(vec![MediaFile::default()]);
     dir.last_modified = 47;
 
-    dir.db_insert(&db).await.unwrap();
+    dir.db_insert(&store).await.unwrap();
 
     assert_eq!(dir.id.unwrap(), 1);
     assert_eq!(dir.files().len(), 5);
@@ -31,11 +31,11 @@ async fn audio_dir_create_and_read() {
 
     drop(dir);
 
-    let dirs = MediaDir::get_audio_dirs(&db).await;
+    let dirs = MediaDir::get_audio_dirs(&store).await.unwrap();
     assert_eq!(dirs.len(), 1);
     assert_eq!(dirs[0].last_modified, 47);
 
-    let files = MediaDir::get_audio_files(&db, 1).await;
+    let files = MediaDir::get_audio_files(&store, 1).await.unwrap();
     println!("{:#?}", files);
     assert_eq!(files.len(), 5);
     assert_eq!(files[3].file_size, Some(42));

@@ -8,9 +8,6 @@ mkdir -p "$RUNDIR"
 export RUST_LOG="DEBUG"
 export TAPEDECK_DEV_DIR=`realpath "$RUNDIR"`
 
-# Sqlx needs a database to compile
-cargo sqlx db setup
-
 if [ "$1" == "init" ]; then
     exit 0
 fi

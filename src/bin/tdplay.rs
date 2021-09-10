@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 
 use tapedeck::{
     audio_dir::{MediaDir, MediaFile},
-    database::get_database,
+    database::Store,
     logging::dev_log,
     screen::{Screen, ScreenHandle},
     system::start_pulse,
@@ -37,7 +37,7 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 
 async fn run(args: Cli) -> Result<(), anyhow::Error> {
-    let pool = get_database("tapedeck").await?;
+    let store = Store::new()?;
 
     // Channel for processing top-level commands
     let (tx_cmd, mut rx_cmd) = mpsc::unbounded_channel();
@@ -61,8 +61,11 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
         transport.extend(vec![MediaFile::from(music_url)]);
         tokio::spawn(transport.run(tx_cmd.clone()));
     } else if let Some(id) = args.id {
+        //---------------------------------------------------------------------------
         // Play an audio directory from the database
-        let music_files = MediaDir::get_audio_files(&pool, id).await;
+        //let music_files = MediaDir::get_audio_files(&pool, id).await;
+        let music_files = MediaDir::get_audio_files(&store, id).await.unwrap();
+        //---------------------------------------------------------------------------
         transport.extend(music_files);
         tokio::spawn(transport.run(tx_cmd.clone()));
     }
@@ -74,8 +77,8 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
         match command {
             Command::Info => {
                 // Concatenate and display text files from media directory
-                if let Some(directory) = playback.now_playing().await?.directory(&pool).await {
-                    if let Some(text_files) = directory.text_files(&pool).await {
+                if let Some(directory) = playback.now_playing().await?.directory(&store).await {
+                    if let Some(text_files) = directory.text_files(&store).await {
                         if let Ok(mut pager) = Pager::new(text_files).await {
                             let screen = screen.clone();
                             let ui = ui.clone();

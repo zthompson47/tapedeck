@@ -7,7 +7,7 @@ use walkdir::WalkDir;
 
 use tapedeck::{
     audio_dir::{MaybeFetched, MediaDir, MediaFile, MediaType},
-    database::get_database,
+    database::Store,
     logging::dev_log,
 };
 
@@ -35,8 +35,9 @@ fn main() -> Result<(), anyhow::Error> {
 
 /// Get all audio_dir records from the database and print them to stdout.
 async fn list_dirs() -> Result<(), anyhow::Error> {
-    let db = get_database("tapedeck").await?;
-    let audio_dirs = MediaDir::get_audio_dirs(&db).await;
+    //let db = get_database("tapedeck").await?;
+    let store = Store::new().unwrap();
+    let audio_dirs = MediaDir::get_audio_dirs(&store).await.unwrap();
 
     for dir in audio_dirs.iter() {
         println!(
@@ -52,7 +53,8 @@ async fn list_dirs() -> Result<(), anyhow::Error> {
 
 /// Search search_path for audio directories and save to database.
 async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
-    let db = get_database("tapedeck").await?;
+    //let db = get_database("tapedeck").await?;
+    let store = Store::new().unwrap();
     let mut mime_type_count: HashMap<String, usize> = HashMap::new();
     let mut new_files: Vec<MediaFile> = Vec::new();
     let mut found_audio = false;
@@ -123,7 +125,7 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
                 audio_dir.last_modified = timestamp(entry.metadata()?.modified()?);
 
                 // Insert into database
-                match audio_dir.db_insert(&db).await {
+                match audio_dir.db_insert(&store).await {
                     Ok(_) => print!("{}", &audio_dir),
                     Err(_) => println!("dup"), // TODO
                 }

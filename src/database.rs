@@ -1,54 +1,83 @@
 use std::{env, path::PathBuf};
 
-use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePool, Pool, Sqlite};
-use tokio::fs;
+use rusqlite::Connection;
 
-/// Prepare the database and return a handle.
-pub async fn get_database(app_name: &str) -> Result<Pool<Sqlite>, anyhow::Error> {
-    // Look for APPNAME_DEV_DIR environment variable to override default
-    let mut dev_dir = app_name.to_uppercase();
-    dev_dir.push_str("_DEV_DIR");
+const APP: &str = "tapedeck";
 
-    // Find directory location from environment
-    let dir = match env::var(&dev_dir) {
-        Ok(dir) => PathBuf::from(dir),
-        Err(_) => match env::var("XDG_DATA_HOME") {
-            Ok(dir) => PathBuf::from(dir).join(app_name),
-            Err(_) => match env::var("HOME") {
-                Ok(dir) => PathBuf::from(dir)
-                    .join(".local")
-                    .join("share")
-                    .join(app_name),
-                Err(_) => PathBuf::from("/tmp").join(app_name),
-            },
-        },
-    };
-
-    // Make sure the directory exists
-    fs::create_dir_all(&dir).await?;
-
-    // Compose connection string
-    let mut url = dir.clone().join(app_name);
-    url.set_extension("db");
-    let mut conn_str = String::from("sqlite:");
-    conn_str.push_str(url.to_str().unwrap_or(":memory:"));  // TODO memory fallback??
-
-    // Create if it doesn't exist
-    Sqlite::create_database(&conn_str).await?;
-
-    // Connect and migrate
-    let db = SqlitePool::connect(&conn_str).await?;
-    let migrator = sqlx::migrate!();
-    migrator.run(&db).await?;
-
-    Ok(db)
+#[derive(Debug)]
+pub struct Store {
+    pub conn: Connection,
 }
 
-pub async fn get_test_database() -> Result<Pool<Sqlite>, anyhow::Error> {
-    let conn_str = String::from("sqlite::memory:");
-    let db = SqlitePool::connect(&conn_str).await?;
-    let migrator = sqlx::migrate!();
-    migrator.run(&db).await?;
+impl Store {
+    pub fn new() -> Result<Self, anyhow::Error> {
+        Store::with_base_dir(None)
+    }
 
-    Ok(db)
+    pub fn with_base_dir(base_dir: Option<PathBuf>) -> Result<Self, anyhow::Error> {
+        let db_path = match base_dir {
+            Some(dir) => dir,
+            None => match env::var("XDG_DATA_HOME") {
+                Ok(dir) => PathBuf::from(dir).join(APP),
+                Err(_) => match env::var("HOME") {
+                    Ok(dir) => PathBuf::from(dir).join(".local").join("share").join(APP),
+                    Err(_) => PathBuf::from("/tmp").join(APP),
+                },
+            },
+        };
+
+        // Make sure the database directory exists
+        let db_path = match std::fs::create_dir_all(&db_path) {
+            Ok(_) => Some(db_path),
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Some(db_path),
+            Err(_) => None,
+        };
+
+        // Open the database, which creates a new db file if needed
+        let conn = match db_path {
+            Some(mut db_path) => {
+                db_path = db_path.join(APP);
+                db_path.set_extension("db");
+                Connection::open(&db_path)?
+            }
+            None => Connection::open_in_memory()?,
+        };
+
+        // Create tables if this is a new database
+        if conn.prepare("select max(id) from version").is_err() {
+            init_db(&conn)?;
+        }
+
+        Ok(Store { conn })
+    }
+}
+
+pub async fn get_test_store() -> Result<Store, anyhow::Error> {
+    let store = Connection::open_in_memory()?;
+    init_db(&store)?;
+    Ok(Store { conn: store })
+}
+
+fn init_db(conn: &Connection) -> Result<(), anyhow::Error> {
+    conn.execute_batch(
+        "\
+        create table media_dir(
+            id integer primary key not null,
+            last_modified integer,
+            location blob unique not null
+        );
+        create table media_file(
+            id integer primary key not null,
+            media_dir_id integer not null,
+            file_size integer,
+            media_type text,
+            location blob unique not null,
+            foreign key(media_dir_id) references media_dir(id)
+        );
+        create table version(id int);
+        insert into version values(1);
+        ",
+    )?;
+
+    Ok(())
 }
