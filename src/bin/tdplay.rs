@@ -64,7 +64,7 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
         //---------------------------------------------------------------------------
         // Play an audio directory from the database
         //let music_files = MediaDir::get_audio_files(&pool, id).await;
-        let music_files = MediaDir::get_audio_files(&store, id).await.unwrap();
+        let music_files = MediaDir::get_audio_files(&store, id).unwrap();
         //---------------------------------------------------------------------------
         transport.extend(music_files);
         tokio::spawn(transport.run(tx_cmd.clone()));
@@ -77,8 +77,8 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
         match command {
             Command::Info => {
                 // Concatenate and display text files from media directory
-                if let Some(directory) = playback.now_playing().await?.directory(&store).await {
-                    if let Some(text_files) = directory.text_files(&store).await {
+                if let Some(directory) = playback.now_playing().await?.directory(&store) {
+                    if let Some(text_files) = directory.text_files(&store) {
                         if let Ok(mut pager) = Pager::new(text_files).await {
                             let screen = screen.clone();
                             let ui = ui.clone();

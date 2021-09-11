@@ -37,7 +37,7 @@ fn main() -> Result<(), anyhow::Error> {
 async fn list_dirs() -> Result<(), anyhow::Error> {
     //let db = get_database("tapedeck").await?;
     let store = Store::new().unwrap();
-    let audio_dirs = MediaDir::get_audio_dirs(&store).await.unwrap();
+    let audio_dirs = MediaDir::get_audio_dirs(&store).unwrap();
 
     for dir in audio_dirs.iter() {
         println!(
@@ -125,7 +125,7 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
                 audio_dir.last_modified = timestamp(entry.metadata()?.modified()?);
 
                 // Insert into database
-                match audio_dir.db_insert(&store).await {
+                match audio_dir.db_insert(&store) {
                     Ok(_) => print!("{}", &audio_dir),
                     Err(_) => println!("dup"), // TODO
                 }

@@ -95,7 +95,7 @@ impl From<PathBuf> for MediaDir {
 }
 
 impl MediaFile {
-    pub async fn directory(&self, store: &Store) -> Option<MediaDir> {
+    pub fn directory(&self, store: &Store) -> Option<MediaDir> {
         tokio::task::block_in_place(|| match &self.directory {
             MaybeFetched::Id(id) => {
                 let mut stmt = store
@@ -129,7 +129,7 @@ impl MediaDir {
     }
 
     /// Find a list of directories by matching path with a pattern.
-    pub async fn get_with_path(store: &Store, pattern: &str) -> Vec<MediaDir> {
+    pub fn get_with_path(store: &Store, pattern: &str) -> Vec<MediaDir> {
         tokio::task::block_in_place(|| {
             let mut stmt = store
                 .conn
@@ -156,7 +156,7 @@ impl MediaDir {
         })
     }
 
-    pub async fn get_audio_dirs(store: &Store) -> Result<Vec<MediaDir>, anyhow::Error> {
+    pub fn get_audio_dirs(store: &Store) -> Result<Vec<MediaDir>, anyhow::Error> {
         tokio::task::block_in_place(|| {
             let mut stmt = store.conn.prepare(
                 r#"
@@ -178,7 +178,7 @@ impl MediaDir {
     }
 
     /// Return a list of all audio files in a particular audio directory.
-    pub async fn get_audio_files(store: &Store, id: i64) -> Result<Vec<MediaFile>, anyhow::Error> {
+    pub fn get_audio_files(store: &Store, id: i64) -> Result<Vec<MediaFile>, anyhow::Error> {
         tokio::task::block_in_place(|| {
             let mut stmt = store.conn.prepare(
                 r#"
@@ -201,15 +201,11 @@ impl MediaDir {
         })
     }
 
-    pub async fn text_files(&self, store: &Store) -> Option<Vec<MediaFile>> {
-        if let Some(id) = self.id {
-            Some(Self::get_text_files(store, id).await)
-        } else {
-            None
-        }
+    pub fn text_files(&self, store: &Store) -> Option<Vec<MediaFile>> {
+        self.id.map(|id| Self::get_text_files(store, id))
     }
 
-    pub async fn get_text_files(store: &Store, id: i64) -> Vec<MediaFile> {
+    pub fn get_text_files(store: &Store, id: i64) -> Vec<MediaFile> {
         tokio::task::block_in_place(|| {
             let mut stmt = store
                 .conn
@@ -239,7 +235,7 @@ impl MediaDir {
     }
 
     /// Save all records to database.
-    pub async fn db_insert(&mut self, store: &Store) -> Result<(), anyhow::Error> {
+    pub fn db_insert(&mut self, store: &Store) -> Result<(), anyhow::Error> {
         tokio::task::block_in_place(|| {
             let mut stmt = store
                 .conn
