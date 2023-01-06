@@ -38,7 +38,7 @@ pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
         while let Some(buf) = rx_audio.blocking_recv() {
             match pulse.write(&buf) {
                 Ok(_) => {}
-                Err(_e) => {}  // tracing::debug!("{:?}", e.to_string()),
+                Err(_e) => {} // tracing::debug!("{:?}", e.to_string()),
             }
             //pulse.drain().unwrap(); TODO makes audio breakup.. but backpressure?
         }

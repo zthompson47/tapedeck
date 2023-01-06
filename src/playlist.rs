@@ -67,9 +67,7 @@ pub fn parse(input: &str) -> std::result::Result<Playlist, String> {
                                 match key_type {
                                     Rule::file_idx => entry.file = val.to_string(),
                                     Rule::title_idx => entry.title = val.to_string(),
-                                    Rule::length_idx => {
-                                        entry.length = val.parse::<i32>().unwrap()
-                                    }
+                                    Rule::length_idx => entry.length = val.parse::<i32>().unwrap(),
                                     _ => {}
                                 }
                             }
