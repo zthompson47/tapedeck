@@ -51,7 +51,7 @@ pub fn _with_raw_mode(f: impl FnOnce() + panic::UnwindSafe) -> Result<(), anyhow
         };
 
         // Override the default error message print handler
-        eprintln!("PANIC! {} {:?}", msg, p);
+        eprintln!("PANIC! {msg} {p:?}");
     }));
 
     // Run the provided code in raw mode

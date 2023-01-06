@@ -134,7 +134,7 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
             }
         }
     }
-    println!("{:#?}", mime_type_count);
+    println!("{mime_type_count:#?}");
 
     Ok(())
 }

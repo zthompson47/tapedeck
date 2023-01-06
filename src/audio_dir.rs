@@ -61,7 +61,7 @@ impl fmt::Display for MediaType {
             "{}",
             match self {
                 Self::Audio(m) => m.essence_str().to_string(),
-                Self::Checksum(m) => format!("checksum/{}", m.to_str().unwrap_or("-").to_string()),
+                Self::Checksum(m) => format!("checksum/{}", m.to_str().unwrap_or("-")),
                 Self::Unknown => "-/-".to_string(),
             }
         )
@@ -308,7 +308,7 @@ impl fmt::Display for MediaDir {
                 writeln!(f, " {}{}", file, "...".to_string().green())?;
                 break;
             } else {
-                writeln!(f, " {}", file)?;
+                writeln!(f, " {file}")?;
                 i += 1
             }
         }

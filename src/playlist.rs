@@ -4,7 +4,7 @@ use pest::Parser;
 
 #[derive(Clone, Debug, Default)]
 pub struct Playlist {
-    has_header: bool,
+    _has_header: bool,
     number_of_entries: u32,
     version: String,
     entries: HashMap<u32, Entry>,
@@ -65,10 +65,10 @@ pub fn parse(input: &str) -> std::result::Result<Playlist, String> {
                             if let Some(val) = kv_iter.next() {
                                 let val = val.into_inner().as_str();
                                 match key_type {
-                                    Rule::file_idx => (*entry).file = val.to_string(),
-                                    Rule::title_idx => (*entry).title = val.to_string(),
+                                    Rule::file_idx => entry.file = val.to_string(),
+                                    Rule::title_idx => entry.title = val.to_string(),
                                     Rule::length_idx => {
-                                        (*entry).length = val.parse::<i32>().unwrap()
+                                        entry.length = val.parse::<i32>().unwrap()
                                     }
                                     _ => {}
                                 }

@@ -116,7 +116,7 @@ impl Pager {
 
     async fn run(&mut self, ui: UserHandle, screen: ScreenHandle) {
         screen.enter_alternate_screen();
-        screen.draw(&self.lines[self.cursor..].to_vec());
+        screen.draw(&self.lines[self.cursor..]);
 
         // Take user input channel
         let mut rx_input = ui.take_input().await;
@@ -128,14 +128,14 @@ impl Pager {
                         //tracing::debug!("j:{}:{}", self.cursor, self.lines.len());
                         if self.cursor < self.lines.len() - 2 {
                             self.cursor += 1;
-                            screen.draw(&self.lines[self.cursor..].to_vec());
+                            screen.draw(&self.lines[self.cursor..]);
                         }
                     }
                     'k' => {
                         //tracing::debug!("k:{}:{}", self.cursor, self.lines.len());
                         if self.cursor > 0 {
                             self.cursor -= 1;
-                            screen.draw(&self.lines[self.cursor..].to_vec());
+                            screen.draw(&self.lines[self.cursor..]);
                         }
                     }
                     _ => {}

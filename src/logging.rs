@@ -77,7 +77,7 @@ where
             String::from(":").yellow(),
             meta.line().unwrap_or(0).to_string().yellow(),
         );
-        write!(writer, "{}", message).unwrap();
+        write!(writer, "{message}").unwrap();
         ctx.format_fields(writer, event)?;
         writeln!(writer)
     }

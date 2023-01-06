@@ -60,12 +60,10 @@ impl Screen {
                         stdout.queue(cursor::MoveTo(0, 0)).unwrap();
                         // TODO: u16 conversion might panic?
                         let (_x, y) = terminal::size().unwrap();
-                        for i in 0..(std::cmp::min(y as usize - 1, lines.len() - 1)) {
+                        (0..(std::cmp::min(y as usize - 1, lines.len() - 1))).for_each(|i| {
                             stdout.queue(cursor::MoveTo(0, i as u16)).unwrap();
-                            stdout
-                                .queue(style::Print(lines[i as usize].as_str()))
-                                .unwrap();
-                        }
+                            stdout.queue(style::Print(lines[i].as_str())).unwrap();
+                        });
                         stdout.flush().unwrap();
                         self.draw_status();
                     }
@@ -86,7 +84,7 @@ impl Screen {
         let xx = (x - 2) as usize; // TODO: check predicted unicode widths
         let mut stdout = std::io::stdout();
         stdout.queue(cursor::MoveTo(0, y)).unwrap();
-        print!("{}", truncate(self.status.as_str(), xx as usize).green());
+        print!("{}", truncate(self.status.as_str(), xx).green());
         std::io::stdout().flush().unwrap();
     }
 }
