@@ -2,7 +2,7 @@ use std::io::Write;
 
 use crossterm::{
     cursor,
-    style::{self, Colorize},
+    style::{self, Stylize},
     terminal, QueueableCommand,
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};

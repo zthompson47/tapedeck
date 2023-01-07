@@ -136,6 +136,9 @@ impl User {
                 },
                 Event::Mouse(_) => {}
                 Event::Resize(_, _) => {}
+                Event::FocusGained => {}
+                Event::FocusLost => {}
+                Event::Paste(_) => {}
             }
         }
     }

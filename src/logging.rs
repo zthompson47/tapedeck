@@ -1,31 +1,34 @@
-use std::{
-    env,
-    fmt::{Error, Write},
-    path::PathBuf,
-};
+use std::env;
+use std::fmt::Error;
+use std::path::Path;
 
-use crossterm::style::Colorize;
-use tracing::{subscriber::Subscriber, Event};
-use tracing_appender::{non_blocking::WorkerGuard, rolling};
+use crossterm::style::Stylize;
+
+use tracing::subscriber::Subscriber;
+use tracing::Event;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_appender::rolling;
 use tracing_log::NormalizeEvent;
 use tracing_subscriber::{
-    fmt::time::{ChronoLocal, FormatTime},
-    fmt::{FmtContext, FormatEvent, FormatFields},
+    filter::EnvFilter,
+    fmt::{format::Writer, FmtContext, FormatEvent, FormatFields},
     registry::LookupSpan,
-    EnvFilter,
 };
 
-pub fn dev_log() -> Option<WorkerGuard> {
-    let log_dir = match env::var("TAPEDECK_DEV_DIR") {
-        Ok(dir) => PathBuf::from(&dir), //Path::new(&dir).to_path_buf(),
-        Err(_) => PathBuf::from("."),
+pub type Guard = WorkerGuard;
+
+#[must_use]
+pub fn init() -> Option<Guard> {
+    let log_dir = match env::var("TD_LOG_DIR") {
+        Ok(dir) => Path::new(&dir).to_path_buf(),
+        Err(_) => Path::new(".").to_path_buf(),
     };
     let file_appender = rolling::never(log_dir, String::from("log"));
     let (log_writer, guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
         .with_writer(log_writer)
+        .with_env_filter(EnvFilter::from_default_env())
         .event_format(SimpleFmt)
         .try_init()
         .ok();
@@ -43,29 +46,26 @@ where
     fn format_event(
         &self,
         ctx: &FmtContext<'_, S, N>,
-        writer: &mut dyn Write,
+        mut writer: Writer<'_>,
         event: &Event<'_>,
     ) -> Result<(), Error> {
-        // Create timestamp
-        let time_format = "%b %d %I:%M:%S%.6f %p";
-        let mut time_now = String::new();
-        ChronoLocal::with_format(time_format.into()).format_time(&mut time_now)?;
-
+        let time_now = chrono::Local::now();
+        let time_now = time_now.format("%b %d %I:%M:%S%.6f %p").to_string();
         // Get line numbers from log crate events
         let normalized_meta = event.normalized_metadata();
         let meta = normalized_meta.as_ref().unwrap_or_else(|| event.metadata());
-
-        // Write formatted log record
-        let time = time_now.grey();
-        let level = meta.level().to_string().blue();
-        let file = meta.file().unwrap_or("").to_string().yellow();
-        let colon = String::from(":").yellow();
-        let line = meta.line().unwrap_or(0).to_string().yellow();
-
-        let message = format!("{time} {level} {file}{colon}{line} ");
+        let message = format!(
+            "{} {} {}{}{} ",
+            time_now.grey(),
+            meta.level().to_string().blue(),
+            meta.file().unwrap_or("").to_string().yellow(),
+            String::from(":").yellow(),
+            meta.line().unwrap_or(0).to_string().yellow(),
+        );
 
         write!(writer, "{message}").unwrap();
-        ctx.format_fields(writer, event)?;
+        // Write actual log message with newline
+        ctx.format_fields(writer.by_ref(), event)?;
         writeln!(writer)
     }
 }
@@ -74,9 +74,7 @@ where
 mod tests {
     use std::{env, fs, io::prelude::*, io::BufReader};
 
-    use log;
     use tempfile::tempdir;
-    use tracing;
 
     use super::*;
 
@@ -84,8 +82,9 @@ mod tests {
     fn generate_log_records() {
         // Use tempdir for log files
         let dir = tempdir().unwrap().into_path();
-        env::set_var("TAPEDECK_DEV_DIR", &dir);
-        let _logging = dev_log();
+        env::set_var("RUST_LOG", "debug");
+        env::set_current_dir(&dir).unwrap();
+        let _log = init();
 
         // Try both logging crates
         log::info!("test log INFO");
@@ -95,18 +94,19 @@ mod tests {
         //let dir = dir.join("appname-test");
         //let dir = dir.join("log");
         assert!(dir.is_dir());
-        let log_file = dir.join("log");
+        let log_file = dir.join("log.txt");
         assert!(log_file.is_file());
 
         // Drop logging guard to flush logs.
         // TODO test it??  failure below was intermittent
         //   hmm still dropping records after this drop..
-        drop(_logging);
+        drop(_log);
 
         // Check log records
         let file = fs::File::open(&log_file).unwrap();
         let buf_reader = BufReader::new(file);
         let log_records: Vec<String> = buf_reader.lines().map(|x| x.unwrap()).collect();
+        println!("---------->> {:?}", log_records);
         assert!(log_records.len() >= 2);
         let idx = log_records.len() - 2;
 

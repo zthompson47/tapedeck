@@ -1,6 +1,6 @@
-use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, path::PathBuf};
+use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, path::PathBuf, time::SystemTime};
 
-use crossterm::style::Colorize;
+use crossterm::style::Stylize;
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
 use walkdir::WalkDir;
@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 use tapedeck::{
     audio_dir::{MaybeFetched, MediaDir, MediaFile, MediaType},
     database::Store,
-    logging::dev_log,
+    logging,
 };
 
 #[derive(StructOpt)]
@@ -20,7 +20,7 @@ struct Cli {
 }
 
 fn main() -> Result<(), anyhow::Error> {
-    let _log = dev_log();
+    let _log = logging::init();
     let args = Cli::from_args();
     let rt = Runtime::new()?;
 
@@ -122,7 +122,12 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
                 // Create new MediaDir
                 let mut audio_dir = MediaDir::from(path.to_owned());
                 audio_dir.extend(std::mem::take(&mut new_files));
-                audio_dir.last_modified = timestamp(entry.metadata()?.modified()?);
+                //audio_dir.last_modified = timestamp(entry.metadata()?.modified()?);
+                audio_dir.last_modified = entry
+                    .metadata()?
+                    .modified()?
+                    .duration_since(SystemTime::UNIX_EPOCH)?
+                    .as_millis() as u64;
 
                 // Insert into database
                 match audio_dir.db_insert(&store) {
@@ -139,9 +144,11 @@ async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/*
 use chrono::{DateTime, Utc};
 use std::time::SystemTime;
 fn timestamp(t: SystemTime) -> i64 {
     let utc: DateTime<Utc> = DateTime::from(t);
     utc.timestamp_millis()
 }
+*/

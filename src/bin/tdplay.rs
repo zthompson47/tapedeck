@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 use tapedeck::{
     audio_dir::{MediaDir, MediaFile},
     database::Store,
-    logging::dev_log,
+    logging,
     screen::{Screen, ScreenHandle},
     system::start_pulse,
     terminal::TuiMode,
@@ -26,7 +26,8 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let _log = dev_log();
+    let _log = logging::init();
+    tracing::info!("START");
     let args = Cli::from_args();
 
     if let Ok(_tui) = TuiMode::enter() {
@@ -58,7 +59,9 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
     // Execute command line
     if let Some(music_url) = args.music_url {
         // Play one music url
-        transport.extend(vec![MediaFile::from(music_url)]);
+        let media_file = MediaFile::from(music_url);
+        tracing::info!("============>> media_file");
+        transport.extend(vec![media_file]);
         tokio::spawn(transport.run(tx_cmd.clone()));
     } else if let Some(id) = args.id {
         //---------------------------------------------------------------------------

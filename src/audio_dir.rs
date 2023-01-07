@@ -3,7 +3,7 @@ use std::fmt;
 use std::os::unix::ffi::{OsStrExt, OsStringExt}; // TODO system predicate
 use std::path::PathBuf;
 
-use crossterm::style::Colorize;
+use crossterm::style::Stylize;
 use mime_guess::{self, Mime};
 use rusqlite::{named_params, params};
 
@@ -13,7 +13,7 @@ use crate::database::Store;
 #[derive(Clone, Debug, Default)]
 pub struct MediaDir {
     pub id: Option<i64>,
-    pub last_modified: i64,
+    pub last_modified: u64,
     pub location: OsString,
     files: Vec<MediaFile>,
 }
