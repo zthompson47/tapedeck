@@ -24,8 +24,9 @@ pub async fn audio_from_url(url: &OsString) -> Command {
         .arg("-")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(Stdio::piped());
 
+    tracing::debug!("{cmd:?}");
     cmd
 }
 

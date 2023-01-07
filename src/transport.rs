@@ -83,10 +83,20 @@ impl Transport {
 
         'play: loop {
             // Get next file to play
-            let mut audio_reader = match self.get_reader_at_cursor().await {
-                Ok(reader) => reader,
-                Err(_) => break 'play,
+            let mut audio_child = match self.get_audio_child_at_cursor().await {
+                Ok(child) => child,
+                Err(err) => {
+                    tracing::error!("{err}");
+                    break 'play;
+                }
             };
+            let mut audio_reader = audio_child
+                .stdout
+                .take()
+                .ok_or_else(|| anyhow::Error::msg("could not take music file's stdout"))
+                .unwrap(); // TODO propagate error
+
+            let mut audio_err = audio_child.stderr.take().unwrap();
 
             let path = std::path::PathBuf::from(&self.now_playing().location);
             tx_cmd
@@ -101,9 +111,23 @@ impl Transport {
             const DOUBLE_TAP: Duration = Duration::from_millis(333);
             let start_time = Instant::now();
 
+            tracing::debug!("---------->> about to play at cursor {}", self.cursor);
+            tracing::debug!("---------->> audio_reader: {:?}", audio_reader);
+
             // Send audio file to output device
             while let Ok(len) = audio_reader.read(&mut buf).await {
+                //tracing::debug!("---------->> READING AUDIO OUTPUT");
                 if len == 0 {
+                    tracing::debug!("---------->> LEN IS 0");
+                    // TODO error handling in general
+                    let success = audio_child.wait().await.unwrap().success();
+                    if !success {
+                        let mut err_buf = String::new();
+                        audio_err.read_to_string(&mut err_buf).await.unwrap();
+                        tracing::debug!("{err_buf}");
+                        break;
+                    }
+                    tracing::debug!("====>> audio_child exit success: {success}");
                     self.cursor += 1;
                     continue 'play;
                 } else {
@@ -139,15 +163,15 @@ impl Transport {
     }
 
     /// Create a stream of audio data from the current playlist position.
-    async fn get_reader_at_cursor(&mut self) -> Result<process::ChildStdout, anyhow::Error> {
-        // TODO ! not returning reader, so bad name
+    async fn get_audio_child_at_cursor(&mut self) -> Result<process::Child, anyhow::Error> {
         if self.cursor >= self.files.len() {
-            return Err(anyhow::Error::msg("cursor index out of bounds, just quit"));
+            return Err(anyhow::Error::msg(format!(
+                "cursor index ({}) out of bounds ({}), just quit",
+                self.cursor,
+                self.files.len()
+            )));
         }
         let file_url = &self.now_playing().location;
-        let mut file = audio_from_url(file_url).await.spawn()?;
-        file.stdout
-            .take()
-            .ok_or_else(|| anyhow::Error::msg("could not take music file's stdout"))
+        Ok(audio_from_url(file_url).await.spawn()?)
     }
 }

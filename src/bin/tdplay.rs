@@ -3,7 +3,6 @@ use std::{io::Write, path::PathBuf};
 use bytes::Bytes;
 use clap::Parser;
 use crossterm::{event::KeyCode, terminal::LeaveAlternateScreen, QueueableCommand};
-//use structopt::StructOpt;
 use tokio::sync::mpsc;
 
 use tapedeck::{
@@ -61,7 +60,7 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
     if let Some(music_url) = args.music_url {
         // Play one music url
         let media_file = MediaFile::from(music_url);
-        tracing::info!("============>> media_file");
+        tracing::debug!("Got media_file from cli args: {media_file}");
         transport.extend(vec![media_file]);
         tokio::spawn(transport.run(tx_cmd.clone()));
     } else if let Some(id) = args.id {
