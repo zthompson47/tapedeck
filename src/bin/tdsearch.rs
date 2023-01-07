@@ -1,7 +1,8 @@
 use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, path::PathBuf, time::SystemTime};
 
+use clap::Parser;
 use crossterm::style::Stylize;
-use structopt::StructOpt;
+//use structopt::StructOpt;
 use tokio::runtime::Runtime;
 use walkdir::WalkDir;
 
@@ -11,17 +12,16 @@ use tapedeck::{
     logging,
 };
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Cli {
-    #[structopt(short, long)]
+    #[arg(short, long)]
     list: bool,
-    #[structopt(parse(from_os_str))]
     search_path: Option<PathBuf>,
 }
 
 fn main() -> Result<(), anyhow::Error> {
     let _log = logging::init();
-    let args = Cli::from_args();
+    let args = Cli::parse();
     let rt = Runtime::new()?;
 
     if args.list {

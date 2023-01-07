@@ -1,8 +1,9 @@
 use std::{io::Write, path::PathBuf};
 
 use bytes::Bytes;
+use clap::Parser;
 use crossterm::{event::KeyCode, terminal::LeaveAlternateScreen, QueueableCommand};
-use structopt::StructOpt;
+//use structopt::StructOpt;
 use tokio::sync::mpsc;
 
 use tapedeck::{
@@ -16,19 +17,19 @@ use tapedeck::{
     user::{Command, User, UserHandle},
 };
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Cli {
-    #[structopt(short, long)]
+    #[arg(short, long)]
     id: Option<i64>,
-    #[structopt(parse(from_os_str))]
     music_url: Option<PathBuf>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let _log = logging::init();
-    tracing::info!("START");
-    let args = Cli::from_args();
+    tracing::info!("Start tdplay");
+
+    let args = Cli::parse();
 
     if let Ok(_tui) = TuiMode::enter() {
         run(args).await?;
