@@ -21,6 +21,8 @@ struct Cli {
 
 fn main() -> Result<(), anyhow::Error> {
     let _log = logging::init();
+    tracing::info!("Start tdsearch");
+
     let args = Cli::parse();
     let rt = Runtime::new()?;
 
@@ -35,9 +37,8 @@ fn main() -> Result<(), anyhow::Error> {
 
 /// Get all audio_dir records from the database and print them to stdout.
 async fn list_dirs() -> Result<(), anyhow::Error> {
-    //let db = get_database("tapedeck").await?;
-    let store = Store::new().unwrap();
-    let audio_dirs = MediaDir::get_audio_dirs(&store).unwrap();
+    let store = Store::new()?;
+    let audio_dirs = MediaDir::get_audio_dirs(&store)?;
 
     for dir in audio_dirs.iter() {
         println!(
@@ -53,8 +54,7 @@ async fn list_dirs() -> Result<(), anyhow::Error> {
 
 /// Search search_path for audio directories and save to database.
 async fn import_dirs(search_path: PathBuf) -> Result<(), anyhow::Error> {
-    //let db = get_database("tapedeck").await?;
-    let store = Store::new().unwrap();
+    let store = Store::new()?;
     let mut mime_type_count: HashMap<String, usize> = HashMap::new();
     let mut new_files: Vec<MediaFile> = Vec::new();
     let mut found_audio = false;

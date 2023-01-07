@@ -68,7 +68,7 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
         //---------------------------------------------------------------------------
         // Play an audio directory from the database
         //let music_files = MediaDir::get_audio_files(&pool, id).await;
-        let music_files = MediaDir::get_audio_files(&store, id).unwrap();
+        let music_files = MediaDir::get_audio_files(&store, id)?;
         //---------------------------------------------------------------------------
         transport.extend(music_files);
         tokio::spawn(transport.run(tx_cmd.clone()));
