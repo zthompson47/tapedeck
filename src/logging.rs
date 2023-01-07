@@ -1,43 +1,30 @@
 use std::{
     env,
     fmt::{Error, Write},
-    path::Path,
+    path::PathBuf,
 };
 
 use crossterm::style::Colorize;
-use tracing::{
-    subscriber::Subscriber,
-    {Event, Level},
-};
+use tracing::{subscriber::Subscriber, Event};
 use tracing_appender::{non_blocking::WorkerGuard, rolling};
 use tracing_log::NormalizeEvent;
 use tracing_subscriber::{
     fmt::time::{ChronoLocal, FormatTime},
     fmt::{FmtContext, FormatEvent, FormatFields},
     registry::LookupSpan,
+    EnvFilter,
 };
 
 pub fn dev_log() -> Option<WorkerGuard> {
     let log_dir = match env::var("TAPEDECK_DEV_DIR") {
-        Ok(dir) => Path::new(&dir).to_path_buf(),
-        Err(_) => return None,
+        Ok(dir) => PathBuf::from(&dir), //Path::new(&dir).to_path_buf(),
+        Err(_) => PathBuf::from("."),
     };
-    let default_level = Level::INFO;
     let file_appender = rolling::never(log_dir, String::from("log"));
     let (log_writer, guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::fmt()
-        .with_max_level(match env::var("RUST_LOG") {
-            Ok(level) => match level.as_str() {
-                "info" | "INFO" => Level::INFO,
-                "warn" | "WARN" => Level::WARN,
-                "error" | "ERROR" => Level::ERROR,
-                "debug" | "DEBUG" => Level::DEBUG,
-                "trace" | "TRACE" => Level::TRACE,
-                _ => default_level,
-            },
-            _ => default_level,
-        })
+        .with_env_filter(EnvFilter::from_default_env())
         .with_writer(log_writer)
         .event_format(SimpleFmt)
         .try_init()
@@ -69,14 +56,14 @@ where
         let meta = normalized_meta.as_ref().unwrap_or_else(|| event.metadata());
 
         // Write formatted log record
-        let message = format!(
-            "{}{} {}{}{} ",
-            time_now.grey(),
-            meta.level().to_string().blue(),
-            meta.file().unwrap_or("").to_string().yellow(),
-            String::from(":").yellow(),
-            meta.line().unwrap_or(0).to_string().yellow(),
-        );
+        let time = time_now.grey();
+        let level = meta.level().to_string().blue();
+        let file = meta.file().unwrap_or("").to_string().yellow();
+        let colon = String::from(":").yellow();
+        let line = meta.line().unwrap_or(0).to_string().yellow();
+
+        let message = format!("{time} {level} {file}{colon}{line} ");
+
         write!(writer, "{message}").unwrap();
         ctx.format_fields(writer, event)?;
         writeln!(writer)
