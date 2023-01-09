@@ -2,7 +2,7 @@
 name = "tapedeck"
 version = "0.1.0"
 authors = ["Zach Thompson <zach@allotropic.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT"
 description = "A cli tool for organizing and enjoying music collections."
 homepage = "https://github.com/zthompson47/tapedeck"
