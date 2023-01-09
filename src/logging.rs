@@ -23,7 +23,7 @@ pub fn init() -> Option<Guard> {
         Ok(dir) => Path::new(&dir).to_path_buf(),
         Err(_) => Path::new(".").to_path_buf(),
     };
-    let file_appender = rolling::never(log_dir, String::from("log"));
+    let file_appender = rolling::never(log_dir, String::from("td_log"));
     let (log_writer, guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::fmt()

@@ -56,22 +56,16 @@ async fn run(args: Cli) -> Result<(), anyhow::Error> {
     let mut transport = Transport::new(tx_audio);
     let playback = transport.get_handle();
 
-    // Execute command line
-    if let Some(music_url) = args.music_url {
-        // Play one music url
-        let media_file = MediaFile::from(music_url);
-        tracing::debug!("Got media_file from cli args: {media_file}");
-        transport.extend(vec![media_file]);
-        tokio::spawn(transport.run(tx_cmd.clone()));
+    // Start playing the audio files.
+    let music_files = if let Some(music_url) = args.music_url {
+        vec![MediaFile::from(music_url)]
     } else if let Some(id) = args.id {
-        //---------------------------------------------------------------------------
-        // Play an audio directory from the database
-        //let music_files = MediaDir::get_audio_files(&pool, id).await;
-        let music_files = MediaDir::get_audio_files(&store, id)?;
-        //---------------------------------------------------------------------------
-        transport.extend(music_files);
-        tokio::spawn(transport.run(tx_cmd.clone()));
-    }
+        MediaDir::get_audio_files(&store, id)?
+    } else {
+        vec![]
+    };
+    transport.extend(music_files);
+    tokio::spawn(transport.run(tx_cmd.clone()));
 
     let screen = Screen::new().run();
 

@@ -16,7 +16,7 @@ pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
             rate: 44100,
         };
         if !spec.is_valid() {
-            panic!("Audio spec not valid: {:?}", spec);
+            panic!("Audio spec not valid: {spec:?}");
         }
 
         let pulse = match Pulse::new(
@@ -30,15 +30,15 @@ pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
             None,                // Use default buffering attributes
         ) {
             Ok(pulse) => pulse,
-            Err(e) => {
-                panic!("Can't connect PulseAudio: {:?}", e);
+            Err(err) => {
+                panic!("Can't connect to PulseAudio: {err:?}");
             }
         };
 
         while let Some(buf) = rx_audio.blocking_recv() {
             match pulse.write(&buf) {
                 Ok(_) => {}
-                Err(_e) => {} // tracing::debug!("{:?}", e.to_string()),
+                Err(err) => tracing::debug!("{err:?}"),
             }
             //pulse.drain().unwrap(); TODO makes audio breakup.. but backpressure?
         }

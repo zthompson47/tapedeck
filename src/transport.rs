@@ -116,7 +116,6 @@ impl Transport {
 
             // Send audio file to output device
             while let Ok(len) = audio_reader.read(&mut buf).await {
-                //tracing::debug!("---------->> READING AUDIO OUTPUT");
                 if len == 0 {
                     tracing::debug!("---------->> LEN IS 0");
                     // TODO error handling in general

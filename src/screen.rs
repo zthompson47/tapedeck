@@ -7,17 +7,17 @@ use crossterm::{
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-/// An interface to the terminal screen.
+/// An interface to the terminal screen
 pub struct Screen {
-    /// The current status message.
+    /// The current status message
     pub status: String,
-    /// Endpoint for sending commands to the screen.
+    /// Channel for sending commands to the screen
     pub tx_screen_cmd: UnboundedSender<ScreenCommand>,
-    /// Endpoint for receiving commands in the screen.
+    /// Channel for receiving commands in the screen
     pub rx_screen_cmd: UnboundedReceiver<ScreenCommand>,
 }
 
-/// Commands for a screen.
+/// Commands for a screen
 #[derive(Debug)]
 pub enum ScreenCommand {
     /// Draw lines of text to the screen.
