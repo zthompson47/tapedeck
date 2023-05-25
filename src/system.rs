@@ -9,7 +9,9 @@ use libpulse_simple_binding::Simple as Pulse;
 use tokio::sync::mpsc;
 
 pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
+    tracing::debug!("Spawning PulseAudio thread...");
     thread::spawn(move || {
+        tracing::debug!("INSIDE PulseAudio thread...");
         let spec = Spec {
             format: Format::S16le,
             channels: 2,
@@ -36,9 +38,11 @@ pub fn start_pulse(mut rx_audio: mpsc::Receiver<Bytes>) -> JoinHandle<()> {
         };
 
         while let Some(buf) = rx_audio.blocking_recv() {
-            match pulse.write(&buf) {
-                Ok(_) => {}
-                Err(err) => tracing::debug!("{err:?}"),
+            if buf.len() < 4096 {
+                tracing::debug!("------->>  PULSE got data {}", buf.len());
+            }
+            if let Err(err) = pulse.write(&buf) {
+                tracing::debug!("{err:?}");
             }
             //pulse.drain().unwrap(); TODO makes audio breakup.. but backpressure?
         }

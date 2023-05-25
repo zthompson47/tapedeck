@@ -130,10 +130,14 @@ impl Transport {
                     self.cursor += 1;
                     continue 'play;
                 } else {
+                    tracing::debug!("---------->> BEFORE copy_from_slice");
                     let chunk = Bytes::copy_from_slice(&buf[0..len]);
+                    tracing::debug!("---------->> AFTER copy_from_slice");
                     self.tx_audio.send(chunk).await.unwrap();
+                    tracing::debug!("---------->> AFTER tx_audio.send");
                 }
 
+                tracing::debug!("Before unconstrained - cursor is {}", self.cursor);
                 // Poll for transport commands that interrupt playback
                 if let Some(Some(cmd)) = unconstrained(self.rx_transport_cmd.recv()).now_or_never()
                 {
@@ -155,8 +159,10 @@ impl Transport {
                         }
                     }
                 }
+                tracing::debug!("End of while let - cursor is {}", self.cursor);
             }
             self.cursor += 1;
+            tracing::debug!("End of loop - increment cursor to {}", self.cursor);
         }
         tx_cmd.send(Command::Quit).unwrap();
     }
