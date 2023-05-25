@@ -41,17 +41,12 @@ impl<T> Default for MaybeFetched<T> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum MediaType {
     Audio(Mime),
     Checksum(OsString),
+    #[default]
     Unknown,
-}
-
-impl Default for MediaType {
-    fn default() -> Self {
-        MediaType::Unknown
-    }
 }
 
 impl fmt::Display for MediaType {
